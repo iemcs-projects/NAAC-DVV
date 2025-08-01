@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "db:gen": "node -e \"const { exec } = require('child_process'); const config = require('./src/config/config.json').development; const cmd = `sequelize-auto -h ${config.host} -d ${config.database} -u ${config.username} -x ${config.password} -p ${config.port || 3306} -o ./src/models --dialect mysql --esm --lang esm`; console.log('Running:', cmd); exec(cmd, (error, stdout, stderr) => { if (error) { console.error('Error:', error.message); return; } if (stderr) { console.error('Stderr:', stderr); } console.log('Stdout:', stdout); });\"",
+    "db:migrate": "sequelize db:migrate",
+    "db:sync": "node -e \"import { sequelize } from './src/config/database.js'; sequelize.sync({ alter: true, logging: console.log }).then(() => { console.log('Database synced successfully'); process.exit(0); }).catch(console.error);\"",
+    "db:force-sync": "node -e \"import { sequelize } from './src/config/database.js'; sequelize.sync({ force: true, logging: console.log }).then(() => { console.log('Database force synced successfully'); process.exit(0); }).catch(console.error);\"",
+    "db:init": "sequelize db:create && sequelize db:migrate"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@railway/cli": "^4.5.4",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "nodemon": "^3.1.10",
+    "sequelize": "^6.37.7",
+    "sqlite3": "^5.1.7",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "sequelize-auto": "^0.8.8",
+    "sequelize-cli": "^6.6.3"
+  }
+}
