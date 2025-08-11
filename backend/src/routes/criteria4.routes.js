@@ -8,12 +8,14 @@ import {
   createResponse424,
   createResponse432,
   createResponse441,
+  createResponse433,
   score413,
   score414,
   score422,
   score423,
   score424,
   score432,
+  score433,
   getResponsesByCriteriaCode 
 } from '../controllers/criteria4.controller.js';
 
@@ -39,6 +41,9 @@ router.route('/createResponse432')
 router.route('/createResponse441')
   .post(createResponse441);
 
+router.route('/createResponse433')
+  .post(createResponse433);
+
 // Score calculation routes
 router.route('/score413')
   .get(score413);
@@ -57,6 +62,9 @@ router.route('/score424')
 
 router.route('/score432')
   .get(score432);
+
+router.route('/score433')
+  .get(score433);
 
 // General purpose route
 router.route('/getResponsesByCriteriaCode/:criteriaCode')

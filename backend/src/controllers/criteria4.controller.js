@@ -13,6 +13,7 @@ const Criteria422 = db.response_4_2_2;
 const Criteria423 = db.response_4_2_3;
 const Criteria424 = db.response_4_2_4;
 const Criteria432 = db.response_4_3_2;
+const Criteria433 = db.response_4_3_3;
 const Criteria441 = db.response_4_4_1;
 const Score = db.scores;
 
@@ -69,15 +70,7 @@ const convertToPaddedFormat = (code) => {
 };
 
 /*
-
-Score-
-424,423,422,413
-1. 413 done
-2. 414 done
-3. 422423 done
-4. 424 done
-5. 432 done
-6. 441 not done
+433,441
 */
 /**
  * @route POST /api/response/4.1.3
@@ -551,6 +544,214 @@ const score = parseFloat(
     new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
+
+const createResponse433 = asyncHandler(async (req, res) => {
+  const {session, options}= req.body;
+
+  if(!session || !options){
+    throw new apiError(400, "Missing required fields");
+  }
+  const sessionYear = Number(session);
+  const currentYear = new Date().getFullYear();
+  if (sessionYear < 1990 || sessionYear > currentYear) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
+  }
+
+  // Fetch Criteria
+  const criteria = await CriteriaMaster.findOne({
+    where: {
+      sub_sub_criterion_id: '040103',
+      sub_criterion_id: '0401',
+      criterion_id: '04'
+    }
+  });
+
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Check session range with IIQA
+  const latestIIQA = await IIQA.findOne({
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']]
+  });
+
+  if (!latestIIQA) throw new apiError(404, "IIQA not found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (sessionYear < startYear || sessionYear > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+  }
+
+  const duplicate = await Criteria433.findOne({
+    where: { session, options }
+  }); 
+
+  if (duplicate) {
+    throw new apiError(409, "Entry already exists for this session and options");
+  }
+
+  // Upsert logic (check if entry exists)
+  let [entry, created] = await Criteria433.findOrCreate({
+    where: {
+      session: session,
+      criteria_code: criteria.criteria_code,
+      options: options,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session: session,
+      options: options,
+    }
+  });
+
+  // If already exists, update values
+  if (!created) {
+    await Criteria433.update({
+      options: options
+    }, {
+      where: {
+        session: session,
+        criteria_code: criteria.criteria_code,
+      }
+    });
+
+    entry = await Criteria433.findOne({
+      where: {
+        session: session,
+        criteria_code: criteria.criteria_code,
+        options: options
+      }
+    });
+  }
+
+  return res.status(created ? 201 : 200).json(
+    new apiResponse(
+      created ? 201 : 200,
+      entry,
+      created ? "Response created successfully" : "Response updated successfully"
+    )
+  );
+});
+
+const score433 = asyncHandler(async (req, res) => {
+  const session = new Date().getFullYear();
+  const criteria_code = convertToPaddedFormat("4.3.3");
+  
+  const criteria = await CriteriaMaster.findOne({
+    where: { sub_sub_criterion_id: criteria_code }
+  });
+  
+  if (!criteria) {
+    throw new apiError(404, "Criteria not found");
+  }
+  // 5 Years should be calculated form IIQA session DB
+  const currentIIQA = await IIQA.findOne({
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']] // Get the most recent IIQA form
+  });
+  
+  if (!currentIIQA) {
+    throw new apiError(404, "No IIQA form found");
+  }
+  
+  const startDate = currentIIQA.session_end_year - 5;
+  const endDate = currentIIQA.session_end_year;
+  
+  if (session < startDate || session > endDate) {
+    throw new apiError(400, "Session must be between the latest IIQA session and the current year");
+  }
+
+  const responses = await Criteria433.findAll({
+    attributes: [
+      'session',
+      'options',
+    ],
+    where: {
+      session: {
+        [Sequelize.Op.gte]: startDate,
+        [Sequelize.Op.lte]: endDate
+      }
+    },
+    order: [['session', 'DESC']],
+    raw: true
+  });
+  
+  const options = responses.map(r => r.options);
+  const scoreSelected = options[0];
+  console.log(scoreSelected)
+
+  let scoreValue, gradeValue;
+
+  // Map option to score and grade
+  switch(scoreSelected) {
+    case '4':
+      scoreValue = 4;
+      gradeValue = 4;
+      break;
+    case '3':
+      scoreValue = 3;
+      gradeValue = 3;
+      break;
+    case '2':
+      scoreValue = 2;
+      gradeValue = 2;
+      break;
+    case '1':
+      scoreValue = 1;
+      gradeValue = 1;
+      break;
+    default:
+      scoreValue = 0;
+      gradeValue = 0;
+  }
+
+  console.log(scoreValue, gradeValue)
+
+  // Create or update score entry
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: scoreValue,
+      sub_sub_cr_grade: gradeValue,
+      session: session,
+      cycle_year: 1
+    }
+  }); 
+
+  if (!created) {
+    await Score.update({
+      score_sub_sub_criteria: scoreValue,
+      sub_sub_cr_grade: gradeValue
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: session
+      }
+    });
+
+    entry = await Score.findOne({
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: session
+      }
+    });
+  }
+
+  return res.status(200).json(
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
+  );
+}); 
 
 
 
@@ -1554,12 +1755,14 @@ export{
   createResponse423,
   createResponse413,
   createResponse422,
+  createResponse433,
   score414,
   score423,
   score413,
   score432,
   score424,
   score422,
+  score433,
   createResponse424,
   createResponse432,
   createResponse441,
