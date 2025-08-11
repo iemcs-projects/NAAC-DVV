@@ -2,6 +2,7 @@ import db from "../models/index.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import apiResponse from "../utils/apiResponse.js";
 import apiError from "../utils/apiError.js";
+import Sequelize from "sequelize";
 
 const Criteria413 = db.response_4_1_3;
 const Criteria414 = db.response_4_1_4;
@@ -68,7 +69,7 @@ const convertToPaddedFormat = (code) => {
 };
 
 /*
-1. 413 not done
+1. 413 done
 2. 414 done
 3. 422423 done
 4. 424 done
@@ -434,57 +435,75 @@ const score414 = asyncHandler(async (req, res) => {
   const startYear = endYear - 5;
 
   // Step 3: Fetch responses for last 5 years
-  const responses = await Criteria414.findAll({
-    attributes: [
-      'session',
-      'expenditure_infra_aug',
-      'total_expenditure_excl_salary'
-    ],
-    where: {
-      criteria_code: criteria.criteria_code,
-      session: {
-        [Sequelize.Op.gte]: startYear,
-        [Sequelize.Op.lte]: endYear
-      }
-    },
-    order: [['session', 'DESC']]
-  });
-
-  if (responses.length === 0) {
-    throw new apiError(404, "No responses found for the given period");
-  }
-
-  // Step 4: Group by year and calculate yearly percentages
-  const yearlyData = {};
-  responses.forEach(r => {
-    if (!yearlyData[r.session]) {
-      yearlyData[r.session] = { infra: 0, total: 0 };
+const responses = await Criteria414.findAll({
+  attributes: [
+    'session',
+    'expenditure_infra_aug'
+  ],
+  where: {
+    criteria_code: criteria.criteria_code,
+    session: {
+      [Sequelize.Op.gte]: startYear,
+      [Sequelize.Op.lte]: endYear
     }
-    yearlyData[r.session].infra += r.expenditure_infra_aug || 0;
-    yearlyData[r.session].total += r.total_expenditure_excl_salary || 0;
-  });
+  },
+  order: [['session', 'DESC']],
+  raw: true
+});
 
-  const yearlyPercentages = Object.keys(yearlyData).map(year => {
-    const { infra, total } = yearlyData[year];
-    return total > 0 ? (infra / total) * 100 : 0;
-  });
+// Get latest expenditure from ExtendedProfile
+const ExtendedProfileResponse = await ExtendedProfile.findOne({
+  attributes: ['expenditure_in_lakhs'],
+  raw: true,
+  order: [['created_at', 'DESC']],
+  limit: 1
+});
 
-  if (yearlyPercentages.length === 0) {
-    throw new apiError(400, "No valid data to compute score");
+if (!ExtendedProfileResponse) {
+  throw new apiError(404, "No ExtendedProfile data found");
+}
+
+const expenditureInLakhs = Number(ExtendedProfileResponse.expenditure_in_lakhs || 0);
+
+if (responses.length === 0) {
+  throw new apiError(404, "No responses found for the given period");
+}
+
+// Step 4: Group infra expenditure by year
+const yearlyData = {};
+responses.forEach(r => {
+  if (!yearlyData[r.session]) {
+    yearlyData[r.session] = { infra: 0, total: expenditureInLakhs };
   }
+  yearlyData[r.session].infra += Number(r.expenditure_infra_aug || 0);
+});
 
-  // Step 5: Calculate average score
-  const score = parseFloat(
-    (yearlyPercentages.reduce((a, b) => a + b, 0) / yearlyPercentages.length).toFixed(3)
-  );
+// Calculate yearly percentages
+const yearlyPercentages = Object.keys(yearlyData).map(year => {
+  const { infra, total } = yearlyData[year];
+  return total > 0 ? (infra / total) * 100 : 0;
+});
+
+if (yearlyPercentages.length === 0) {
+  throw new apiError(400, "No valid data to compute score");
+}
+
+// Step 5: Calculate average score
+const score = parseFloat(
+  (yearlyPercentages.reduce((a, b) => a + b, 0) / yearlyPercentages.length).toFixed(3)
+);
+
+
 
   // Step 6: Grade mapping
   let grade;
-  if (score >= 80) grade = 4;
-  else if (score >= 60) grade = 3;
-  else if (score >= 40) grade = 2;
-  else if (score >= 30) grade = 1;
+  if (score >= 25) grade = 4;
+  else if (score >= 20) grade = 3;
+  else if (score >= 10) grade = 2;
+  else if (score >= 1) grade = 1;
   else grade = 0;
+
+  console.log(score, grade)
 
   // Step 7: Create or update Score
   let [entry, created] = await Score.findOrCreate({
@@ -540,15 +559,19 @@ const score414 = asyncHandler(async (req, res) => {
  */
 
 const createResponse423 = asyncHandler(async (req, res) => {
-  const {
-    session,
-    resource_type,
-    subscription_detail,
-    expenditure_lakhs,
-    total_expenditure
-  } = req.body;
+  /*
+    1. Get the user input from req.body
+    2. Validate required fields
+    3. Fetch criteria from criteria_master
+    4. Fetch the latest IIQA session range
+    5. Validate session within range
+    6. Create or update Criteria423 record
+    7. Return the response
+  */
 
-  // Validate required fields
+  const { session, resource_type, subscription_detail, expenditure_lakhs, total_expenditure } = req.body;
+
+  // Step 2: Validate required fields
   if (
     !session ||
     !resource_type ||
@@ -563,104 +586,110 @@ const createResponse423 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  const year =session.toString().slice(0, 4);
+  console.log("Year::",year)
 
-  // Get IIQA session range for validation
+  // Step 3: Fetch criteria
+  const criteria = await CriteriaMaster.findOne({
+    where: {
+      sub_sub_criterion_id: '040203',
+      sub_criterion_id: '0402',
+      criterion_id: '04'
+    }
+  });
+
+  if (!criteria) throw new apiError(404, "Criteria 4.2.3 not found");
+
+  // Step 4: Fetch latest IIQA session range
   const latestIIQA = await IIQA.findOne({
-    attributes: ["session_end_year"],
-    order: [["created_at", "DESC"]],
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']]
   });
 
   if (!latestIIQA) {
-    throw new apiError(404, "IIQA session not found");
+    throw new apiError(404, "No IIQA form found");
   }
 
   const endYear = latestIIQA.session_end_year;
   const startYear = endYear - 5;
 
+  // Step 5: Validate session
   if (session < startYear || session > endYear) {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  // Start transaction
-  const transaction = await db.sequelize.transaction();
+  const duplicate = await Criteria423.findOne({
+    where: { session, year, resource_type, subscription_detail,expenditure_lakhs }
+  });
 
-  try {
-    // Step 1: Get both 4.2.2 and 4.2.3 criteria from master
-    const criteriaList = await CriteriaMaster.findAll({
+  if (duplicate) {
+    throw new apiError(409, "Entry already exists for this session, year, and resource type");
+  }
+
+  // Step 6: Create or update Criteria423 record
+  let [entry, created] = await Criteria423.findOrCreate({
+    where: {
+      session,
+      year,
+      criteria_code: criteria.criteria_code,
+      resource_type,
+      subscription_detail,
+      expenditure_lakhs,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      year,
+      resource_type,
+      subscription_detail,
+      expenditure_lakhs,
+      total_expenditure
+    }
+  });
+
+  if (!created) {
+    await Criteria423.update({
+      subscription_detail,
+      expenditure_lakhs,
+      total_expenditure
+    }, {
       where: {
-        sub_sub_criterion_id: { [Sequelize.Op.in]: ['040202', '040203'] },
-        sub_criterion_id: '0402',
-        criterion_id: '04'
-      },
-      transaction
+        session,
+        year,
+        criteria_code: criteria.criteria_code,
+        resource_type
+      }
     });
 
-    if (!criteriaList || criteriaList.length !== 2) {
-      await transaction.rollback();
-      throw new apiError(404, "One or both criteria not found");
-    }
-
-    // Step 2: Map each sub_sub_criterion_id to model
-    const modelMap = {
-      '040202': { model: Criteria422, name: '4.2.2' },
-      '040203': { model: Criteria423, name: '4.2.3' }
-    };
-
-    const responses = [];
-
-    for (const criteria of criteriaList) {
-      const { model: Model, name } = modelMap[criteria.sub_sub_criterion_id];
-      if (!Model) continue;
-
-      try {
-        const [entry, created] = await Model.findOrCreate({
-          where: {
-            session,
-            resource_type
-          },
-          defaults: {
-            id: criteria.id,
-            criteria_code: criteria.criteria_code,
-            session,
-            resource_type,
-            subscription_detail,
-            expenditure_lakhs,
-            total_expenditure
-          },
-          transaction
-        });
-
-        responses.push({
-          criteria: name,
-          entry,
-          created,
-          message: created ? "Entry created successfully" : "Entry already exists"
-        });
-
-      } catch (error) {
-        await transaction.rollback();
-        throw new apiError(500, `Failed to create entry for criteria ${name}: ${error.message}`);
+    entry = await Criteria423.findOne({
+      where: {
+        session,
+        year,
+        criteria_code: criteria.criteria_code,
+        resource_type
       }
-    }
-
-    // Commit transaction if all went well
-    await transaction.commit();
-
-    return res.status(200).json(
-      new apiResponse(200, { responses }, "Operation completed successfully")
-    );
-
-  } catch (error) {
-    await transaction.rollback();
-    throw error;
+    });
   }
-  
-  res.status(200).json(
-      new apiResponse(200, criteria, "Criteria found")
+
+  // Step 7: Return response
+  return res.status(created ? 201 : 200).json(
+    new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
   );
 });
 
+
 const createResponse422 = asyncHandler(async (req, res) => {
+  /*
+  1. get the user input from the req body
+  2. query the criteria_master table to get the id and criteria_code 
+  3. validate the user input(check for missing data, year and session must be between 1990 and current year and req body logic)
+  4. Fetch the criteria_code from the criteria_master table
+  5. Fetch the latest IIQA session
+  6. check if the session is between the latest IIQA session and the current year
+  7. create a new response or Update the existing response
+  8. return the response
+  */
 
   const { session, options } = req.body;
 
@@ -676,19 +705,67 @@ const createResponse422 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Options must be between 0 and 4");
   }
 
-  const [entry, created] = await Criteria422.findOrCreate({
+  const optionString = String(options);
+
+  const criteria = await CriteriaMaster.findOne({
     where: {
-      session,
-      options
-    },
-    defaults: {
-      session,
-      options
+      sub_sub_criterion_id: '040202',
+      sub_criterion_id: '0402',
+      criterion_id: '04'
     }
   });
 
-  return res.status(200).json(
-    new apiResponse(200, entry, created ? "Entry created successfully" : "Entry already exists")
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  const latestIIQA = await IIQA.findOne({
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']]
+  });
+
+  if (!latestIIQA) {
+    throw new apiError(404, "No IIQA form found");
+  }
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+  }
+
+  let [entry, created] = await Criteria422.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      options: optionString
+    }
+  });
+
+  if (!created) {
+    await Criteria422.update({
+      options: optionString
+    }, {
+      where: {
+        session,
+        criteria_code: criteria.criteria_code
+      }
+    });
+
+    entry = await Criteria422.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      }
+    });
+  }
+
+  return res.status(created ? 201 : 200).json(
+    new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
   );
 });
 
@@ -696,11 +773,13 @@ const createResponse422 = asyncHandler(async (req, res) => {
 const score422 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("4.2.2");
   const currentYear = new Date().getFullYear();
-  const session = currentYear;
+
+  console.log(criteria_code, currentYear);
 
   // Step 1: Fetch criteria metadata
   const criteria = await CriteriaMaster.findOne({
-    where: { sub_sub_criterion_id: criteria_code }
+    where: { sub_sub_criterion_id: criteria_code },
+    raw: true
   });
 
   if (!criteria) {
@@ -744,12 +823,13 @@ const score422 = asyncHandler(async (req, res) => {
       grade = 0;
   }
 
+  console.log(score, grade);
+
   // Step 3: Upsert score into the Score table
-  const [entry, created] = await Score.findOrCreate({
+  let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
-      session: currentYear,
-      year: currentYear
+      session: currentYear
     },
     defaults: {
       criteria_code: criteria.criteria_code,
@@ -761,7 +841,6 @@ const score422 = asyncHandler(async (req, res) => {
       score_sub_sub_criteria: score,
       sub_sub_cr_grade: grade,
       session: currentYear,
-      year: currentYear,
       cycle_year: 1
     }
   });
@@ -771,13 +850,11 @@ const score422 = asyncHandler(async (req, res) => {
       score_sub_sub_criteria: score,
       sub_sub_cr_grade: grade,
       session: currentYear,
-      year: currentYear,
       cycle_year: 1
     }, {
       where: {
         criteria_code: criteria.criteria_code,
-        session: currentYear,
-        year: currentYear
+        session: currentYear
       }
     });
   }
@@ -785,20 +862,14 @@ const score422 = asyncHandler(async (req, res) => {
   entry = await Score.findOne({
     where: {
       criteria_code: criteria.criteria_code,
-      session: currentYear,
-      year: currentYear
+      session: currentYear
     }
   });
 
 
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      optionSelected,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${optionSelected})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
 
@@ -811,58 +882,74 @@ const score423 = asyncHandler(async (req, res) => {
   const criteria = await CriteriaMaster.findOne({
     where: { sub_sub_criterion_id: criteria_code }
   });
-
   if (!criteria) {
     throw new apiError(404, "Criteria 4.2.3 not found in criteria_master");
   }
 
-  // Step 2: Fetch all responses for the given criteria code
-  const responses = await Criteria423.findAll({
-    attributes: ['expenditure_lakhs', 'session'],
-    where: {
-      criteria_code: criteria.criteria_code
-    },
+  // Step 2: Fetch expenditure data rows
+  const expenditureRows = await Criteria423.findAll({
+    attributes: ["expenditure_lakhs", "session"],
+    where: { criteria_code: criteria.criteria_code },
+    order: [["session", "DESC"]],
     raw: true
   });
 
-  if (!responses || responses.length === 0) {
+  if (!expenditureRows.length) {
     throw new apiError(404, "No responses found for criteria 4.2.3");
   }
 
-  // Step 3: Group expenditure_lakhs by session
+  // Step 3: Group expenditure by session
   const groupedBySession = {};
-  for (const resp of responses) {
-    const year = resp.session;
-    if (!groupedBySession[year]) {
-      groupedBySession[year] = 0;
-    }
-    groupedBySession[year] += Number(resp.expenditure_lakhs || 0);
-  }
+  expenditureRows.forEach(record => {
+    const year = record.session;
+    groupedBySession[year] =
+      (groupedBySession[year] || 0) + Number(record.expenditure_lakhs || 0);
+  });
 
-  // Step 4: Get last 5 sessions and compute total
-  const last5Years = Object.keys(groupedBySession)
+  console.log("Grouped Expenditure Data:", groupedBySession);
+
+  // Step 4: Take last 5 sessions
+  const last5Sessions = Object.keys(groupedBySession)
     .map(Number)
     .sort((a, b) => b - a)
     .slice(0, 5);
 
-  if (last5Years.length === 0) {
+  if (!last5Sessions.length) {
     throw new apiError(400, "Not enough session data to compute score");
   }
 
-  let totalExpenditure = 0;
-  for (const year of last5Years) {
-    totalExpenditure += groupedBySession[year];
+  // Step 5: Calculate average expenditure
+  const expenditureValues = last5Sessions.map(year => groupedBySession[year]);
+  const totalExpenditure = expenditureValues.reduce((sum, val) => sum + val, 0);
+  const avgExpenditure = parseFloat(
+    (totalExpenditure / last5Sessions.length).toFixed(3)
+  );
+
+  console.log("Average Expenditure:", avgExpenditure);
+
+  let grade = 0; // No grading criteria defined
+
+  if (avgExpenditure >=10) {
+    grade = 4;
+  }
+  else if (avgExpenditure >=8 && avgExpenditure < 10) {
+    grade = 3;
+  }
+  else if (avgExpenditure >=6 && avgExpenditure < 8) {
+    grade = 2;
+  }
+  else if (avgExpenditure >=4 && avgExpenditure < 6) {
+    grade = 1;
+  }
+  else if (avgExpenditure >=2 && avgExpenditure < 4) {
+    grade = 0;
   }
 
-  const score = (totalExpenditure / 5).toFixed(3);
-  const grade = 0; // No grading criteria defined
-
-  // Step 5: Insert or update score using findOrCreate
+  // Step 6: Insert or update score
   let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
-      session,
-      year: currentYear
+      session
     },
     defaults: {
       criteria_code: criteria.criteria_code,
@@ -871,44 +958,45 @@ const score423 = asyncHandler(async (req, res) => {
       sub_sub_criteria_id: criteria.sub_sub_criterion_id,
       score_criteria: 0,
       score_sub_criteria: 0,
-      score_sub_sub_criteria: score,
+      score_sub_sub_criteria: avgExpenditure,
       sub_sub_cr_grade: grade,
       session,
-      year: currentYear,
       cycle_year: 1
     }
   });
 
   if (!created) {
-    await Score.update({
-      score_sub_sub_criteria: score,
-      sub_sub_cr_grade: grade
-    }, {
-      where: {
-        criteria_code: criteria.criteria_code,
-        session,
-        year: currentYear
+    await Score.update(
+      {
+        score_sub_sub_criteria: avgExpenditure,
+        sub_sub_cr_grade: grade
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session
+        }
       }
-    });
+    );
 
     entry = await Score.findOne({
       where: {
         criteria_code: criteria.criteria_code,
-        session,
-        year: currentYear
+        session
       }
     });
   }
 
+  // Step 7: Response
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      totalExpenditure,
-      last5Years,
-      message: `Score calculated as average of last 5 years' expenditure in lakhs`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
+
 
 
 /**
@@ -921,14 +1009,12 @@ const createResponse424 = asyncHandler(async (req, res) => {
   const {
     session,
     no_of_teachers_stds,
-    total_teachers_stds
   } = req.body;
 
   const sessionYear = Number(session);
   const noOfTeachers = Number(no_of_teachers_stds);
-  const totalTeachers = Number(total_teachers_stds);
 
-  if (!sessionYear || !noOfTeachers || !totalTeachers) {
+  if (!sessionYear || !noOfTeachers) {
     throw new apiError(400, "Missing or invalid required fields");
   }
 
@@ -963,26 +1049,36 @@ const createResponse424 = asyncHandler(async (req, res) => {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
+  const duplicateResponse = await Criteria424.findOne({
+    where: {
+      session: sessionYear,
+      criteria_code: criteria.criteria_code,
+      no_of_teachers_stds: noOfTeachers,
+    }
+  });
+
+  if (duplicateResponse) {
+    throw new apiError(400, "Response already exists for this session");
+  }
+
   // Upsert logic (check if entry exists)
   let [entry, created] = await Criteria424.findOrCreate({
     where: {
       session: sessionYear,
       criteria_code: criteria.criteria_code
+
     },
     defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
-      session: sessionYear,
-      no_of_teachers_stds: noOfTeachers,
-      total_teachers_stds: totalTeachers
+      session: sessionYear
     }
   });
 
   // If already exists, update values
   if (!created) {
     await Criteria424.update({
-      no_of_teachers_stds: noOfTeachers,
-      total_teachers_stds: totalTeachers
+      no_of_teachers_stds: noOfTeachers
     }, {
       where: {
         session: sessionYear,
@@ -993,7 +1089,8 @@ const createResponse424 = asyncHandler(async (req, res) => {
     entry = await Criteria424.findOne({
       where: {
         session: sessionYear,
-        criteria_code: criteria.criteria_code
+        criteria_code: criteria.criteria_code,
+        no_of_teachers_stds: noOfTeachers
       }
     });
   }
@@ -1060,12 +1157,10 @@ const score424 = asyncHandler(async (req, res) => {
 
   // Step 4: Get corresponding ExtendedProfile response
   const extendedProfileResponse = await ExtendedProfile.findOne({
-    attributes: ['session', 'total_students', 'full_time_teachers'],
-    where: {
-      session: session
-    },
+    attributes: ['total_students', 'full_time_teachers'],
     raw: true,
-    order: [['session', 'DESC']]
+    order: [['created_at', 'DESC']],
+    limit: 1
   });
 
   if (!extendedProfileResponse) {
@@ -1083,14 +1178,25 @@ const score424 = asyncHandler(async (req, res) => {
   }
 
   const score = (numerator / denominator).toFixed(3)*100;
-  const grade = 0; // No grading logic provided
+  let grade = 0; // No grading logic provided
+
+  if(score < 2){
+    grade = 0;
+  }else if(score >= 2 && score <= 6){
+    grade = 1;
+  }else if(score >= 6 && score <= 8){
+    grade = 2;
+  }else if(score >= 8 && score <= 10){
+    grade = 3;
+  }else if(score >= 10){
+    grade = 4;
+  }
 
   // Step 6: Store or update score in the scores table
   let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
       session,
-      year: session
     },
     defaults: {
       criteria_code: criteria.criteria_code,
@@ -1102,7 +1208,6 @@ const score424 = asyncHandler(async (req, res) => {
       score_sub_sub_criteria: score,
       sub_sub_cr_grade: grade,
       session,
-      year: session,
       cycle_year: 1
     }
   });
@@ -1115,7 +1220,6 @@ const score424 = asyncHandler(async (req, res) => {
       where: {
         criteria_code: criteria.criteria_code,
         session,
-        year: session
       }
     });
 
@@ -1123,18 +1227,12 @@ const score424 = asyncHandler(async (req, res) => {
       where: {
         criteria_code: criteria.criteria_code,
         session,
-        year: session
       }
     });
   }
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      numerator,
-      denominator,
-      message: "Score for 4.2.4 calculated successfully"
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
 
