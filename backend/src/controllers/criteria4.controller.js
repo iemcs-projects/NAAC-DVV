@@ -69,6 +69,9 @@ const convertToPaddedFormat = (code) => {
 };
 
 /*
+
+Score-
+424,423,422,413
 1. 413 done
 2. 414 done
 3. 422423 done
@@ -677,7 +680,6 @@ const createResponse423 = asyncHandler(async (req, res) => {
     new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
   );
 });
-
 
 const createResponse422 = asyncHandler(async (req, res) => {
   /*
@@ -1366,27 +1368,13 @@ const score432 = asyncHandler(async (req, res) => {
   }
 
   // Step 3: Fetch latest working_computers from Criteria432
-  const latestCriteriaResponse = await Criteria432.findOne({
-    attributes: ['session', 'working_computers'],
-    where: {
-      session: {
-        [Sequelize.Op.between]: [startYear, endYear]
-      }
-    },
-    order: [['session', 'DESC']],
-    raw: true
-  });
 
-  if (!latestCriteriaResponse || latestCriteriaResponse.session !== session) {
-    throw new apiError(404, `No valid Criteria 4.3.2 response found for session ${session}`);
-  }
 
   // Step 4: Fetch total students from ExtendedProfile
   const extendedProfileResponse = await ExtendedProfile.findOne({
-    attributes: ['session', 'total_students'],
-    where: {
-      session: session
-    },
+    attributes: ['total_students','total_computers'],
+    order: [['created_at', 'DESC']],
+    limit: 1,
     raw: true
   });
 
@@ -1395,7 +1383,7 @@ const score432 = asyncHandler(async (req, res) => {
   }
 
   const totalStudents = Number(extendedProfileResponse.total_students || 0);
-  const workingComputers = Number(latestCriteriaResponse.working_computers || 0);
+  const workingComputers = Number(extendedProfileResponse.total_computers || 0);
 
   if (workingComputers === 0) {
     throw new apiError(400, "Cannot calculate ratio: number of working computers is zero");
@@ -1453,12 +1441,7 @@ const score432 = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      ratio,
-      totalStudents,
-      workingComputers
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
 
