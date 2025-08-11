@@ -1067,13 +1067,15 @@ const createResponse424 = asyncHandler(async (req, res) => {
   let [entry, created] = await Criteria424.findOrCreate({
     where: {
       session: sessionYear,
-      criteria_code: criteria.criteria_code
+      criteria_code: criteria.criteria_code,
+      no_of_teachers_stds: noOfTeachers,
 
     },
     defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
-      session: sessionYear
+      session: sessionYear,
+      no_of_teachers_stds: noOfTeachers,
     }
   });
 
@@ -1084,7 +1086,7 @@ const createResponse424 = asyncHandler(async (req, res) => {
     }, {
       where: {
         session: sessionYear,
-        criteria_code: criteria.criteria_code
+        criteria_code: criteria.criteria_code,
       }
     });
 
