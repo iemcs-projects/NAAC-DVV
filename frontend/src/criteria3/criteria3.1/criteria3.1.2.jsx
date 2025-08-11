@@ -1,15 +1,19 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import { SessionContext } from "../../contextprovider/sessioncontext";
+import { useContext } from "react";
+import axios from "axios";
 
 const Criteria3_1_2 = () => {
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+  const [currentYear, setCurrentYear] = useState(sessions?.[0] || "");
   const [yearData, setYearData] = useState({});
   const [formData, setFormData] = useState({
     proj: "",
@@ -42,33 +46,71 @@ const Criteria3_1_2 = () => {
     }
   };
 
-  const handleSubmit = () => {
-    const { proj, name, princ, dept, amt, duration, agency, type } = formData;
+  // Add these state variables at the top with other state declarations
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+const [score, setScore] = useState(null);
 
-    if (proj && name && princ && dept && amt && duration && agency && type) {
-      const updatedForm = { ...formData, year: selectedYear };
-
-      const updatedYearData = {
-        ...yearData,
-        [selectedYear]: [...(yearData[selectedYear] || []), updatedForm],
-      };
-
-      setYearData(updatedYearData);
-      setFormData({
-        proj: "",
-        name: "",
-        princ: "",
-        year: "",
-        amt: "",
-        duration: "",
-        agency: "",
-        type: "",
-        supportLinks: [""],
-      });
-    } else {
-      alert("Please fill in all fields.");
+// Update the fetchScore function to use the correct endpoint and handle the response
+useEffect(() => {
+  async function fetchScore() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria3/score312");
+      console.log("Fetched score:", response.data);
+      setScore(response.data);
+    } catch (error) {
+      console.error("Error fetching score:", error);
+      setError("Failed to load data. Please try again later.");
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+  fetchScore();
+}, []);
+
+// Utility to get a valid score from the response
+const getValidScore = (scoreObj) => {
+  if (!scoreObj?.data) return null;
+  return (
+    scoreObj.data.weighted_cr_score ||
+    scoreObj.data.score_sub_sub_criteria ||
+    scoreObj.data.score_sub_criteria ||
+    scoreObj.data.score_criteria ||
+    null
+  );
+};
+
+const validScore = getValidScore(score);
+
+  // const handleSubmit = () => {
+  //   const { proj, name, princ, dept, amt, duration, agency, type } = formData;
+
+  //   if (proj && name && princ && dept && amt && duration && agency && type) {
+  //     const updatedForm = { ...formData, year: selectedYear };
+
+  //     const updatedYearData = {
+  //       ...yearData,
+  //       [selectedYear]: [...(yearData[selectedYear] || []), updatedForm],
+  //     };
+
+  //     setYearData(updatedYearData);
+  //     setFormData({
+  //       proj: "",
+  //       name: "",
+  //       princ: "",
+  //       year: "",
+  //       amt: "",
+  //       duration: "",
+  //       agency: "",
+  //       type: "",
+  //       supportLinks: [""],
+  //     });
+  //   } else {
+  //     alert("Please fill in all fields.");
+  //   }
+  // };
 
   const goToNextPage = () => navigate("/criteria3.1.2");
   const goToPreviousPage = () => navigate("/criteria4.4.2");
@@ -90,14 +132,7 @@ const Criteria3_1_2 = () => {
             <div className="text-sm text-gray-600">3.2- Resource Mobilization for Research</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                <div className="text-lg font-medium text-green-500 bg-[#bee7c7] !w-[1000px] h-[50px] pt-[10px] rounded-lg">
-                  Provisional Score: 18.75
-                </div>
-              </div>
-              </div></div>
+          
 
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-2">3.1.2*** Metric Information</h3>
@@ -113,6 +148,24 @@ const Criteria3_1_2 = () => {
 <li>Paste link to funding agency website</li>
             </ul>
 
+            <div className="bg-white text-black p-4 border border-green-300 rounded shadow">
+  <h3 className="text-green-700 text-lg font-semibold mb-2">
+    Calculated Score:
+  </h3>
+  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+    {loading ? (
+      <p className="text-gray-600">Loading score...</p>
+    ) : validScore !== null ? (
+      <p className="text-lg font-semibold text-green-800">
+        Provisional Score (3.1.2): {parseFloat(validScore).toFixed(2)} %
+      </p>
+    ) : (
+      <p className="text-gray-600">No score data available.</p>
+    )}
+  </div>
+</div>
+
+
 
             
           </div>
@@ -124,82 +177,34 @@ const Criteria3_1_2 = () => {
                 research projects / endowments in the institution during the last five
                 years (INR in Lakhs)
               </h2>
-              <div>
-                <label className="mr-2 font-medium">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border px-3 py-1 rounded text-gray-950"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
+              <div className="flex justify-end mb-4">
+  <label className="mr-2 font-medium">Select Year:</label>
+  <select
+    className="border px-3 py-1 rounded"
+    value={currentYear}
+    onChange={(e) => setCurrentYear(e.target.value)}
+    disabled={sessionLoading || !sessions?.length}
+  >
+    {sessionLoading ? (
+      <option>Loading sessions...</option>
+    ) : sessionError ? (
+      <option>Error loading sessions</option>
+    ) : (
+      sessions?.map((year) => (
+        <option key={year} value={year}>
+          {year}
+        </option>
+      ))
+    )}
+  </select>
+</div>
             </div>
 
-            <table className="w-full border text-sm">
-              <thead className="bg-gray-100 text-gray-950">
-                <tr>
-                  <th className="border px-2 py-2">Name of the Project/ Endowments, Chairs</th>
-                  <th className="border px-2 py-2">Name of the Principal Investigator/Co-Investigator</th>
-                  <th className="border px-2 py-2">Department of Principal Investigator</th>
-                  <th className="border px-2 py-2">Year of Award</th>
-                  <th className="border px-2 py-2">Amount Sanctioned</th>
-                  <th className="border px-2 py-2">Duration of the project</th>
-                  <th className="border px-2 py-2">Name of the Funding Agency </th>
-                  <th className="border px-2 py-2"> Type  (Government/non-Government)</th>
-                  <th className="border px-2 py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {["proj", "name", "dept", "year", "amt", "duration", "agency", "type"].map((key) => (
-                    <td key={key} className="border px-2 py-1">
-                      <input
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
-                        value={formData[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                      />
-                    </td>
-                  ))}
-                  <td className="border px-2 py-1 text-center">
-                    <button
-                      className="!bg-blue-600 text-white px-3 py-1 rounded hover:!bg-blue-700"
-                      onClick={handleSubmit}
-                    >
-                      Add
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded">
+            <p className="font-semibold">
+              Fill in the inputs in 2.4.1 to get the corresponding results.
+            </p>
           </div>
-
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Links to relevant documents:
-            </label>
-            <div className="flex flex-col gap-2">
-              {formData.supportLinks.map((link, index) => (
-                <input
-                  key={index}
-                  type="url"
-                  placeholder={`Enter support link ${index + 1}`}
-                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                  value={link}
-                  onChange={(e) => handleChange("supportLinks", e.target.value, index)}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:!bg-blue-700 w-fit"
-              >
-                + Add Another Link
-              </button>
-            </div>
           </div>
 
           {years.map((year) => (

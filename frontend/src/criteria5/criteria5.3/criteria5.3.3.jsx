@@ -4,19 +4,32 @@ import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import { useContext } from "react";
+import { SessionContext } from "../../contextprovider/sessioncontext";
+import axios from "axios";
+import { useEffect } from "react";
 
-const Criteria5_3_3= () => {
+const Criteria5_3_3 = () => {
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
   const [yearData, setYearData] = useState({});
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+  const { sessions: availableSessions } = useContext(SessionContext);
+
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0) {
+      setCurrentYear(availableSessions[0]);
+      setSelectedYear(availableSessions[0]);
+    }
+  }, [availableSessions]);
 
   const [formData, setFormData] = useState({
-    date: "",
-    
-    eventname: "",
-    studentname: "",
-  
-    
+    event_date: "",
+    event_name: "",
+    student_name: "",
     supportLinks: [""],
   });
 
@@ -29,6 +42,38 @@ const Criteria5_3_3= () => {
   const navigate = useNavigate();
   const years = pastFiveYears;
 
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score533");
+      console.log('API Response:', response);
+      
+      if (response.data && response.data.data && response.data.data.entry) {
+        console.log('Score data:', response.data.data.entry);
+        setProvisionalScore(response.data.data.entry);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
+
   const handleChange = (field, value, index = null) => {
     if (field === "supportLinks") {
       const updatedLinks = [...formData.supportLinks];
@@ -39,33 +84,72 @@ const Criteria5_3_3= () => {
     }
   };
 
-  const handleSubmit = () => {
-  const { year, studentname, programme, institution, pname } = formData;
-  if (year && studentname && programme && institution && pname) {
-    const updatedYearData = {
-      ...yearData,
-      [selectedYear]: [...(yearData[selectedYear] || []), formData],
-    };
-    setYearData(updatedYearData);
-    setFormData({
-        year: "",
-        eventname: "",
-        studentname: "",
-      supportLinks: [""],
-    });
-  } else {
-    alert("Please fill in all fields.");
-  }
-};
-const goToNextPage = () => {
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    
+    const event_date = formData.event_date;
+    const event_name = formData.event_name;
+    const student_name = formData.student_name;
+    const year = currentYear.split("-")[0];
+
+    if (!event_date || !event_name || !student_name) {
+      alert("Please fill in all required fields (Event Date, Event Name, and Student Name).\n\nCurrent values:\nEvent Date: " + event_date + "\nEvent Name: " + event_name + "\nStudent Name: " + student_name);
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria5/createResponse533",
+        {
+          session: parseInt(year, 10),
+          event_date,
+          event_name,
+          student_name
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+
+      const newEntry = {
+        year,
+        event_date,
+        event_name,
+        student_name
+      };
+
+      setYearData(prev => ({
+        ...prev,
+        [year]: [...(prev[year] || []), newEntry]
+      }));
+
+      // Reset form
+      setFormData({
+        event_date: "",
+        event_name: "",
+        student_name: "",
+        supportLinks: [""]
+      });
+
+      // Refresh score
+      fetchScore();
+      alert("Data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting:", error);
+      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+    }
+  };
+
+  const goToNextPage = () => {
     navigate("/criteria5.4.1");
   };
 
   const goToPreviousPage = () => {
     navigate("/criteria5.3.2");
   };
-
-  
 
   const totalPrograms = years.reduce((acc, year) => acc + (yearData[year]?.length || 0), 0);
   const averagePrograms = (totalPrograms / years.length).toFixed(2);
@@ -78,7 +162,7 @@ const goToNextPage = () => {
         <Sidebar />
         <div className="flex-1 p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-medium text-gray-800">Criteria 5: Student Support and Progression </h2>
+            <h2 className="text-xl font-medium text-gray-800">Criteria 5: Student Support and Progression</h2>
             <div className="text-sm">
               <span className="text-gray-600">5.3-Student Participation and Activities</span>
               <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
@@ -89,37 +173,49 @@ const goToNextPage = () => {
             <div className="mb-4">
               <h3 className="text-blue-600 font-medium mb-2">5.3.3 Metric Information</h3>
               <p className="text-sm text-gray-700">
-             Average number of sports and cultural activities/events in which students of the Institution participated
+                Average number of sports and cultural activities/events in which students of the Institution participated
               </p>
             </div>
 
             <div className="mb-6">
               <h3 className="text-blue-600 font-medium mb-2">Requirements:</h3>
               <ul className="list-disc pl-5 text-sm text-gray-700">
-                <li>Report of the even</li>
-
-<li>Number of sports and cultural events/competitions in which
-students of the Institution participated</li> 
-<li>Upload any additional information</li>
-                </ul>
+                <li>Report of the event</li>
+                <li>Number of sports and cultural events/competitions in which students of the Institution participated</li> 
+                <li>Upload any additional information</li>
+              </ul>
             </div>
+          </div>
+
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (5.3.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
           </div>
 
           <div className="border rounded mb-8">
             <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">Sports and cultural events/competitions in which
-students of the Institution participated</h2>
-              <div className="size-7 mb-1">
-                <label className="text-gray-700 font-medium mr-2 -ml-[270px]">Select Year:</label>
+              <h2 className="text-xl font-bold">Sports and cultural events/competitions in which students of the Institution participated</h2>
+              <div>
+                <label className="font-medium text-gray-700 mr-2">Select Year:</label>
                 <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950 mb-[200px] "
+                  className="border px-3 py-1 rounded text-black"
+                  value={currentYear}
+                  onChange={(e) => setCurrentYear(e.target.value)}
                 >
-                  {pastFiveYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
+                  {availableSessions && availableSessions.map((year) => (
+                    <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
               </div>
@@ -128,32 +224,43 @@ students of the Institution participated</h2>
             <table className="w-full border text-sm border-black">
               <thead className="bg-gray-100 text-gray-950">
                 <tr>
-                  <th className="border px-2 py-2"> Date of event/activity (DD-MM-YYYY)</th>
-                  <th className="border px-2 py-2">Name of the event/activity
- </th>
-                  <th  className="border px-2 py-2">Name of the student participated
-</th>
-
-                <th  className="border px-2 py-2">Action</th>
+                  <th className="border px-2 py-2">Date of event/activity (DD-MM-YYYY)</th>
+                  <th className="border px-2 py-2">Name of the event/activity</th>
+                  <th className="border px-2 py-2">Name of the student participated</th>
+                  <th className="border px-2 py-2">Action</th>
                 </tr>
-                  
               </thead>
               <tbody>
                 <tr>
-                  {["date", "event", "student"].map((key) => (
-                    <td key={key} className="border px-2 py-1">
-                      <input
-                        
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
-                        value={formData[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                      />
-                    </td>
-                  ))}
+                  <td className="border px-2 py-1">
+                    <input
+                      type="date"
+                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                      value={formData.event_date}
+                      onChange={(e) => handleChange("event_date", e.target.value)}
+                    />
+                  </td>
+                  <td className="border px-2 py-1">
+                    <input
+                      type="text"
+                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                      placeholder="Event Name"
+                      value={formData.event_name}
+                      onChange={(e) => handleChange("event_name", e.target.value)}
+                    />
+                  </td>
+                  <td className="border px-2 py-1">
+                    <input
+                      type="text"
+                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                      placeholder="Student Name"
+                      value={formData.student_name}
+                      onChange={(e) => handleChange("student_name", e.target.value)}
+                    />
+                  </td>
                   <td className="border px-2 py-1 text-center">
                     <button
-                      className="!bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
                       onClick={handleSubmit}
                     >
                       Add
@@ -166,7 +273,7 @@ students of the Institution participated</h2>
 
           <div className="mb-6">
             <label className="block text-gray-700 font-medium mb-2">
-             Links to relevant documents:
+              Links to relevant documents:
             </label>
             <div className="flex flex-col gap-2">
               {formData.supportLinks.map((link, index) => (
@@ -182,7 +289,7 @@ students of the Institution participated</h2>
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
+                className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
               >
                 + Add Another Link
               </button>
@@ -195,26 +302,20 @@ students of the Institution participated</h2>
               {yearData[year] && yearData[year].length > 0 ? (
                 <table className="w-full text-sm border">
                   <thead className="bg-gray-200">
-                  
-                  <tr>
-                      <th  className="border text-gray-950 px-4 py-2">#</th>
-                      <th  className="border text-gray-950 px-4 py-2">Date of event/activity (DD-MM-YYYY) </th>
-                       <th  className="border text-gray-950 px-4 py-2">Name of the event/activity
-</th>
-                      <th  className="border text-gray-950 px-4 py-2">Name of the student participated
-</th>
-                      </tr>
-                                 
+                    <tr>
+                      <th className="border text-gray-950 px-4 py-2">#</th>
+                      <th className="border text-gray-950 px-4 py-2">Date of event/activity (DD-MM-YYYY)</th>
+                      <th className="border text-gray-950 px-4 py-2">Name of the event/activity</th>
+                      <th className="border text-gray-950 px-4 py-2">Name of the student participated</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {yearData[year].map((entry, index) => (
                       <tr key={index} className="even:bg-gray-50">
                         <td className="border text-gray-950 px-2 py-1">{index + 1}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.date}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.event}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.student}</td>
-                      
-                      
+                        <td className="border text-gray-950 px-2 py-1">{entry.event_date}</td>
+                        <td className="border text-gray-950 px-2 py-1">{entry.event_name}</td>
+                        <td className="border text-gray-950 px-2 py-1">{entry.student_name}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -229,7 +330,7 @@ students of the Institution participated</h2>
             <h2 className="text-lg font-semibold mb-2 text-gray-700">
               Calculation Table (Last 5 Years)
             </h2>
-            <table className="table-auto border-collapse w-full ">
+            <table className="table-auto border-collapse w-full">
               <thead>
                 <tr className="bg-gray-100 text-gray-600 font-semibold">
                   <th className="border px-4 py-2">Year</th>
@@ -271,7 +372,7 @@ students of the Institution participated</h2>
                 className="w-20 border px-2 py-1 rounded text-center text-gray-950"
               />
               <button
-                className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:bg-green-700"
+                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-green-700"
                 onClick={() => {
                   const values = Object.values(yearScores).slice(0, yearCount);
                   const sum = values.reduce((acc, val) => acc + val, 0);

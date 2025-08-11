@@ -31,7 +31,7 @@ export default class response_6_4_2 extends Model {
       allowNull: true
     },
     year: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     donor_name: {

@@ -20,7 +20,7 @@ export default class response_3_4_1 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,7 +28,7 @@ export default class response_3_4_1 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     title_of_activity: {
       type: DataTypes.STRING(255),
@@ -43,15 +43,11 @@ export default class response_3_4_1 extends Model {
       allowNull: true
     },
     year_of_collaboration: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     duration: {
       type: DataTypes.STRING(100),
-      allowNull: true
-    },
-    document_link: {
-      type: DataTypes.STRING(500),
       allowNull: true
     },
     submitted_at: {

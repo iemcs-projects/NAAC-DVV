@@ -84,12 +84,10 @@ const createResponse623 = asyncHandler(async (req, res) => {
     session,
     implimentation,
     area_of_e_governance,
-    year_of_implementation,
+    year_of_implementation
   } = req.body;
 
-  console.log("Received implimentation:", implimentation); // Debug
-
-  // Validation
+  // Step 1: Field validation
   if (
     session === undefined ||
     implimentation === undefined
@@ -98,17 +96,15 @@ const createResponse623 = asyncHandler(async (req, res) => {
   }
 
   const currentYear = new Date().getFullYear();
-  if (
-    session < 1990 || session > currentYear
-  ) {
+  if (session < 1990 || session > currentYear) {
     throw new apiError(400, "Session must be between 1990 and current year");
   }
 
   if (implimentation < 0 || implimentation > 4) {
-    throw new apiError(400, "Implimentation must be between 0 and 4");
+    throw new apiError(400, "Implementation must be between 0 and 4");
   }
 
-  // Get criteria details
+  // Step 2: Fetch criteria details
   const criteria = await CriteriaMaster.findOne({
     where: {
       criterion_id: '06',
@@ -121,7 +117,7 @@ const createResponse623 = asyncHandler(async (req, res) => {
     throw new apiError(404, "Criteria not found");
   }
 
-  // Validate session window against IIQA
+  // Step 3: Validate session window against latest IIQA
   const latestIIQA = await IIQA.findOne({
     attributes: ['session_end_year'],
     order: [['id', 'DESC']]
@@ -138,39 +134,36 @@ const createResponse623 = asyncHandler(async (req, res) => {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  // Find existing record by session only
-  const existingRecord = await Criteria623.findOne({
-    where: {
-      session
-    }
-  });
-
-  let entry;
-
-  if (existingRecord) {
-    await Criteria623.update(
-      { implimentation },
-      { where: { session } }
-    );
-
-    entry = await Criteria623.findOne({ where: { session } });
-  } else {
-    entry = await Criteria623.create({
+  // Step 4: Create or update response
+  let [entry, created] = await Criteria623.findOrCreate({
+    where: { session,
+      area_of_e_governance,
+      year_of_implementation
+     },
+    defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session,
       implimentation,
       area_of_e_governance,
       year_of_implementation
-    });
+    }
+  });
+
+  if (!created) {
+    await entry.update({ implimentation });
   }
 
-  console.log("Saved implimentation:", entry.implimentation);
-
+  // Step 5: Return API response
   return res.status(201).json(
-    new apiResponse(201, entry, existingRecord ? "Response updated successfully" : "Response created successfully")
+    new apiResponse(
+      201,
+      entry,
+      created ? "Response created successfully" : "Response updated successfully"
+    )
   );
 });
+
 
 const score623 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("6.2.3");

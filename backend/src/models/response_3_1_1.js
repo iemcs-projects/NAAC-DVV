@@ -1,7 +1,7 @@
 import _sequelize from 'sequelize';
 const { Model, Sequelize } = _sequelize;
 
-export default class response_4_2_3 extends Model {
+export default class response_3_1_1 extends Model {
   static init(sequelize, DataTypes) {
   return super.init({
     id: {
@@ -20,7 +20,7 @@ export default class response_4_2_3 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,26 +28,42 @@ export default class response_4_2_3 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     year: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    resource_type: {
-      type: DataTypes.STRING(100),
-      allowNull: false
-    },
-    subscription_detail: {
+    name_of_principal_investigator: {
       type: DataTypes.STRING(255),
-      allowNull: false
-    },
-    expenditure_lakhs: {
-      type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },
-    total_expenditure: {
-      type: DataTypes.DECIMAL(10,2),
+    department_of_principal_investigator: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    duration_of_project: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    type: {
+      type: DataTypes.ENUM('Government','Non Government'),
+      allowNull: true
+    },
+    name_of_project: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    year_of_award: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    amount_sanctioned: {
+      type: DataTypes.DECIMAL(5,2),
+      allowNull: true
+    },
+    name_of_funding_agency: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
     submitted_at: {
@@ -57,7 +73,7 @@ export default class response_4_2_3 extends Model {
     }
   }, {
     sequelize,
-    tableName: 'response_4_2_3',
+    tableName: 'response_3_1_1',
     timestamps: false,
     indexes: [
       {
@@ -69,7 +85,7 @@ export default class response_4_2_3 extends Model {
         ]
       },
       {
-        name: "idx_r423_criteria",
+        name: "idx_r311_criteria",
         using: "BTREE",
         fields: [
           { name: "criteria_code" },

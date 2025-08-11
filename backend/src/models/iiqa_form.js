@@ -50,13 +50,13 @@ export default class iiqa_form extends Model {
     },
     created_at: {
       type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      allowNull: true,
+      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     },
     updated_at: {
       type: DataTypes.DATE,
-      allowNull: false,
-      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+      allowNull: true,
+      defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
     sequelize,
@@ -83,4 +83,12 @@ export default class iiqa_form extends Model {
     ]
   });
   }
+
+  // in iiqa_form model
+static associate(models) {
+  this.hasMany(models.iiqa_departments, {
+    foreignKey: 'iiqa_form_id',
+    as: 'departments'
+  });
+}
 }

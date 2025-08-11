@@ -164,26 +164,18 @@ const getResponsesByCriteriaCode = asyncHandler(async (req, res) => {
 });
 
 const createResponse113 = asyncHandler(async (req, res) => {
-  /*
-    1. Extract input from req.body
-    2. Validate required fields and logical constraints
-    3. Check if programme_name or programme_code already exists for the same year and session
-    4. Get criteria_code from criteria_master
-    5. Get latest IIQA session and validate session window
-    6. Create or update response in response_2_1_1 table
-  */
-
   const {
     session,
     year,
     teacher_name,
     body_name,
-    option_selected,
-    } = req.body;
+    option_selected
+  } = req.body;
 
   // Step 1: Field validation
   if (
-    !session || !year || !teacher_name || !body_name || !option_selected
+    !session || !year || !teacher_name || !body_name ||
+    option_selected === undefined
   ) {
     throw new apiError(400, "Missing required fields");
   }
@@ -196,33 +188,13 @@ const createResponse113 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Year and session must be between 1990 and current year");
   }
 
-  if (option_selected < 0 || option_selected >= 4) {
+  if (option_selected < 0 || option_selected > 4) {
     throw new apiError(400, "Option selected must be between 0 and 4");
   }
 
-  // Create proper Date objects for session
-  const sessionDate = new Date(session, 0, 1); // Jan 1st of the given year
-
-
-
-  // Step 2: Check for existing programme_name or programme_code in same session/year
-  const existingRecord = await Criteria113.findOne({
-    where: {
-      session,
-      year,
-      [Sequelize.Op.or]: [
-        { teacher_name },
-      ]
-    }
-  });
-
-  if (existingRecord) {
-    if (existingRecord.teacher_name === teacher_name) {
-      throw new apiError(400, "Teacher name already exists for this session and year");
-    } else {
-      throw new apiError(400, "Programme code already exists for this session and year");
-    }
-  }
+  // Step 2: Prevent duplicates — same session + year + teacher_name + body_name
+  // (We won't throw here, because findOrCreate will handle updating)
+  // But you can keep extra logic here if needed for validation.
 
   // Step 3: Fetch criteria details
   const criteria = await CriteriaMaster.findOne({
@@ -233,15 +205,11 @@ const createResponse113 = asyncHandler(async (req, res) => {
     }
   });
 
-  
-
   if (!criteria) {
     throw new apiError(404, "Criteria not found");
   }
 
-  console.log(criteria.criteria_code);
-
-  // Step 4: Validate session window against IIQA
+  // Step 4: Validate session window against latest IIQA
   const latestIIQA = await IIQA.findOne({
     attributes: ['session_end_year'],
     order: [['created_at', 'DESC']]
@@ -255,7 +223,7 @@ const createResponse113 = asyncHandler(async (req, res) => {
   const startYear = endYear - 5;
 
   if (session < startYear || session > endYear) {
-    throw new apiError(400, "Session must be between ${startYear} and ${endYear}");
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
   // Step 5: Create or update response
@@ -278,31 +246,18 @@ const createResponse113 = asyncHandler(async (req, res) => {
   });
 
   if (!created) {
-    await Criteria113.update({
-      option_selected
-    }, {
-      where: {
-        session,
-        year,
-        teacher_name,
-        body_name
-      }
-    });
-
-    entry = await Criteria113.findOne({
-      where: {
-        session,
-        year,
-        teacher_name,
-        body_name
-      }
-    });
+    await entry.update({ option_selected });
   }
 
   return res.status(201).json(
-    new apiResponse(201, entry, created ? "Response created successfully" : "Response updated successfully")
+    new apiResponse(
+      201,
+      entry,
+      created ? "Response created successfully" : "Response updated successfully"
+    )
   );
 });
+
 
 const score113 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("1.1.3");

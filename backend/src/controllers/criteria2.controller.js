@@ -1309,23 +1309,19 @@ const score263 = asyncHandler(async (req, res) => {
   const currentYear = new Date().getFullYear();
   const criteria_code = convertToPaddedFormat("2.6.3");
 
-  // Get criteria
+  // Step 1: Get criteria
   const criteria = await CriteriaMaster.findOne({
-    where: { 
-      sub_sub_criterion_id: criteria_code
-    }
+    where: { sub_sub_criterion_id: criteria_code }
   });
-
   if (!criteria) {
     throw new apiError(404, "Criteria 2.6.3 not found in criteria_master");
   }
 
-  // Get latest IIQA session
+  // Step 2: Get latest IIQA session
   const latestIIQA = await IIQA.findOne({
     attributes: ['session_end_year'],
     order: [['created_at', 'DESC']]
   });
-
   if (!latestIIQA) {
     throw new apiError(404, "No IIQA form found");
   }
@@ -1333,75 +1329,81 @@ const score263 = asyncHandler(async (req, res) => {
   const endYear = latestIIQA.session_end_year;
   const startYear = endYear - 5;
 
-  // Fetch responses
-  const responses = await Criteria263.findAll({
+  // Step 3: Group by year and sum appeared and passed
+  const yearlyData = await Criteria263.findAll({
     attributes: [
       'session',
-      'number_of_students_appeared_in_the_final_year_examination',
-      'number_of_students_passed_in_the_final_year_examination'
+      [Sequelize.fn('SUM', Sequelize.col('number_of_students_appeared_in_the_final_year_examination')), 'totalAppeared'],
+      [Sequelize.fn('SUM', Sequelize.col('number_of_students_passed_in_the_final_year_examination')), 'totalPassed']
     ],
     where: {
       criteria_code: criteria.criteria_code,
       session: {
-        [Sequelize.Op.gte]: startYear,
-        [Sequelize.Op.lte]: endYear
+        [Sequelize.Op.between]: [startYear, endYear]
       }
     },
-    order: [['session', 'DESC']]
+    group: ['session'],
+    order: [['session', 'ASC']],
+    raw: true
   });
 
-  if (responses.length === 0) {
+  console.log("Yearly Data:", yearlyData);
+
+  if (yearlyData.length === 0) {
     throw new apiError(404, "No responses found for the given period");
   }
 
-  // Calculate total appeared and passed
-  const totals = responses.reduce((acc, response) => {
-    acc.totalAppeared += response.number_of_students_appeared_in_the_final_year_examination || 0;
-    acc.totalPassed += response.number_of_students_passed_in_the_final_year_examination || 0;
-    return acc;
-  }, { totalAppeared: 0, totalPassed: 0 });
+  // Step 4: Calculate per-year percentages and average
+  const percentages = yearlyData.map(year => {
+    const appeared = parseInt(year.totalAppeared, 10);
+    const passed = parseInt(year.totalPassed, 10);
+    return appeared > 0 ? (passed / appeared) * 100 : 0;
+  });
 
-  // Calculate score (percentage)
-  const score = totals.totalAppeared > 0 
-    ? (totals.totalPassed / totals.totalAppeared) * 100 
-    : 0;
-    let grade;
-    if (score >= 90) grade = 4;
-    else if (score >= 80) grade = 3;
-    else if (score >= 70) grade = 2;
-    else if (score >= 60) grade = 1;
-    else grade = 0;
-  // Create score entry
+  console.log("Percentages:", percentages);
+
+  const score = percentages.reduce((a, b) => a + b, 0) / percentages.length;
+
+  console.log("Score:", score);
+
+  // Step 5: Grade mapping
+  let grade;
+  if (score >= 90) grade = 4;
+  else if (score >= 80) grade = 3;
+  else if (score >= 70) grade = 2;
+  else if (score >= 60) grade = 1;
+  else grade = 0;
+
+  // Step 6: Create or update score entry
   let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
       session: currentYear
     },
     defaults: {
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: currentYear,
-    cycle_year: 1
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: currentYear,
+      cycle_year: 1
     }
-});
+  });
 
-    if(!created) {
-      await Score.update({
-        score_sub_sub_criteria: score,
-        sub_sub_cr_grade: grade
-      }, {
-        where: {
-          criteria_code: criteria.criteria_code,
-          session: currentYear
-        }
-      });
-    }
+  if (!created) {
+    await Score.update({
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: currentYear
+      }
+    });
 
     entry = await Score.findOne({
       where: {
@@ -1409,11 +1411,13 @@ const score263 = asyncHandler(async (req, res) => {
         session: currentYear
       }
     });
+  }
 
-    return res.status(200).json(
-      new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
+  return res.status(200).json(
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
+
 
 const score243 = asyncHandler(async (req, res) => {
   const currentYear = new Date().getFullYear();

@@ -20,31 +20,15 @@ export default class response_4_3_2 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
       }
     },
     session: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    academic_year: {
-      type: DataTypes.STRING(20),
+      type: DataTypes.DATE,
       allowNull: false
-    },
-    total_students: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    working_computers: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    student_computer_ratio: {
-      type: DataTypes.DECIMAL(10,2),
-      allowNull: true
     },
     submitted_at: {
       type: DataTypes.DATE,

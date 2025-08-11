@@ -56,26 +56,38 @@ const Criteria2_3_3 = () => {
 
   // Define fetchScore with useCallback to prevent recreation on every render
   const fetchScore = useCallback(async () => {
+    console.log('fetchScore called for criteria 2.3.3');
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get(
-        "http://localhost:3000/api/v1/criteria2/score233"
+        "http://localhost:3000/api/v1/criteria2/score233",
+        { withCredentials: true }
       );
       console.log("Fetched score data:", response.data);
-  
-      // The API returns scores as strings inside response.data.data
-      const scoreData = response.data.data;
+      
+      // Handle the actual response structure
+      const responseData = response.data;
+      const scoreData = responseData.data; // The scores are in the data property
+      
+      console.log('Score data:', {
+        sub_sub_criteria: scoreData.score_sub_sub_criteria,
+        sub_criteria: scoreData.score_sub_criteria,
+        criteria: scoreData.score_criteria,
+        grade: scoreData.sub_sub_cr_grade
+      });
+      
+      // Format the scores to match the component's expected structure
       const parsedScore = {
-        score_sub_sub_criteria:
-          parseFloat(scoreData?.score_sub_sub_criteria) || 0,
-        score_sub_criteria: parseFloat(scoreData?.score_sub_criteria) || 0,
-        score_criteria: parseFloat(scoreData?.score_criteria) || 0,
+        score_sub_sub_criteria: parseFloat(scoreData.score_sub_sub_criteria) || 0,
+        score_sub_criteria: parseFloat(scoreData.score_sub_criteria) || 0,
+        score_criteria: parseFloat(scoreData.score_criteria) || 0,
+        grade: scoreData.sub_sub_cr_grade || 0
       };
   
       setProvisionalScore({
         score: parsedScore,
-        message: response.data.message || "Score loaded successfully",
+        message: responseData.message || "Score loaded successfully"
       });
     } catch (error) {
       console.error("Error fetching provisional score:", error);

@@ -35,7 +35,7 @@ export default class response_3_4_2 extends Model {
       allowNull: false
     },
     year_of_mou: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     duration: {

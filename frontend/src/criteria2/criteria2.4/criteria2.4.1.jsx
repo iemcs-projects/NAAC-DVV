@@ -27,7 +27,19 @@ const Criteria2_4_1 = () => {
     additionalInfo: null,
     facultyList: null,
   });
-  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [provisionalScore, setProvisionalScore] = useState({
+    score: {
+      score_sub_sub_criteria: 0,
+      score_sub_criteria: 0,
+      score_criteria: 0,
+      grade: 0
+    },
+    message: '',
+    yearly_data: null,
+    ratio_array: null,
+    average_ratio: null,
+    score_entry: null
+  });
   const [scoreLoading, setScoreLoading] = useState(false);
   const [scoreError, setScoreError] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -45,22 +57,51 @@ const Criteria2_4_1 = () => {
   // Function to fetch provisional score
   const fetchScore = async () => {
     if (!currentYear) return;
+    console.log('fetchScore called for criteria 2.4.1');
     setScoreLoading(true);
     setScoreError(null);
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/criteria2/score241");
-      const data = response.data.data;
+      const response = await axios.get(
+        "http://localhost:3000/api/v1/criteria2/score241",
+        { withCredentials: true }
+      );
       
-      // Get the score directly from the response
-      const score = data?.score_entry?.score_sub_sub_criteria || "N/A";
+      console.log("Fetched score data:", response.data);
+      
+      // Handle the actual response structure
+      const responseData = response.data;
+      const scoreData = responseData.data; // The scores are in the data property
+      const scoreEntry = scoreData.score_entry || {};
+      
+      console.log('Score entry data:', scoreEntry);
+      console.log('Additional data:', {
+        yearly_data: scoreData.yearly_data,
+        ratio_array: scoreData.ratio_array,
+        average_ratio: scoreData.average_ratio
+      });
+      
+      // Format the scores to match the component's expected structure
+      const parsedScore = {
+        score_sub_sub_criteria: parseFloat(scoreEntry.score_sub_sub_criteria) || 0,
+        score_sub_criteria: parseFloat(scoreEntry.score_sub_criteria) || 0,
+        score_criteria: parseFloat(scoreEntry.score_criteria) || 0,
+        grade: scoreEntry.sub_sub_cr_grade || 0,
+        weighted_cr_score: scoreEntry.weighted_cr_score || 0
+      };
+      
+      // Calculate average ratio if not provided
+      const averageRatio = scoreData.average_ratio || 
+                         (scoreData.ratio_array && scoreData.ratio_array.length > 0 ? 
+                          (scoreData.ratio_array.reduce((a, b) => a + b, 0) / scoreData.ratio_array.length).toFixed(2) : 
+                          0);
       
       setProvisionalScore({
-        score,
-        message: response.data.message,
-        yearly_data: data?.yearly_data,
-        ratio_array: data?.ratio_array,
-        average_ratio: data?.average_ratio,
-        score_entry: data?.score_entry
+        score: parsedScore,
+        message: responseData.message || "Score loaded successfully",
+        yearly_data: scoreData.yearly_data || {},
+        ratio_array: scoreData.ratio_array || [],
+        average_ratio: parseFloat(averageRatio) || 0,
+        score_entry: scoreEntry
       });
     } catch (error) {
       console.error("Score fetch error:", error);
@@ -194,12 +235,26 @@ const Criteria2_4_1 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {scoreLoading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore !== null ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (2.4.1): {provisionalScore.score} %
-              </p>
+            ) : provisionalScore.score ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (2.4.1): {provisionalScore.score.score_sub_sub_criteria.toFixed(2)} %
+                </p>
+                <p className="text-sm text-gray-600">
+                  Sub-criteria Score: {provisionalScore.score.score_sub_criteria.toFixed(2)} %
+                </p>
+                <p className="text-sm text-gray-600">
+                  Overall Criteria Score: {provisionalScore.score.score_criteria.toFixed(2)} %
+                </p>
+                <p className="text-sm text-gray-600">
+                  Grade: {provisionalScore.score.grade}
+                </p>
+              </div>
             ) : (
-              <p className="text-gray-600">No score data available.</p>
+              <p className="text-gray-600">No score data available. Please submit data to calculate score.</p>
+            )}
+            {scoreError && (
+              <p className="text-red-500 text-sm mt-2">Error: {scoreError}</p>
             )}
           </div>
 

@@ -20,7 +20,7 @@ export default class response_3_2_1 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,7 +28,7 @@ export default class response_3_2_1 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     paper_title: {
       type: DataTypes.STRING(255),
@@ -47,15 +47,11 @@ export default class response_3_2_1 extends Model {
       allowNull: true
     },
     year_of_publication: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     issn_number: {
       type: DataTypes.STRING(50),
-      allowNull: true
-    },
-    indexation_status: {
-      type: DataTypes.STRING(255),
       allowNull: true
     },
     submitted_at: {

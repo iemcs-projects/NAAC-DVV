@@ -1,276 +1,386 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import axios from "axios";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
-import Criteria7_2_1 from "../../criteria7/criteria7.2/criteria7.2.1";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria3_1_1 = () => {
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [currentYear, setCurrentYear] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [submittedData, setSubmittedData] = useState([]);
+
+  const pastFiveYears = Array.from(
+    { length: 5 },
+    (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`
+  );
+
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-
   const [yearData, setYearData] = useState({});
-  const [formData, setFormData] = useState({
-    proj: "",
-    name: "",
-    princ: "",
-    dept: "",
-    amt: "",
-    duration: "",
-    agency: "",
-    type: "",
-    supportLinks: [""],
-  });
-
   const [yearScores, setYearScores] = useState(
     pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
   );
   const [yearCount, setYearCount] = useState(5);
   const [averageScore, setAverageScore] = useState(null);
+  const [provisionalScore, setProvisionalScore] = useState(null);
+
+
+  const [formData, setFormData] = useState({
+    name_of_project: "",
+    name_of_principal_investigator: "",
+    department_of_principal_investigator: "",
+    amount_sanctioned: "",
+    duration_of_project: "",
+    name_of_funding_agency: "",
+    type: "",
+    supportLinks: [""],
+  });
+
+    useEffect(() => {
+      if (currentYear) {
+        const year = currentYear.split('-')[0];
+        setFormData(prev => ({
+          ...prev,
+          year: year
+        }));
+        // Also update the selectedYear
+        setSelectedYear(currentYear);
+      }
+    }, [currentYear]);
 
   const navigate = useNavigate();
-  const years = pastFiveYears;
 
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...formData.supportLinks];
-      updatedLinks[index] = value;
-      setFormData({ ...formData, supportLinks: updatedLinks });
+  const handleChange = (field, value, index) => {
+    if (field === 'supportLinks') {
+      const newSupportLinks = [...formData.supportLinks];
+      newSupportLinks[index] = value;
+      setFormData(prev => ({ ...prev, supportLinks: newSupportLinks }));
     } else {
-      setFormData({ ...formData, [field]: value });
+      setFormData(prev => ({ ...prev, [field]: value }));
     }
   };
+  console.log(formData);
 
-  const handleSubmit = () => {
-    const { proj, name, princ, dept, amt, duration, agency, type } = formData;
-
-    if (proj && name && princ && dept && amt && duration && agency && type) {
-      const updatedForm = { ...formData, year: selectedYear };
-
-      const updatedYearData = {
-        ...yearData,
-        [selectedYear]: [...(yearData[selectedYear] || []), updatedForm],
-      };
-
-      setYearData(updatedYearData);
-      setFormData({
-        proj: "",
-        name: "",
-        princ: "",
-        year: "",
-        amt: "",
-        duration: "",
-        agency: "",
-        type: "",
-        supportLinks: [""],
+  const fetchScore = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Get the latest IIQA session from the context
+      const response = await axios.get("http://localhost:3000/api/v1/criteria3/score311", {
       });
-    } else {
-      alert("Please fill in all fields.");
+      console.log('Score response:', response.data.data);
+      setProvisionalScore(response.data.data);
+    } catch (err) {
+      setError(err.message || "Failed to fetch score");
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (currentYear) {
+      fetchScore();
+    }
+  }, [currentYear]);
+
+
+  const handleSubmit = async () => {
+    const {
+      name_of_project,
+      name_of_principal_investigator,
+      department_of_principal_investigator,
+      amount_sanctioned,
+      duration_of_project,
+      name_of_funding_agency,
+      type,
+      year,
+    } = formData;
+  
+    const sessionFull = currentYear;
+    const session = sessionFull.split("-")[0];
+    const year_of_award = year || sessionFull.split("-")[0]; // Use form year if provided, otherwise fallback to session year
+  
+    if (!name_of_project || !name_of_principal_investigator || 
+        !amount_sanctioned || !duration_of_project || !name_of_funding_agency || !year) {
+      alert("Please fill in all required fields:");
+      return;
+    }
+  
+    try {
+      const response = await axios.post("http://localhost:3000/api/v1/criteria3/createResponse311_312", {
+        session: parseInt(session),
+        year,
+        name_of_project,
+        name_of_principal_investigator,
+        department_of_principal_investigator,
+        amount_sanctioned: parseFloat(amount_sanctioned),
+        duration_of_project,
+        name_of_funding_agency,
+        type,  // This will be either "Government" or "Non-government"
+        year_of_award
+        
+      });
+  
+      const resp = response?.data?.data || {};
+      const newEntry = {
+        ...resp,
+        year: year_of_award,
+        name_of_project: resp.name_of_project || name_of_project,
+        name_of_principal_investigator: resp.name_of_principal_investigator || name_of_principal_investigator,
+        department_of_principal_investigator: resp.department_of_principal_investigator || department_of_principal_investigator,
+        amount_sanctioned: resp.amount_sanctioned || amount_sanctioned,
+        duration_of_project: resp.duration_of_project || duration_of_project,
+        name_of_funding_agency: resp.name_of_funding_agency || name_of_funding_agency,
+        type: resp.type || type
+      };
+  
+      // Update state with new entry
+      setSubmittedData(prev => [...prev, newEntry]);
+      setYearData(prev => ({
+        ...prev,
+        [year_of_award]: [...(prev[year_of_award] || []), newEntry]
+      }));
+  
+      // Reset form
+      setFormData({
+        name_of_project: "",
+        name_of_principal_investigator: "",
+        department_of_principal_investigator: "",
+        amount_sanctioned: "",
+        duration_of_project: "",
+        name_of_funding_agency: "",
+        type: "",
+        year:""
+      });
+      
+      // Fetch updated score
+      await fetchScore();
+      alert("Project data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting project data:", error);
+      alert(error.response?.data?.message || error.message || "Failed to submit project data");
+    }
+  };
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      setAvailableSessions(sessions);
+      // Optionally set the current year to the first available session
+      setCurrentYear(sessions[0]);
+    }
+  }, [sessions]);
+
 
   const goToNextPage = () => navigate("/criteria3.1.2");
   const goToPreviousPage = () => navigate("/criteria2.7.1");
 
-  const totalPrograms = years.reduce((acc, year) => acc + (yearData[year]?.length || 0), 0);
-  const averagePrograms = (totalPrograms / years.length).toFixed(2);
-
   return (
-    <div className="w-[1690px] min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50">
       <Header />
       <Navbar />
-      <div className="flex w-full">
+      <div className="flex min-h-screen">
         <Sidebar />
         <div className="flex-1 p-6">
+
+          {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-medium text-gray-800">
-              Criteria 3- Research, Innovations and Extension
+            <h2 className="text-xl font-medium text-black">
+              Criteria 3 - Research, Innovations and Extension
             </h2>
-            <div className="text-sm text-gray-600">3.1- Resource Mobilization for Research</div>
+            <span className="text-sm text-black">
+              3.1 – Resource Mobilization for Research
+            </span>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                <div className="text-lg font-medium text-green-500 bg-[#bee7c7] !w-[1000px] h-[50px] pt-[10px] rounded-lg">
-                  Provisional Score: 18.75
-                </div>
+          {/* Provisional Score */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (3.1.1): {provisionalScore?.score_sub_sub_criteria || provisionalScore?.data?.score_sub_sub_criteria || provisionalScore?.score || provisionalScore?.data?.score || 0} Lakhs
+                </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore?.sub_sub_cr_grade || provisionalScore?.data?.sub_sub_cr_grade || provisionalScore?.grade || provisionalScore?.data?.grade || 'N/A'}
+                </p>
               </div>
-              </div></div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
+          </div>
 
+
+          {/* Metric Information */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-2">3.1.1 Metric Information</h3>
-            <p className="text-sm text-gray-700">
-              3.1.1.1: Total Grants from Government and non-governmental agencies
-for research projects / endowments in the institution during the last five
-years (INR in Lakhs)
-
+            <p className="text-gray-700">
+              Total Grants from Government and non-governmental agencies for research projects / endowments in the institution during the last five years (INR in Lakhs)
             </p>
             <h3 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h3>
-            <ul className="list-disc pl-5 text-sm text-gray-700">
+            <ul className="list-disc pl-5 text-gray-700">
               <li>Any additional information</li>
-<li>e-copies of the grant award letters for sponsored research</li>
-projects / endowments
-<li>List of endowments / projects with details of grants (Data
-Template)</li>
+              <li>e-copies of the grant award letters for sponsored research projects / endowments</li>
+              <li>List of endowments / projects with details of grants (Data Template)</li>
             </ul>
-
-
-            
           </div>
 
-          <div className="border rounded mb-8">
-            <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">
-                Grants received from Government and non-governmental agencies for
-                research projects / endowments in the institution during the last five
-                years (INR in Lakhs)
-              </h2>
-              <div>
-                <label className="mr-2 font-medium">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border px-3 py-1 rounded text-gray-950"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          {/* Year Selector */}
+          <div className="flex justify-end mb-4">
+            <label className="mr-2 font-medium text-black">Select Year:</label>
+            <select
+  className="border px-3 py-1 rounded text-black"
+  value={currentYear}
+  onChange={(e) => setCurrentYear(e.target.value)}
+  disabled={sessionLoading || !availableSessions.length}
+>
+  {sessionLoading ? (
+    <option>Loading sessions...</option>
+  ) : sessionError ? (
+    <option>Error loading sessions</option>
+  ) : (
+    availableSessions.map((year) => (
+      <option key={year} value={year}>{year}</option>
+    ))
+  )}
+</select>
+          </div>
 
-            <table className="w-full border text-sm">
-              <thead className="bg-gray-100 text-gray-950">
+          {/* Data Entry Table */}
+          <div className="overflow-auto border rounded mb-6">
+            <table className="min-w-full border text-black text-sm">
+              <thead className="bg-gray-100 font-semibold">
                 <tr>
-                  <th className="border px-2 py-2">Name of the Project/ Endowments, Chairs</th>
-                  <th className="border px-2 py-2">Name of the Principal Investigator/Co-Investigator</th>
-                  <th className="border px-2 py-2">Department of Principal Investigator</th>
-                  <th className="border px-2 py-2">Year of Award</th>
-                  <th className="border px-2 py-2">Amount Sanctioned</th>
-                  <th className="border px-2 py-2">Duration of the project</th>
-                  <th className="border px-2 py-2">Name of the Funding Agency </th>
-                  <th className="border px-2 py-2"> Type  (Government/non-Government)</th>
-                  <th className="border px-2 py-2">Action</th>
+                  <th className="border px-2">Project Name</th>
+                  <th className="border px-2">Principal Investigator</th>
+                  <th className="border px-2">Department</th>
+                  <th className="border px-2">Amount Sanctioned</th>
+                  <th className="border px-2">Duration</th>
+                  <th className="border px-2">Funding Agency</th>
+                  <th className="border px-2">Type</th>
+                  <th className="border px-2">Year</th>
+                  <th className="border px-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  {["proj", "name", "dept", "year", "amt", "duration", "agency", "type"].map((key) => (
-                    <td key={key} className="border px-2 py-1">
-                      <input
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
-                        value={formData[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                      />
-                    </td>
-                  ))}
-                  <td className="border px-2 py-1 text-center">
-                    <button
-                      className="!bg-blue-600 text-white px-3 py-1 rounded hover:!bg-blue-700"
-                      onClick={handleSubmit}
-                    >
-                      Add
-                    </button>
+                  <td className="border px-2">
+                    <input value={formData.name_of_project} onChange={(e) => handleChange("name_of_project", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+                    <input value={formData.name_of_principal_investigator} onChange={(e) => handleChange("name_of_principal_investigator", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+                    <input value={formData.department_of_principal_investigator} onChange={(e) => handleChange("department_of_principal_investigator", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+                    <input type="number" value={formData.amount_sanctioned} onChange={(e) => handleChange("amount_sanctioned", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+                    <input value={formData.duration_of_project} onChange={(e) => handleChange("duration_of_project", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+                    <input value={formData.name_of_funding_agency} onChange={(e) => handleChange("name_of_funding_agency", e.target.value)} className="w-full border px-2 py-1 text-black" />
+                  </td>
+                  <td className="border px-2">
+  <select
+    value={formData.type}
+    onChange={(e) => handleChange("type", e.target.value)}
+    className="w-full border px-2 py-1 text-black"
+  >
+    <option value="">Select Type</option>
+    <option value="Government">Government</option>
+    <option value="Non-government">Non Government</option>
+  </select>
+</td>
+                  <td className="border px-2">
+                    <input 
+                      type="number" 
+                      min="2000"
+                      max={new Date().getFullYear()}
+                      value={formData.year} 
+                      onChange={(e) => handleChange("year", e.target.value)} 
+                      className="w-full border px-2 py-1 text-black"
+                      placeholder="Year"
+                    />
+                  </td>
+                  <td className="border px-2">
+                    <button onClick={handleSubmit} className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Add</button>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Links to relevant documents:
-            </label>
-            <div className="flex flex-col gap-2">
-              {formData.supportLinks.map((link, index) => (
-                <input
-                  key={index}
-                  type="url"
-                  placeholder={`Enter support link ${index + 1}`}
-                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                  value={link}
-                  onChange={(e) => handleChange("supportLinks", e.target.value, index)}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:!bg-blue-700 w-fit"
-              >
-                + Add Another Link
-              </button>
-            </div>
-          </div>
+          {/* Links Section */}
+      
 
-          {years.map((year) => (
-            <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
-              {yearData[year]?.length > 0 ? (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-200">
+          {/* Year-wise Data */}
+          {pastFiveYears.map((yr) => (
+            <div key={yr} className="mb-6 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 px-4 py-2 text-black">Year: {yr}</h3>
+              {yearData[yr]?.length ? (
+                <table className="min-w-full border text-black text-sm">
+                  <thead className="bg-gray-100 font-semibold">
                     <tr>
-                      <th className="border text-gray-900 px-2 py-1">#</th>
-                      <th className="border text-gray-900 px-2 py-1">proj</th>
-                      <th className="border text-gray-900 px-2 py-1">name</th>
-                      <th className="border text-gray-900 px-2 py-1">princ</th>
-                      <th className="border text-gray-900 px-2 py-1">dept</th>
-                      <th className="border text-gray-900 px-2 py-1">amt</th>
-                      <th className="border text-gray-900 px-2 py-1">duration</th>
-                      <th className="border text-gray-900 px-2 py-1">agency</th>
-                      <th className="border text-gray-900 px-2 py-1">type</th>
+                      <th className="border px-2 py-1">#</th>
+                      <th className="border px-2 py-1">Project Name</th>
+                      <th className="border px-2 py-1">Principal Investigator</th>
+                      <th className="border px-2 py-1">Department</th>
+                      <th className="border px-2 py-1">Amount Sanctioned</th>
+                      <th className="border px-2 py-1">Duration</th>
+                      <th className="border px-2 py-1">Funding Agency</th>
+                      <th className="border px-2 py-1">Type</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {yearData[year].map((entry, idx) => (
-                      <tr key={idx} className="even:bg-gray-50">
-                        <td className="border text-gray-900 border-black px-2 py-1">{idx + 1}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.proj}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.name}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.princ}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.dept}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.amt}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.duration}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.agency}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.type}</td>
+                    {yearData[yr].map((entry, idx) => (
+                      <tr key={idx}>
+                        <td className="border px-2 py-1">{idx + 1}</td>
+                        <td className="border px-2 py-1">{entry.name_of_project}</td>
+                        <td className="border px-2 py-1">{entry.name_of_principal_investigator}</td>
+                        <td className="border px-2 py-1">{entry.department_of_principal_investigator}</td>
+                        <td className="border px-2 py-1">{entry.amount_sanctioned}</td>
+                        <td className="border px-2 py-1">{entry.duration_of_project}</td>
+                        <td className="border px-2 py-1">{entry.name_of_funding_agency}</td>
+                        <td className="border px-2 py-1">{entry.type}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-600 p-4">No data available for {year}.</p>
+                <p className="text-black px-4 py-2">No data submitted for this year.</p>
               )}
             </div>
           ))}
 
+          {/* Calculation Table */}
           <div className="overflow-auto border rounded p-4">
-            <h2 className="text-lg font-semibold mb-2 text-gray-700">
-              Calculation Table (Last 5 Years)
-            </h2>
-            <table className="table-auto border-collapse w-full">
+            <h2 className="text-lg font-semibold mb-2 text-black">Calculation Table (Last 5 Years)</h2>
+            <table className="table-auto border-collapse w-full text-black">
               <thead>
-                <tr className="bg-gray-100 text-gray-600 font-semibold">
+                <tr className="bg-gray-100 font-semibold">
                   <th className="border px-4 py-2">Year</th>
-                  {Object.keys(yearScores).map((year) => (
-                    <th key={year} className="border px-4 py-2">{year}</th>
+                  {pastFiveYears.map((yr) => (
+                    <th key={yr} className="border px-4 py-2">{yr}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="border px-4 py-2 font-medium text-gray-600">Calculated Score</td>
-                  {Object.keys(yearScores).map((year) => (
-                    <td key={year} className="border px-4 py-2 text-center">
+                  <td className="border px-4 py-2 font-medium">Calculated Score</td>
+                  {pastFiveYears.map((yr) => (
+                    <td key={yr} className="border px-4 py-2 text-center">
                       <input
                         type="number"
-                        value={yearScores[year]}
-                        onChange={(e) =>
-                          setYearScores({ ...yearScores, [year]: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-20 text-center border px-1 rounded text-gray-950"
+                        value={yearScores[yr]}
+                        onChange={(e) => setYearScores({ ...yearScores, [yr]: parseFloat(e.target.value) || 0 })}
+                        className="w-20 rounded border px-1 text-center text-black"
                       />
                     </td>
                   ))}
@@ -278,24 +388,22 @@ Template)</li>
               </tbody>
             </table>
             <div className="flex items-center gap-2 mt-4">
-              <label className="text-sm font-medium text-gray-700">
-                Enter number of years for average:
-              </label>
+              <label className="text-sm font-medium text-black">Enter number of years for average:</label>
               <input
                 type="number"
                 value={yearCount}
                 min={1}
                 max={5}
                 onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                className="w-20 border px-2 py-1 rounded text-center text-gray-950"
+                className="w-20 border px-2 py-1 rounded text-center text-black"
               />
               <button
-                className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:!bg-green-700"
                 onClick={() => {
-                  const values = Object.values(yearScores).slice(0, yearCount);
-                  const sum = values.reduce((acc, val) => acc + val, 0);
+                  const vals = Object.values(yearScores).slice(0, yearCount);
+                  const sum = vals.reduce((acc, v) => acc + v, 0);
                   setAverageScore((sum / yearCount).toFixed(2));
                 }}
+                className="ml-4 bg-blue-600 px-4 py-2 text-white rounded hover:bg-green-700"
               >
                 Calculate Average
               </button>
@@ -307,8 +415,9 @@ Template)</li>
             )}
           </div>
 
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+          {/* Navigation */}
+          <div className="bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+            <Bottom onPrevious={goToPreviousPage} onNext={goToNextPage} />
           </div>
         </div>
       </div>
@@ -317,5 +426,3 @@ Template)</li>
 };
 
 export default Criteria3_1_1;
-
-

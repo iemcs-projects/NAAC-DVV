@@ -20,7 +20,7 @@ export default class response_4_1_3 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,11 +28,15 @@ export default class response_4_1_3 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
+      allowNull: false
+    },
+    no_of_classroom: {
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     room_identifier: {
-      type: DataTypes.STRING(255),
-      allowNull: false
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     typeict_facility: {
       type: DataTypes.STRING(255),

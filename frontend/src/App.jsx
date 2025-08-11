@@ -103,6 +103,7 @@ import Criteria6_4_2 from "./criteria6/criteria6.4/criteria6.4.2.jsx";
 import Criteria6_4_3 from "./criteria6/criteria6.4/criteria6.4.3.jsx";
 import Criteria6_5_1 from "./criteria6/criteria6.5/criteria6.5.1.jsx";
 import Criteria6_5_2 from "./criteria6/criteria6.5/criteria6.5.2.jsx";
+import Criteria6_5_3 from "./criteria6/criteria6.5/criteria6.5.3.jsx";
 import Criteria7_1_1 from "./criteria7/criteria7.1/criteria7.1.1.jsx";
 import Criteria7_1_2 from "./criteria7/criteria7.1/criteria7.1.2.jsx";
 import Criteria7_1_3 from "./criteria7/criteria7.1/criteria7.1.3.jsx";
@@ -441,14 +442,6 @@ function App() {
               </PrivateRoute>
             }
           />
-           <Route
-            path='/criteria6.1.1'
-            element={
-              <PrivateRoute allowedRoles={['iqac', 'admin']}>
-                <Criteria2_7_1 />
-              </PrivateRoute>
-            }
-          />
              <Route
             path='/criteria6.1.1'
             element={
@@ -466,7 +459,7 @@ function App() {
             }
           />
           <Route
-            path='/criteria6.1.1'
+            path='/criteria6.2.1'
             element={
               <PrivateRoute allowedRoles={['iqac', 'admin']}>
                 <Criteria6_2_1 />
@@ -566,6 +559,14 @@ function App() {
             element={
               <PrivateRoute allowedRoles={['iqac', 'admin']}>
                 <Criteria6_5_2/>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path='/criteria6.5.3'
+            element={
+              <PrivateRoute allowedRoles={['iqac', 'admin']}>
+                <Criteria6_5_3/>
               </PrivateRoute>
             }
           />
@@ -987,6 +988,14 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
 
 
 

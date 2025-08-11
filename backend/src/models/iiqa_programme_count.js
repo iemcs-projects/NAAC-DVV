@@ -19,39 +19,39 @@ export default class iiqa_programme_count extends Model {
       }
     },
     ug: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     pg: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     post_masters: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     pre_doctoral: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     doctoral: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     post_doctoral: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     pg_diploma: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     diploma: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     certificate: {
-      type: DataTypes.TINYINT,
+      type: DataTypes.INTEGER,
       allowNull: true
     }
   }, {

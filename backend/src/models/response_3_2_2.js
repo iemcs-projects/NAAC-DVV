@@ -47,7 +47,7 @@ export default class response_3_2_2 extends Model {
       allowNull: true
     },
     year_of_publication: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     isbn_issn_number: {

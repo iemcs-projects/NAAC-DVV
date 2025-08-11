@@ -20,7 +20,7 @@ export default class response_5_1_4 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,10 +28,10 @@ export default class response_5_1_4 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     year: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     activity_name: {
@@ -39,6 +39,11 @@ export default class response_5_1_4 extends Model {
       allowNull: false
     },
     students_participated: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0
+    },
+    students_benefitted: {
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 0

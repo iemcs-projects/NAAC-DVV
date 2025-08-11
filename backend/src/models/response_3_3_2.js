@@ -43,7 +43,7 @@ export default class response_3_3_2 extends Model {
       allowNull: true
     },
     year_of_award: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     submitted_at: {

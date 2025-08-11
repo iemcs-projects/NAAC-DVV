@@ -4,11 +4,27 @@ import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useEffect } from "react";
+import { SessionContext } from "../../contextprovider/sessioncontext";
+import { useContext } from "react";
+
 
 const Criteria5_2_1= () => {
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
   const [yearData, setYearData] = useState({});
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+  const { sessions: availableSessions } = useContext(SessionContext);
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0) {
+      setCurrentYear(availableSessions[0]);
+      setSelectedYear(availableSessions[0]);
+    }
+  }, [availableSessions]);
 
   const [formData, setFormData] = useState({
     year: "",
@@ -21,6 +37,39 @@ const Criteria5_2_1= () => {
     
     supportLinks: [""],
   });
+
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score521");
+      console.log('API Response:', response);
+      
+      // Check if response has data and the expected score property
+      if (response.data && response.data.data && response.data.data.entry) {
+        console.log('Score data:', response.data.data.entry);
+        setProvisionalScore(response.data.data.entry);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
   const [yearScores, setYearScores] = useState(
     pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
@@ -41,27 +90,78 @@ const Criteria5_2_1= () => {
     }
   };
 
-  const handleSubmit = () => {
-  const { year, studentname, programme, employer, percentage, paypackage, } = formData;
-  if (year && studentname && programme && employer && percentage && paypackage) {
-    const updatedYearData = {
-      ...yearData,
-      [selectedYear]: [...(yearData[selectedYear] || []), formData],
-    };
-    setYearData(updatedYearData);
-    setFormData({
-        year: "",
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    
+    const {
+      studentname: student_name_contact,
+      programme: program_graduated_from,
+      employer: employer_details,
+      paypackage: pay_package_inr
+    } = formData;
+  
+    const year = currentYear;
+    const session = year.split("-")[0];
+  
+    if (!student_name_contact || !program_graduated_from || !employer_details || !pay_package_inr) {
+      alert("Please fill in all required fields (Student Name, Programme, Employer, and Pay Package).");
+      return;
+    }
+  
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria5/createResponse521",
+        {
+          session: parseInt(session, 10),
+          year,
+          student_name_contact,
+          program_graduated_from,
+          employer_details,
+          pay_package_inr: parseFloat(pay_package_inr) || 0,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+  
+      // Update local state with the new entry
+      const newEntry = {
+        year,
+        studentname: student_name_contact,
+        programme: program_graduated_from,
+        employer: employer_details,
+        paypackage: pay_package_inr
+      };
+  
+      setSubmittedData(prev => [...prev, newEntry]);
+      
+      // Update yearData
+      setYearData(prev => ({
+        ...prev,
+        [year]: [...(prev[year] || []), newEntry]
+      }));
+      
+      // Reset form
+      setFormData({
         studentname: "",
         programme: "",
         employer: "",
-        percentage: "",
         paypackage: "",
-      supportLinks: [""],
-    });
-  } else {
-    alert("Please fill in all fields.");
-  }
-};
+        supportLinks: [""],
+      });
+  
+      // Refresh the score
+      fetchScore();
+      alert("Data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting:", error);
+      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+    }
+  };
+
 const goToNextPage = () => {
     navigate("/criteria5.2.2");
   };
@@ -109,23 +209,39 @@ const goToNextPage = () => {
             </div>
           </div>
 
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
+
+
           <div className="border rounded mb-8">
             <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
               <h2 className="text-xl font-bold">Placement of outgoing student</h2>
-              <div className="size-7 mb-1">
-                <label className="text-gray-700 font-medium mr-2 -ml-[770px]">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950 mb-[200px] "
-                >
-                  {pastFiveYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div>
+                  <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+                  <select
+                    className="border px-3 py-1 rounded text-black"
+                    value={currentYear}
+                    onChange={(e) => setCurrentYear(e.target.value)}
+                  >
+                    {availableSessions && availableSessions.map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
             </div>
 
             <table className="w-full border text-sm border-black">

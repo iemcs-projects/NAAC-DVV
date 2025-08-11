@@ -12,6 +12,7 @@ import UserDropdown from './components/UserDropdown';
 import {useGpa} from './contextprovider/GpaContext';
 import { useGpaData } from './contextprovider/gpadata';
 import RadarGraphSection from './Radar';
+import {GpaDataProvider} from './contextprovider/gpadata';
 
 
 
@@ -130,8 +131,6 @@ const IqacDashboard = () => {
     { icon: BarChart3, label: 'Reports', active: false },
     { icon: Settings, label: 'Settings', active: false }
   ];
-
-
   console.log('Final criteriaLacking value:', criteriaLacking);
   const statusCards = useMemo(() => [
     {
@@ -163,6 +162,8 @@ const IqacDashboard = () => {
       bgGradient: 'from-gray-50 to-gray-100'
     }
   ], [isGpaLoading, gpaError, grade, desiredGrade, criteriaLacking]);
+
+
   const actionItems = [
     {
       priority: 'high',
@@ -322,6 +323,8 @@ const IqacDashboard = () => {
               </div>
             ))}
           </div>
+
+
           {/* SSR Download & Submission Panel */}
           <div className={`bg-white rounded-lg shadow p-5 mb-8 hover:shadow-xl transition-shadow duration-300 transform transition-all duration-700 delay-600 ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
             <h3 className="text-sm font-medium text-gray-700 mb-4">SSR Download & Submission Panel</h3>

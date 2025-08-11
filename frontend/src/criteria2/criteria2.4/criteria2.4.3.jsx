@@ -13,11 +13,19 @@ const Criteria2_4_3 = () => {
   const [currentYear, setCurrentYear] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [scoreData, setScoreData] = useState({
-    score: null,
-    message: "",
-    yearly_data: [],
-    score_entry: null
+  const [provisionalScore, setProvisionalScore] = useState({
+    score: {
+      score_sub_sub_criteria: 0,
+      score_sub_criteria: 0,
+      score_criteria: 0,
+      grade: 0,
+      weighted_cr_score: 0,
+      average_experience: 0,
+      total_experience: 0,
+      full_time_teacher_count: 0
+    },
+    message: '',
+    yearly_data: []
   });
 
   const navigate = useNavigate();
@@ -40,19 +48,66 @@ const Criteria2_4_3 = () => {
       setError(null);
       
       try {
-        const response = await axios.get(`http://localhost:3000/api/v1/criteria2/score243`);
-        const data = response.data.data;
+        const response = await axios.get(
+          `http://localhost:3000/api/v1/criteria2/score243`,
+          { withCredentials: true }
+        );
+
+        console.log("Fetched score data:", response.data);
         
-        setScoreData({
-          score: data?.score_entry?.score_sub_sub_criteria || "N/A",
-          message: response.data.message,
-          yearly_data: data?.yearly_data || [],
-          average_ratio: data?.average_ratio,
-          score_entry: data?.score_entry
+        const responseData = response.data;
+        const scoreEntry = responseData.data?.score_entry;
+        
+        if (scoreEntry) {
+          const parsedScore = {
+            score_sub_sub_criteria: parseFloat(scoreEntry.score_sub_sub_criteria) || 0,
+            score_sub_criteria: parseFloat(scoreEntry.score_sub_criteria) || 0,
+            score_criteria: parseFloat(scoreEntry.score_criteria) || 0,
+            grade: scoreEntry.sub_sub_cr_grade || 0,
+            weighted_cr_score: scoreEntry.weighted_cr_score || 0,
+            average_experience: responseData.data?.average_experience || 0,
+            total_experience: responseData.data?.total_experience || 0,
+            full_time_teacher_count: responseData.data?.full_time_teacher_count || 0
+          };
+          
+          setProvisionalScore({
+            score: parsedScore,
+            message: responseData.message || "Score loaded successfully",
+            yearly_data: responseData.data?.yearly_data || []
+          });
+        } else {
+          setProvisionalScore({
+            score: {
+              score_sub_sub_criteria: 0,
+              score_sub_criteria: 0,
+              score_criteria: 0,
+              grade: 0,
+              weighted_cr_score: 0,
+              average_experience: 0,
+              total_experience: 0,
+              full_time_teacher_count: 0
+            },
+            message: "No score data available",
+            yearly_data: []
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching score data:", error);
+        setError(error.response?.data?.message || "Failed to fetch score data");
+        setProvisionalScore({
+          score: {
+            score_sub_sub_criteria: 0,
+            score_sub_criteria: 0,
+            score_criteria: 0,
+            grade: 0,
+            weighted_cr_score: 0,
+            average_experience: 0,
+            total_experience: 0,
+            full_time_teacher_count: 0
+          },
+          message: error.response?.data?.message || "Failed to fetch score data",
+          yearly_data: []
         });
-      } catch (err) {
-        console.error("Error fetching score data:", err);
-        setError("Failed to fetch score data. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -126,16 +181,45 @@ const Criteria2_4_3 = () => {
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
               {loading ? (
                 <p className="text-gray-600">Loading provisional score...</p>
-              ) : scoreData?.score !== undefined ? (
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (2.4.3): {scoreData.score} %
-                </p>
+              ) : provisionalScore.score.score_sub_sub_criteria > 0 ? (
+                <div>
+                  <p className="text-lg font-semibold text-green-800">
+                    Provisional Score (2.4.3): {provisionalScore.score.score_sub_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Sub-criteria Score: {provisionalScore.score.score_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Overall Criteria Score: {provisionalScore.score.score_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Grade: {provisionalScore.score.grade}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Weighted Score: {provisionalScore.score.weighted_cr_score}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <p className="text-sm font-medium text-gray-700">Experience Details:</p>
+                    <p className="text-sm text-gray-600">
+                      Average Experience: {provisionalScore.score.average_experience.toFixed(2)} years
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Total Experience: {provisionalScore.score.total_experience} years
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Full-time Teachers: {provisionalScore.score.full_time_teacher_count}
+                    </p>
+                  </div>
+                </div>
               ) : (
-                <p className="text-gray-600">No score data available.</p>
+                <p className="text-gray-600">No score data available. Please submit data to calculate score.</p>
+              )}
+              {provisionalScore.message && !loading && (
+                <p className="text-sm mt-2 text-blue-600">{provisionalScore.message}</p>
               )}
             </div>
 
-            {scoreData.yearly_data.length > 0 && (
+            {provisionalScore.yearly_data && provisionalScore.yearly_data.length > 0 && (
               <div className="mt-4">
                 <p className="font-medium mb-2">Yearly Data:</p>
                 <div className="overflow-x-auto">
@@ -149,7 +233,7 @@ const Criteria2_4_3 = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {scoreData.yearly_data.map((yearData, index) => (
+                      {provisionalScore.yearly_data.map((yearData, index) => (
                         <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="border px-3 py-2">{yearData.year}</td>
                           <td className="border px-3 py-2">{yearData.total_experience}</td>

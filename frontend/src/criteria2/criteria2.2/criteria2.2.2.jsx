@@ -10,8 +10,16 @@ import LandingNavbar from "../../components/landing-navbar";
 const Criteria2_2_2 = () => {
   const navigate = useNavigate();
 
-  const [file, setFile] = useState(null);
-  const [score, setScore] = useState(null);
+    const [file, setFile] = useState(null);
+  const [provisionalScore, setProvisionalScore] = useState({
+    score: {
+      score_sub_sub_criteria: 0,
+      score_sub_criteria: 0,
+      score_criteria: 0,
+      grade: 0
+    },
+    message: ''
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,37 +35,51 @@ const Criteria2_2_2 = () => {
     navigate("/criteria2.2.1");
   };
 
-  useEffect(() => {
-    async function fetchScore() {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get("http://localhost:3000/api/v1/criteria2/score222");
-        console.log("Fetched score222:", response.data);
-        setScore(response.data.data);
-      } catch (error) {
-        console.error("Error fetching score222:", error);
-        setError("Failed to load ratio. Please ensure data in 2.4.1 is filled.");
-      } finally {
-        setLoading(false);
-      }
+  const fetchScore = async () => {
+    console.log('fetchScore called for criteria 2.2.2');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(
+        "http://localhost:3000/api/v1/criteria2/score222",
+        { withCredentials: true }
+      );
+      console.log("Fetched score data:", response.data);
+      
+      // Handle the actual response structure
+      const responseData = response.data;
+      const scoreData = responseData.data; // The scores are in the data property
+      
+      console.log('Score data:', {
+        sub_sub_criteria: scoreData.score_sub_sub_criteria,
+        sub_criteria: scoreData.score_sub_criteria,
+        criteria: scoreData.score_criteria,
+        grade: scoreData.sub_sub_cr_grade
+      });
+      
+      // Format the scores to match the component's expected structure
+      const parsedScore = {
+        score_sub_sub_criteria: parseFloat(scoreData.score_sub_sub_criteria) || 0,
+        score_sub_criteria: parseFloat(scoreData.score_sub_criteria) || 0,
+        score_criteria: parseFloat(scoreData.score_criteria) || 0,
+        grade: scoreData.sub_sub_cr_grade || 0
+      };
+  
+      setProvisionalScore({
+        score: parsedScore,
+        message: responseData.message || "Score loaded successfully"
+      });
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      setError(error.response?.data?.message || error.message || "Failed to fetch provisional score");
+    } finally {
+      setLoading(false);
     }
-    fetchScore();
-  }, []);
-
-  // Utility to get a valid score field from the response
-  const getValidScore = (scoreObj) => {
-    if (!scoreObj) return null;
-    return (
-      scoreObj.weighted_cr_score ||
-      scoreObj.score_sub_sub_criteria ||
-      scoreObj.score_sub_criteria ||
-      scoreObj.score_criteria ||
-      null
-    );
   };
 
-  const validScore = getValidScore(score);
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
   return (
     <div className="w-screen min-h-screen bg-white text-black overflow-x-auto">
@@ -93,10 +115,21 @@ const Criteria2_2_2 = () => {
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
               {loading ? (
                 <p className="text-gray-600">Loading provisional score...</p>
-              ) : validScore !== null ? (
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (2.2.2): {parseFloat(validScore).toFixed(2)} %
-                </p>
+              ) : provisionalScore.score.score_sub_sub_criteria > 0 ? (
+                <div>
+                  <p className="text-lg font-semibold text-green-800">
+                    Provisional Score (2.2.2): {provisionalScore.score.score_sub_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Sub-criteria Score: {provisionalScore.score.score_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Overall Criteria Score: {provisionalScore.score.score_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Grade: {provisionalScore.score.grade}
+                  </p>
+                </div>
               ) : (
                 <p className="text-gray-600">No score data available.</p>
               )}

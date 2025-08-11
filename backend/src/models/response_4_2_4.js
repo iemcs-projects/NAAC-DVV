@@ -20,7 +20,7 @@ export default class response_4_2_4 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,13 +28,9 @@ export default class response_4_2_4 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    no_of_teachers_stds: {
-      type: DataTypes.INTEGER,
       allowNull: false
     },
-    total_teachers_stds: {
+    no_of_teachers_stds: {
       type: DataTypes.INTEGER,
       allowNull: false
     },

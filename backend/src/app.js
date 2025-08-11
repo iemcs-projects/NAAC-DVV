@@ -5,11 +5,15 @@ import cors from "cors";
 import criteriaMasterRoutes from "./routes/criteriaMaster.routes.js";
 import criteria1Routes from "./routes/criteria1.routes.js";
 import criteria2Routes from "./routes/criteria2.routes.js";
+import criteria4Routes from "./routes/criteria4.routes.js";
 import criteria6Routes from "./routes/criteria6.routes.js";
+import criteria5Routes from "./routes/criteria5.routes.js";
+import criteria7Routes from "./routes/criteria7.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import iiqaRoutes from "./routes/iiqa.routes.js";
 import extendedprofileRoutes from "./routes/extendedprofile.routes.js";
 import scoresRoutes from "./routes/scores.routes.js";
+import criteria3Routes from "./routes/criteria3.routes.js";
 dotenv.config();          // Load .env vars
 
 const app = express();    // Create Express app
@@ -35,7 +39,11 @@ app.use(cookieParser());
 app.use('/api/v1/criteria', criteriaMasterRoutes);
 app.use('/api/v1/criteria1', criteria1Routes);
 app.use('/api/v1/criteria2', criteria2Routes);
+app.use('/api/v1/criteria3', criteria3Routes);
+app.use('/api/v1/criteria4', criteria4Routes);
 app.use('/api/v1/criteria6', criteria6Routes);
+app.use('/api/v1/criteria5', criteria5Routes);
+app.use('/api/v1/criteria7', criteria7Routes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/iiqa', iiqaRoutes);
 app.use('/api/v1/extendedprofile', extendedprofileRoutes);

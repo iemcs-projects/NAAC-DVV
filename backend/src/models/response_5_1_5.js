@@ -1,7 +1,7 @@
 import _sequelize from 'sequelize';
 const { Model, Sequelize } = _sequelize;
 
-export default class response_4_2_3 extends Model {
+export default class response_5_1_5 extends Model {
   static init(sequelize, DataTypes) {
   return super.init({
     id: {
@@ -20,44 +20,28 @@ export default class response_4_2_3 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
       }
     },
     session: {
-      type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    year: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.DATE,
       allowNull: false
     },
-    resource_type: {
-      type: DataTypes.STRING(100),
+    options: {
+      type: DataTypes.ENUM('0','1','2','3','4'),
       allowNull: false
-    },
-    subscription_detail: {
-      type: DataTypes.STRING(255),
-      allowNull: false
-    },
-    expenditure_lakhs: {
-      type: DataTypes.DECIMAL(10,2),
-      allowNull: true
-    },
-    total_expenditure: {
-      type: DataTypes.DECIMAL(10,2),
-      allowNull: true
     },
     submitted_at: {
       type: DataTypes.DATE,
-      allowNull: false,
+      allowNull: true,
       defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
     }
   }, {
     sequelize,
-    tableName: 'response_4_2_3',
+    tableName: 'response_5_1_5',
     timestamps: false,
     indexes: [
       {
@@ -69,7 +53,7 @@ export default class response_4_2_3 extends Model {
         ]
       },
       {
-        name: "idx_r423_criteria",
+        name: "idx_r515_criteria",
         using: "BTREE",
         fields: [
           { name: "criteria_code" },

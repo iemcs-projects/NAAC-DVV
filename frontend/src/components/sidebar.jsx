@@ -62,7 +62,7 @@ const Sidebar = () => {
         {
           id: "2.2",
           name: "2.2 Catering to Student Diversity",
-          subItems: ["2.2.1", "2.2.2", "2.2.3"],
+          subItems: ["2.2.1", "2.2.2", ],
         },
         {
           id: "2.3",
@@ -98,7 +98,12 @@ const Sidebar = () => {
         {
           id: "3.1",
           name: "3.1 Promotion of Research",
-          subItems: ["3.1.1", "3.1.2"],
+          subItems: ["3.1.1", "3.1.2","3.1.3"],
+        },
+        {
+          id: "3.2",
+          name: "3.2 Promotion of Research",
+          subItems: ["3.2.1", "3.2.2"],
         },
         {
           id: "3.3",
@@ -119,13 +124,23 @@ const Sidebar = () => {
       subCriteria: [
         {
           id: "4.1",
-          name: "4.1 Infrastructure",
+          name: "4.1 Physical Infrastructure",
           subItems: ["4.1.1", "4.1.2", "4.1.3", "4.1.4"],
         },
         {
           id: "4.2",
-          name: "4.2 Infrastructure",
+          name: "4.2 Library Infrastructure",
           subItems: ["4.2.1", "4.2.2", "4.2.3", "4.2.4"],
+        },
+        {
+          id: "4.3",
+          name: "4.3 IT Infrastructure",
+          subItems: ["4.3.1", "4.3.2", "4.3.3"],
+        },
+        {
+          id: "4.4",
+          name: "4.4 Infrastructure",
+          subItems: ["4.4.1", "4.4.2"],
         },
       ],
     },
@@ -182,7 +197,7 @@ const Sidebar = () => {
         {
           id: "6.5",
           name: "6.5 Faculty Empowerment Strategies",
-          subItems: ["6.5.1", "6.5.2"],
+          subItems: ["6.5.1", "6.5.2","6.5.3"],
         },
       ],
     },

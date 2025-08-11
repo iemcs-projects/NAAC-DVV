@@ -20,7 +20,7 @@ export default class response_4_2_2 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,26 +28,10 @@ export default class response_4_2_2 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
-    },
-    year: {
-      type: DataTypes.DATE,
       allowNull: false
     },
-    resource_type: {
-      type: DataTypes.STRING(100),
-      allowNull: false
-    },
-    subscription_detail: {
-      type: DataTypes.STRING(255),
-      allowNull: false
-    },
-    expenditure_lakhs: {
-      type: DataTypes.DECIMAL(10,2),
-      allowNull: true
-    },
-    total_expenditure: {
-      type: DataTypes.DECIMAL(10,2),
+    options: {
+      type: DataTypes.ENUM('0','1','2','3','4'),
       allowNull: true
     },
     submitted_at: {

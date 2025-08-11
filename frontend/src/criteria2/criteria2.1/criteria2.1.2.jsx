@@ -19,8 +19,14 @@ const Criteria2_1_2 = () => {
   const [currentYear, setCurrentYear] = useState("");
   const [yearData, setYearData] = useState({});
   const [provisionalScore, setProvisionalScore] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Fetch score when component mounts
+  useEffect(() => {
+    console.log('Component mounted, fetching score...');
+    fetchScore();
+  }, []); // Empty dependency array means this runs once on mount
   const [dataRows, setDataRows] = useState({});
 
   // Initialize currentYear and dataRows when sessions load
@@ -61,21 +67,35 @@ const Criteria2_1_2 = () => {
 
   // Fetch provisional score
   const fetchScore = async () => {
+    console.log('fetchScore called');
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/criteria2/score212");
+      const response = await axios.get("http://localhost:3000/api/v1/criteria2/score212", {
+        withCredentials: true
+      });
       console.log("Fetched score data:", response.data);
-      // Update to handle both response structures
+      
+      // Debug: Log the full response structure
+      console.log('Full response structure:', JSON.stringify(response.data, null, 2));
+      
+      // Handle the response structure correctly
+      const scoreData = response.data.data || response.data;
+      console.log('scoreData:', scoreData);
+      
+      const scoreValue = scoreData.score_sub_sub_criteria || 
+                        (scoreData.score?.score_sub_sub_criteria) || 0;
+      console.log('Extracted score value:', scoreValue);
+      
       setProvisionalScore({
         data: {
-          score_sub_sub_criteria: response.data.data?.score_sub_sub_criteria || response.data?.score?.score_sub_sub_criteria || 0
+          score_sub_sub_criteria: scoreValue
         },
         message: response.data.message || "Score loaded successfully"
       });
-    } catch (error) {
-      console.error("Error fetching provisional score:", error);
-      setError(error.response?.data?.message || error.message || "Failed to fetch provisional score");
+    } catch (err) {
+      console.error("Error fetching provisional score:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch provisional score");
     } finally {
       setLoading(false);
     }
@@ -109,6 +129,7 @@ const Criteria2_1_2 = () => {
 
   // Submit form data to backend
   const handleSubmit = async () => {
+    console.log('handleSubmit called');
     try {
       const sessionYear = parseInt(currentYear.split("-")[0], 10);
       const rows = dataRows[currentYear] || [];
@@ -149,12 +170,18 @@ const Criteria2_1_2 = () => {
           headers: {
             "Content-Type": "application/json",
           },
+          withCredentials: true
         }
       );
 
       console.log("Response created for year totals:", response.data);
 
-      await fetchScore();
+      console.log('Before fetchScore call');
+      await fetchScore().then(() => {
+        console.log('After fetchScore completed');
+      }).catch(err => {
+        console.error('Error in fetchScore:', err);
+      });
 
       // Update the year data with the submitted rows (only in the year-wise table)
       setYearData(prev => {

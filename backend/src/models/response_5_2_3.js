@@ -20,7 +20,7 @@ export default class response_5_2_3 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,63 +28,67 @@ export default class response_5_2_3 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     year: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     registeration_number: {
       type: DataTypes.STRING(100),
       allowNull: false
     },
+    students_appearing: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     exam_net: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_slet: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_gate: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_gmat: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_cat: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_gre: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_jam: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_ielts: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_toefl: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_civil_services: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_state_services: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     exam_other: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true
     },
     submitted_at: {
       type: DataTypes.DATE,

@@ -5,7 +5,7 @@ import {iqacRegister, userLogin, refreshAccessToken, getAuthStatus, logout} from
 //http://localhost:3000/api/v1/auth/iqacRegister
 import verifyToken from '../middlewares/auth.middlewares.js';
 router.route('/iqacRegister')
-    .post(verifyToken, iqacRegister);
+    .post(iqacRegister);
 
 router.route('/userLogin')
     .post(userLogin);

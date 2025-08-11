@@ -4,21 +4,80 @@ import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import { useContext } from "react";
+import { SessionContext } from "../../contextprovider/sessioncontext";
+import axios from "axios";
+import { useEffect } from "react";
 
 const Criteria5_1_4= () => {
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
+  const { sessions: availableSessions } = useContext(SessionContext);
+
+  const [selectedYear, setSelectedYear] = useState(
+    availableSessions && availableSessions.length > 0 ? availableSessions[0] : pastFiveYears[0]
+  );
+  const [currentYear, setCurrentYear] = useState(selectedYear);
+  
   const [yearData, setYearData] = useState({});
+  const [submittedData, setSubmittedData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  // Add this with your other state declarations at the top of the component
+const [provisionalScore, setProvisionalScore] = useState(null);
+
+
+  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
+
 
   const [formData, setFormData] = useState({
     year: "",
     activityname: "",
     students: "",
+    students_benefitted: "",
    
    
     
     supportLinks: [""],
   });
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0) {
+      setCurrentYear(availableSessions[0]);
+      setSelectedYear(availableSessions[0]);
+    }
+  }, [availableSessions]);
+
+
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score514");
+      console.log('API Response:', response);
+      
+      // Check if response has data and the expected score property
+      if (response.data && response.data.data && response.data.data.entry) {
+        console.log('Score data:', response.data.data.entry);
+        setProvisionalScore(response.data.data.entry);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
   const [yearScores, setYearScores] = useState(
     pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
@@ -39,24 +98,87 @@ const Criteria5_1_4= () => {
     }
   };
 
-  const handleSubmit = () => {
-  const { year,activityname, students} = formData;
-  if (year && activityname && students) {
-    const updatedYearData = {
-      ...yearData,
-      [selectedYear]: [...(yearData[selectedYear] || []), formData],
-    };
-    setYearData(updatedYearData);
-    setFormData({
-      year: "",
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    
+    const {
+      year: inputYear,
+      activityname: activity_name,
+      students: students_participated,
+      students_benefitted
+    } = formData;
+  
+    const sessionFull = currentYear;
+    const session = sessionFull.split("-")[0];
+    const year = inputYear || sessionFull;
+  
+    // Convert and validate numeric inputs
+    const studentsParticipated = parseInt(students_participated);
+    const studentsBenefitted = parseInt(students_benefitted);
+    
+    if (isNaN(studentsParticipated) || isNaN(studentsBenefitted)) {
+      alert("Please enter valid numbers for both 'Students Participated' and 'Students Benefitted' fields.");
+      return;
+    }
+    
+    if (studentsParticipated <= 0 || studentsBenefitted <= 0) {
+      alert("Number of students must be greater than 0.");
+      return;
+    }
+  
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria5/createResponse514",
+        {
+          session: parseInt(session, 10),
+          year,
+          activity_name,
+          students_participated: studentsParticipated,
+          students_benefitted: studentsBenefitted
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+  
+      const resp = response?.data?.data || {};
+      const newEntry = {
+        year: resp.year || year,
+        activity_name: resp.activity_name || activity_name,
+        students_participated: resp.students_participated || students_participated,
+      };
+  
+      setSubmittedData(prev => [...prev, newEntry]);
+      
+      // Update yearData
+      setYearData(prev => ({
+        ...prev,
+        [newEntry.year]: [...(prev[newEntry.year] || []), {
+          activity_name: newEntry.activity_name,
+          students_participated: newEntry.students_participated,
+        }],
+      }));
+  
+      // Reset form
+      setFormData({
+        year: "",
         activityname: "",
         students: "",
-      supportLinks: [""],
-    });
-  } else {
-    alert("Please fill in all fields.");
-  }
-};
+        students_benefitted: "",
+        supportLinks: [""],
+      });
+  
+      // Refresh the score
+      fetchScore();
+      alert("Data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting:", error);
+      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+    }
+  };
 const goToNextPage = () => {
     navigate("/criteria5.1.5");
   };
@@ -103,24 +225,68 @@ examinations and career counselling</li>
                 </ul>
             </div>
           </div>
-
+          
+          
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
           <div className="border rounded mb-8">
             <div className=" items-center bg-blue-100 text-gray-800 px-4 py-2">
               <h2 className="text-xl font-bold"> Students benefitted by guidance for competitive examinations and career counseling offered by the institution  </h2>
-              <div className=" mb-1">
-                <label className="text-gray-700 font-medium mr-2 ml-[10px]">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950 "
-                >
-                  {pastFiveYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+              <div className="mb-1">
+  <label className="text-gray-700 font-medium mr-2 ml-[70px]">Select Year:</label>
+  <select
+    value={currentYear}
+    onChange={(e) => setCurrentYear(e.target.value)}
+    className="border border-gray-300 px-3 py-1 rounded text-gray-950"
+  >
+    {availableSessions && availableSessions.length > 0 ? (
+      availableSessions.map((year) => (
+        <option key={year} value={year}>
+          {year}
+        </option>
+      ))
+    ) : (
+      pastFiveYears.map((year) => (
+        <option key={year} value={year}>
+          {year}
+        </option>
+      ))
+    )}
+  </select>
+</div>
+
+<div className="px-4 py-3 bg-gray-50 border-b">
+              <div className="flex items-center gap-4">
+                <label className="font-medium text-gray-700">
+                  Number of students benefited by guidance for competitive examinations and career counselling
+                </label>
+                <input
+                  type="number"
+                  className="border border-gray-300 rounded px-3 py-2 w-32 text-gray-950"
+                  placeholder="Enter count"
+                  min="0"
+                  value={formData.students_benefitted}
+                  onChange={(e) => handleChange("students_benefitted", e.target.value)}
+                />
               </div>
+            </div>
+
+
+
             </div>
 
             <table className="w-full border text-sm border-black">

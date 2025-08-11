@@ -4,63 +4,133 @@ import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useEffect } from "react";
+import { SessionContext } from "../../contextprovider/sessioncontext";
+import { useContext } from "react";
 
 const Criteria3_3_2 = () => {
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
   const [yearData, setYearData] = useState({});
+  const [currentYear, setCurrentYear] = useState("");
+  const [submittedData, setSubmittedData] = useState([]);
   const [formData, setFormData] = useState({
-    names: "",
-    name_award: "",
-    name_gov: "",
+    session: "",
+    activity_name: "",
+    awarding_body: "",
     year: "",
     supportLinks: []
   });
+  const [availableSessions, setAvailableSessions] = useState([]);
   const [yearScores, setYearScores] = useState(
     pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
   );
   const [yearCount, setYearCount] = useState(5);
   const [averageScore, setAverageScore] = useState(null);
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0) {
+      setCurrentYear(availableSessions[0]); // Default to most recent session
+    }
+  }, [availableSessions]);
 
   const navigate = useNavigate();
+  const { sessions, isLoading: sessionLoading } = useContext(SessionContext);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    if (!sessionLoading && sessions?.length > 0) {
+      setAvailableSessions(sessions);
+      setSelectedYear(sessions[0]);
+    }
+  }, [sessionLoading, sessions]);  
+  const [provisionalScore, setProvisionalScore] = useState(null);
 
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...formData.supportLinks];
-      updatedLinks[index] = value;
-      setFormData({ ...formData, supportLinks: updatedLinks });
-    } else {
-      setFormData({ ...formData, [field]: value });
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria3/score332");
+      console.log('API Response:', response);
+      
+      // Check if response has data and the expected score property
+      if (response.data && response.data.data && response.data.data.entry) {
+        console.log('Score data:', response.data.data.entry);
+        setProvisionalScore(response.data.data.entry);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = () => {
-    const { names, name_award, name_gov, year, supportLinks } = formData;
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
-    if (names && name_award && name_gov && year) {
-      const dataToSubmit = {
-        year: selectedYear,
-        names,
-        name_award,
-        name_gov,
-        supportLinks
-      };
 
-      const updatedYearData = {
-        ...yearData,
-        [selectedYear]: [...(yearData[selectedYear] || []), dataToSubmit]
-      };
+ 
+  const handleChange = (field, value) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
-      setYearData(updatedYearData);
-      setFormData({
-        year: "",
-        names: "",
-        name_award: "",
-        name_gov: "",
-        supportLinks: []
+  const handleSubmit = async () => {
+    const activity_name = formData.activity_name.trim();
+    const awarding_body = formData.awarding_body.trim();
+    const sessionFull = currentYear;
+    const year = sessionFull.split("-")[0];
+    const session = sessionFull.split("-")[0];
+
+    if (!activity_name || !awarding_body || !year) {
+      alert("Please fill in all required fields: Activity Name, Awarding Body, and Year");
+      return;
+    }
+
+    try {
+      const response = await axios.post("http://localhost:3000/api/v1/criteria3/createResponse332", {
+        session: parseInt(session),
+        activity_name,
+        awarding_body,
+        year
       });
-    } else {
-      alert("Please fill in all fields.");
+
+      const resp = response?.data?.data || {};
+      const newEntry = {
+        activity_name: resp.activity_name || activity_name,
+        awarding_body: resp.awarding_body || awarding_body,
+        year_of_award: resp.year_of_award || year
+      };
+
+      setSubmittedData((prev) => [...prev, newEntry]);
+      setYearData((prev) => ({
+        ...prev,
+        [newEntry.year_of_award]: [...(prev[newEntry.year_of_award] || []), {
+          activity_name: newEntry.activity_name,
+          awarding_body: newEntry.awarding_body,
+          year_of_award: newEntry.year_of_award
+        }],
+      }));
+
+      setFormData({ 
+        activity_name: "",
+        awarding_body: "",
+        year: ""
+      });
+      fetchScore();
+      alert("Award data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting award data:", error);
+      alert(error.response?.data?.message || error.message || "Failed to submit award data");
     }
   };
 
@@ -97,24 +167,41 @@ const Criteria3_3_2 = () => {
               </ul>
             </div>
           </div>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.3.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
 
           <div className="border rounded mb-8">
             <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
               <h2 className="text-xl font-bold">Awards and Recognitions Received</h2>
-              <div className="flex items-center gap-2">
-                <label className="text-gray-700 font-medium">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950"
-                >
-                  {pastFiveYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              className="border px-3 py-1 rounded text-black"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+            >
+              {pastFiveYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+              
             </div>
 
             <table className="w-full border text-sm border-black">
@@ -152,28 +239,28 @@ const Criteria3_3_2 = () => {
             </table>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">Links to relevant documents:</label>
-            <div className="flex flex-col gap-2">
-              {formData.supportLinks.map((link, index) => (
-                <input
-                  key={index}
-                  type="url"
-                  placeholder={`Enter support link ${index + 1}`}
-                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                  value={link}
-                  onChange={(e) => handleChange("supportLinks", e.target.value, index)}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
-              >
-                + Add Another Link
-              </button>
-            </div>
-          </div>
+          <div className="flex flex-col gap-2">
+  {(formData.supportLinks || []).map((link, index) => (
+    <input
+      key={index}
+      type="url"
+      placeholder={`Enter document link ${index + 1}`}
+      className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+      value={link}
+      onChange={(e) => handleChange("supportLinks", e.target.value, index)}
+    />
+  ))}
+  <button
+    type="button"
+    onClick={() => setFormData(prev => ({
+      ...prev,
+      supportLinks: [...(prev.supportLinks || []), ""]
+    }))}
+    className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
+  >
+    + Add Another Link
+  </button>
+</div>
 
           {pastFiveYears.map((year) => (
             <div key={year} className="mb-8 border rounded">
@@ -274,4 +361,3 @@ const Criteria3_3_2 = () => {
 };
 
 export default Criteria3_3_2;
-

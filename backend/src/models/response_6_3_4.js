@@ -19,27 +19,30 @@ export default class response_6_3_4 extends Model {
       }
     },
     criteria_code: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
+      type: DataTypes.STRING(10),
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
       }
     },
     session: {
-      type: DataTypes.INTEGER,
-      allowNull: true
+      type: DataTypes.DATE,
+      allowNull: false
     },
     teacher_name: {
       type: DataTypes.STRING(255),
-      allowNull: false,
-      primaryKey: true
+      allowNull: false
     },
     program_title: {
       type: DataTypes.STRING(255),
       allowNull: true
     },
-    from_to_date: {
+    from_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    to_date: {
       type: DataTypes.DATEONLY,
       allowNull: true
     },
@@ -59,7 +62,6 @@ export default class response_6_3_4 extends Model {
         using: "BTREE",
         fields: [
           { name: "sl_no" },
-          { name: "teacher_name" },
         ]
       },
       {
