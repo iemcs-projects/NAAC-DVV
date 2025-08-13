@@ -19,8 +19,8 @@ export default class response_6_3_4 extends Model {
       }
     },
     criteria_code: {
-      type: DataTypes.STRING(10),
-      allowNull: false,
+      type: DataTypes.STRING(20),
+      allowNull: true,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'

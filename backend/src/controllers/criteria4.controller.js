@@ -77,107 +77,6 @@ const convertToPaddedFormat = (code) => {
  * @description Create a new response for criteria 4.1.3
  * @access Private/Admin
  */
-const createResponse413 = asyncHandler(async (req, res) => {
-
-  const { session, room_identifier, typeict_facility, ict_facilities_count } = req.body;
-  console.log("Session",req.body)
-
-  const sessionYear = Number(session);
-  const room = String(room_identifier);
-  const facilityType = String(typeict_facility);
-  const no_of_classroom = Number(ict_facilities_count);
-
-  if (!sessionYear || !room || !facilityType || !no_of_classroom) {
-    throw new apiError(400, "Missing or invalid required fields");
-  }
-
-  const currentYear = new Date().getFullYear();
-  if (sessionYear < 1990 || sessionYear > currentYear) {
-    throw new apiError(400, "Session year must be between 1990 and current year");
-  }
-
-  // Fetch Criteria
-  const criteria = await CriteriaMaster.findOne({
-    where: {
-      sub_sub_criterion_id: '040103',
-      sub_criterion_id: '0401',
-      criterion_id: '04'
-    }
-  });
-
-  if (!criteria) throw new apiError(404, "Criteria not found");
-
-  // Check session range with IIQA
-  const latestIIQA = await IIQA.findOne({
-    attributes: ['session_end_year'],
-    order: [['created_at', 'DESC']]
-  });
-
-  if (!latestIIQA) throw new apiError(404, "IIQA not found");
-
-  const endYear = latestIIQA.session_end_year;
-  const startYear = endYear - 5;
-
-  if (sessionYear < startYear || sessionYear > endYear) {
-    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-  }
-
-  const extendedProfile = await ExtendedProfile.findOne({
-    order: [['created_at', 'DESC']],
-    limit: 1
-  });
-
-  if (!extendedProfile) {
-    throw new apiError(404, "Extended profile not found");
-  }
-
-  const response = await extendedProfile.update({
-    classroom_ict_enabled: no_of_classroom,   
-  });
-
-  console.log("Response",response)
-
-
-  // Upsert entry
-  let [entry, created] = await Criteria413.findOrCreate({
-    where: {
-      session: sessionYear,
-      criteria_code: criteria.criteria_code,
-      room_identifier: room
-    },
-    defaults: {
-      id: criteria.id,
-      criteria_code: criteria.criteria_code,
-      session: sessionYear,
-      room_identifier: room,
-      typeict_facility: facilityType
-    }
-  });
-
-  if (!created) {
-    await Criteria413.update({
-      typeict_facility: facilityType
-    }, {
-      where: {
-        session: sessionYear,
-        criteria_code: criteria.criteria_code,
-        room_identifier: room
-      }
-    });
-
-    entry = await Criteria413.findOne({
-      where: {
-        session: sessionYear,
-        criteria_code: criteria.criteria_code,
-        room_identifier: room
-      }
-    });
-  }
-
-  return res.status(created ? 201 : 200).json(
-    new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
-  );
-});
 
 const score413 = asyncHandler(async (req, res) => {
   const session = new Date().getFullYear();
@@ -299,46 +198,148 @@ const score413 = asyncHandler(async (req, res) => {
 });
 
 
-const createResponse414 = asyncHandler(async (req, res) => {
+const createResponse414_441 = asyncHandler(async (req, res) => {
   const {
     session,
     year,
-    budget_allocated_infra_aug,
-    expenditure_infra_aug,
-    expenditure_academic_maint,
-    expenditure_physical_maint
+    budget_allocated_infra,
+    expenditure_infra_lakhs,
+    total_exp_infra_lakhs,
+    exp_maintainance_acad,
+    exp_maintainance_physical
   } = req.body;
 
   const sessionYear = Number(session);
   const yearVal = Number(year);
-  const budget = Number(budget_allocated_infra_aug);
-  const infraExpenditure = Number(expenditure_infra_aug);
-  const academicMaint = Number(expenditure_academic_maint);
-  const physicalMaint = Number(expenditure_physical_maint);
 
-  if (
-    !sessionYear ||
-    !yearVal ||
-    isNaN(budget) ||
-    isNaN(infraExpenditure) ||
-    isNaN(academicMaint) ||
-    isNaN(physicalMaint)
-  ) {
+  // Validate year fields
+  const currentYear = new Date().getFullYear();
+  if (!sessionYear || !yearVal) {
+    throw new apiError(400, "Session and Year are required");
+  }
+  if (sessionYear < 1990 || sessionYear > currentYear || yearVal < 1990 || yearVal > currentYear) {
+    throw new apiError(400, "Years must be between 1990 and current year");
+  }
+
+  // Validate numeric fields
+  const numericFields = {
+    budget_allocated_infra: Number(budget_allocated_infra),
+    expenditure_infra_lakhs: Number(expenditure_infra_lakhs),
+    total_exp_infra_lakhs: Number(total_exp_infra_lakhs),
+    exp_maintainance_acad: Number(exp_maintainance_acad),
+    exp_maintainance_physical: Number(exp_maintainance_physical)
+  };
+
+  if (Object.values(numericFields).some(v => isNaN(v))) {
+    throw new apiError(400, "All budget and expenditure fields must be valid numbers");
+  }
+
+  // Get IIQA session range
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]]
+  });
+  if (!latestIIQA) {
+    throw new apiError(404, "No IIQA form found");
+  }
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+  if (sessionYear < startYear || sessionYear > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+  }
+
+  // Start transaction
+  const transaction = await db.sequelize.transaction();
+  try {
+    // Fetch criteria for 4.1.4 and 4.4.1
+    const criteriaList = await CriteriaMaster.findAll({
+      where: {
+        sub_sub_criterion_id: { [Sequelize.Op.in]: ["040104", "040401"] },
+        criterion_id: "04"
+      },
+      transaction
+    });
+
+    if (!criteriaList || criteriaList.length !== 2) {
+      await transaction.rollback();
+      throw new apiError(404, "Criteria 4.1.4 or 4.4.1 not found");
+    }
+
+    // Map criteria to models
+    const modelMap = {
+      "040104": { model: Criteria414, name: "4.1.4" },
+      "040401": { model: Criteria441, name: "4.4.1" }
+    };
+
+    const responses = [];
+
+    for (const criteria of criteriaList) {
+      const { model: Model, name } = modelMap[criteria.sub_sub_criterion_id];
+
+      const [entry, created] = await Model.findOrCreate({
+        where: { session: sessionYear, year: yearVal, criteria_code: criteria.criteria_code },
+        defaults: {
+          id: criteria.id,
+          criteria_code: criteria.criteria_code,
+          session: sessionYear,
+          year: yearVal,
+          ...numericFields,
+          submitted_at: new Date()
+        },
+        transaction
+      });
+
+      if (!created) {
+        await Model.update(
+          { ...numericFields, submitted_at: new Date() },
+          { where: { session: sessionYear, year: yearVal, criteria_code: criteria.criteria_code }, transaction }
+        );
+      }
+
+      responses.push({
+        criteria: name,
+        created,
+        message: created ? "Entry created successfully" : "Entry updated successfully"
+      });
+    }
+
+    await transaction.commit();
+
+    return res.status(200).json(
+      new apiResponse(200, { responses }, "Operation completed successfully")
+    );
+
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+});
+
+
+const createResponse413 = asyncHandler(async (req, res) => {
+
+  const { session, room_identifier, typeict_facility, ict_facilities_count } = req.body;
+  console.log("Session",req.body)
+
+  const sessionYear = Number(session);
+  const room = String(room_identifier);
+  const facilityType = String(typeict_facility);
+  const no_of_classroom = Number(ict_facilities_count);
+
+  if (!sessionYear || !room || !facilityType || !no_of_classroom) {
     throw new apiError(400, "Missing or invalid required fields");
   }
 
   const currentYear = new Date().getFullYear();
-
-  if (
-    sessionYear < 1990 || sessionYear > currentYear ||
-    yearVal < 1990 || yearVal > currentYear
-  ) {
-    throw new apiError(400, "Years must be between 1990 and current year");
+  if (sessionYear < 1990 || sessionYear > currentYear) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  // Fetch Criteria
   const criteria = await CriteriaMaster.findOne({
     where: {
-      sub_sub_criterion_id: '040104',
+      sub_sub_criterion_id: '040103',
       sub_criterion_id: '0401',
       criterion_id: '04'
     }
@@ -346,6 +347,7 @@ const createResponse414 = asyncHandler(async (req, res) => {
 
   if (!criteria) throw new apiError(404, "Criteria not found");
 
+  // Check session range with IIQA
   const latestIIQA = await IIQA.findOne({
     attributes: ['session_end_year'],
     order: [['created_at', 'DESC']]
@@ -360,43 +362,54 @@ const createResponse414 = asyncHandler(async (req, res) => {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  let [entry, created] = await Criteria414.findOrCreate({
+  const extendedProfile = await ExtendedProfile.findOne({
+    order: [['created_at', 'DESC']],
+    limit: 1
+  });
+
+  if (!extendedProfile) {
+    throw new apiError(404, "Extended profile not found");
+  }
+
+  const response = await extendedProfile.update({
+    classroom_ict_enabled: no_of_classroom,   
+  });
+
+  console.log("Response",response)
+
+
+  // Upsert entry
+  let [entry, created] = await Criteria413.findOrCreate({
     where: {
       session: sessionYear,
       criteria_code: criteria.criteria_code,
-      year: yearVal
+      room_identifier: room
     },
     defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session: sessionYear,
-      year: yearVal,
-      budget_allocated_infra_aug: budget,
-      expenditure_infra_aug: infraExpenditure,
-      expenditure_academic_maint: academicMaint,
-      expenditure_physical_maint: physicalMaint
+      room_identifier: room,
+      typeict_facility: facilityType
     }
   });
 
   if (!created) {
-    await Criteria414.update({
-      budget_allocated_infra_aug: budget,
-      expenditure_infra_aug: infraExpenditure,
-      expenditure_academic_maint: academicMaint,
-      expenditure_physical_maint: physicalMaint
+    await Criteria413.update({
+      typeict_facility: facilityType
     }, {
       where: {
         session: sessionYear,
         criteria_code: criteria.criteria_code,
-        year: yearVal
+        room_identifier: room
       }
     });
 
-    entry = await Criteria414.findOne({
+    entry = await Criteria413.findOne({
       where: {
         session: sessionYear,
         criteria_code: criteria.criteria_code,
-        year: yearVal
+        room_identifier: room
       }
     });
   }
@@ -405,6 +418,7 @@ const createResponse414 = asyncHandler(async (req, res) => {
     new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
   );
 });
+
 
 const score414 = asyncHandler(async (req, res) => {
   const currentYear = new Date().getFullYear();
@@ -430,65 +444,62 @@ const score414 = asyncHandler(async (req, res) => {
   const endYear = latestIIQA.session_end_year;
   const startYear = endYear - 5;
 
-  // Step 3: Fetch responses for last 5 years
-const responses = await Criteria414.findAll({
-  attributes: [
-    'session',
-    'expenditure_infra_aug'
-  ],
-  where: {
-    criteria_code: criteria.criteria_code,
-    session: {
-      [Sequelize.Op.gte]: startYear,
-      [Sequelize.Op.lte]: endYear
-    }
-  },
-  order: [['session', 'DESC']],
-  raw: true
-});
+  // Step 3: Fetch responses for last 5 years from response_4_1_4
+  const responses = await Criteria414.findAll({
+    attributes: ['session', 'expenditure_infra_lakhs'],
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: { [Sequelize.Op.between]: [startYear, endYear] }
+    },
+    order: [['session', 'DESC']],
+    raw: true
+  });
 
-// Get latest expenditure from ExtendedProfile
-const ExtendedProfileResponse = await ExtendedProfile.findOne({
-  attributes: ['expenditure_in_lakhs'],
-  raw: true,
-  order: [['created_at', 'DESC']],
-  limit: 1
-});
+  // Get latest expenditure from ExtendedProfile
+  const ExtendedProfileResponse = await ExtendedProfile.findOne({
+    attributes: ['expenditure_in_lakhs'],
+    raw: true,
+    order: [['created_at', 'DESC']],
+    limit: 1
+  });
 
-if (!ExtendedProfileResponse) {
-  throw new apiError(404, "No ExtendedProfile data found");
-}
-
-const expenditureInLakhs = Number(ExtendedProfileResponse.expenditure_in_lakhs || 0);
-
-if (responses.length === 0) {
-  throw new apiError(404, "No responses found for the given period");
-}
-
-// Step 4: Group infra expenditure by year
-const yearlyData = {};
-responses.forEach(r => {
-  if (!yearlyData[r.session]) {
-    yearlyData[r.session] = { infra: 0, total: expenditureInLakhs };
+  if (!ExtendedProfileResponse) {
+    throw new apiError(404, "No ExtendedProfile data found");
   }
-  yearlyData[r.session].infra += Number(r.expenditure_infra_aug || 0);
-});
 
-// Calculate yearly percentages
-const yearlyPercentages = Object.keys(yearlyData).map(year => {
-  const { infra, total } = yearlyData[year];
-  return total > 0 ? (infra / total) * 100 : 0;
-});
+  const expenditureInLakhs = Number(ExtendedProfileResponse.expenditure_in_lakhs || 0);
 
-if (yearlyPercentages.length === 0) {
-  throw new apiError(400, "No valid data to compute score");
-}
+  if (responses.length === 0) {
+    throw new apiError(404, "No responses found for the given period");
+  }
 
-// Step 5: Calculate average score
-const score = parseFloat(
-  (yearlyPercentages.reduce((a, b) => a + b, 0) / yearlyPercentages.length).toFixed(3)
-);
+  // Step 4: Group infra expenditure by year
+  const yearlyData = {};
+  responses.forEach(r => {
+    if (!yearlyData[r.session]) {
+      yearlyData[r.session] = { infra: 0, total: expenditureInLakhs };
+    }
+    yearlyData[r.session].infra += Number(r.expenditure_infra_lakhs || 0);
+  });
 
+  console.log(yearlyData)
+
+  // Calculate yearly percentages
+  const yearlyPercentages = Object.keys(yearlyData).map(year => {
+    const { infra, total } = yearlyData[year];
+    return total > 0 ? ((infra/100000) / total) * 100 : 0;
+  });
+
+  console.log(yearlyPercentages)
+
+  if (yearlyPercentages.length === 0) {
+    throw new apiError(400, "No valid data to compute score");
+  }
+
+  // Step 5: Calculate average score
+  const score = parseFloat(
+    (yearlyPercentages.reduce((a, b) => a + b, 0) / yearlyPercentages.length).toFixed(3)
+  );
 
 
   // Step 6: Grade mapping
@@ -500,6 +511,135 @@ const score = parseFloat(
   else grade = 0;
 
   console.log(score, grade)
+
+  // Step 7: Create or update Score
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: currentYear
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: currentYear,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update({
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: currentYear
+      }
+    });
+
+    entry = await Score.findOne({
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: currentYear
+      }
+    });
+  }
+
+  return res.status(200).json(
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
+  );
+});
+
+const score441 = asyncHandler(async (req, res) => {
+  const currentYear = new Date().getFullYear();
+  const criteria_code = convertToPaddedFormat("4.4.1");
+
+  // Step 1: Get criteria
+  const criteria = await CriteriaMaster.findOne({
+    where: { sub_sub_criterion_id: criteria_code }
+  });
+  if (!criteria) {
+    throw new apiError(404, "Criteria 4.4.1 not found in criteria_master");
+  }
+
+  // Step 2: Get latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']]
+  });
+  if (!latestIIQA) {
+    throw new apiError(404, "No IIQA form found");
+  }
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  // Step 3: Fetch responses for last 5 years from response_4_4_1
+  const responses = await Criteria441.findAll({
+    attributes: ['session', 'exp_maintainance_acad', 'exp_maintainance_physical'],
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: { [Sequelize.Op.between]: [startYear, endYear] }
+    },
+    order: [['session', 'DESC']],
+    raw: true
+  });
+
+  // Get latest expenditure from ExtendedProfile
+  const ExtendedProfileResponse = await ExtendedProfile.findOne({
+    attributes: ['expenditure_in_lakhs'],
+    raw: true,
+    order: [['created_at', 'DESC']],
+    limit: 1
+  });
+
+  if (!ExtendedProfileResponse) {
+    throw new apiError(404, "No ExtendedProfile data found");
+  }
+
+  const expenditureInLakhs = Number(ExtendedProfileResponse.expenditure_in_lakhs || 0);
+
+  if (responses.length === 0) {
+    throw new apiError(404, "No responses found for the given period");
+  }
+
+  // Step 4: Group maintenance expenditure by year
+  const yearlyData = {};
+  responses.forEach(r => {
+    if (!yearlyData[r.session]) {
+      yearlyData[r.session] = { maintenance: 0, total: expenditureInLakhs };
+    }
+    yearlyData[r.session].maintenance += Number(r.exp_maintainance_acad || 0) + Number(r.exp_maintainance_physical || 0);
+  });
+
+  // Calculate yearly percentages
+  const yearlyPercentages = Object.keys(yearlyData).map(year => {
+    const { maintenance, total } = yearlyData[year];
+    return total > 0 ? ((maintenance / 100000) / total) * 100 : 0;
+  });
+
+  if (yearlyPercentages.length === 0) {
+    throw new apiError(400, "No valid data to compute score");
+  }
+
+  // Step 5: Calculate average score
+  const score = parseFloat(
+    (yearlyPercentages.reduce((a, b) => a + b, 0) / yearlyPercentages.length).toFixed(3)
+  );
+
+  // Step 6: Grade mapping
+  let grade;
+  if (score >= 25) grade = 4;
+  else if (score >= 20) grade = 3;
+  else if (score >= 10) grade = 2;
+  else if (score >= 1) grade = 1;
+  else grade = 0;
 
   // Step 7: Create or update Score
   let [entry, created] = await Score.findOrCreate({
@@ -1650,108 +1790,10 @@ const score432 = asyncHandler(async (req, res) => {
 
 
 
-const createResponse441 = asyncHandler(async (req, res) => {
-  const {
-    session,
-    year,
-    budget_allocated_infra,
-    expenditure_infra_lakhs,
-    total_exp_infra_lakhs,
-    exp_maintainance_acad,
-    exp_maintainance_physical
-  } = req.body;
 
-  const sessionYear = Number(session);
-  const yearVal = Number(year);
-  const budget = Number(budget_allocated_infra);
-  const expenditure = Number(expenditure_infra_lakhs);
-  const totalExp = Number(total_exp_infra_lakhs);
-  const maintainAcad = Number(exp_maintainance_acad);
-  const maintainPhysical = Number(exp_maintainance_physical);
-
-  if (!sessionYear || !yearVal || !budget || !expenditure || !totalExp || !maintainAcad || !maintainPhysical) {
-    throw new apiError(400, "Missing or invalid required fields");
-  }
-
-  const currentYear = new Date().getFullYear();
-  if (sessionYear < 1990 || sessionYear > currentYear) {
-    throw new apiError(400, "Session year must be between 1990 and current year");
-  }
-
-  const criteria = await CriteriaMaster.findOne({
-    where: {
-      sub_sub_criterion_id: '040401',
-      sub_criterion_id: '0404',
-      criterion_id: '04'
-    }
-  });
-
-  if (!criteria) throw new apiError(404, "Criteria not found");
-
-  const latestIIQA = await IIQA.findOne({
-    attributes: ['session_end_year'],
-    order: [['created_at', 'DESC']]
-  });
-
-  if (!latestIIQA) throw new apiError(404, "IIQA not found");
-
-  const endYear = latestIIQA.session_end_year;
-  const startYear = endYear - 5;
-
-  if (sessionYear < startYear || sessionYear > endYear) {
-    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-  }
-
-  let [entry, created] = await Criteria441.findOrCreate({
-    where: {
-      session: sessionYear,
-      criteria_code: criteria.criteria_code,
-      year: yearVal
-    },
-    defaults: {
-      id: criteria.id,
-      criteria_code: criteria.criteria_code,
-      session: sessionYear,
-      year: yearVal,
-      budget_allocated_infra: budget,
-      expenditure_infra_lakhs: expenditure,
-      total_exp_infra_lakhs: totalExp,
-      exp_maintainance_acad: maintainAcad,
-      exp_maintainance_physical: maintainPhysical
-    }
-  });
-
-  if (!created) {
-    await Criteria441.update({
-      budget_allocated_infra: budget,
-      expenditure_infra_lakhs: expenditure,
-      total_exp_infra_lakhs: totalExp,
-      exp_maintainance_acad: maintainAcad,
-      exp_maintainance_physical: maintainPhysical
-    }, {
-      where: {
-        session: sessionYear,
-        criteria_code: criteria.criteria_code,
-        year: yearVal
-      }
-    });
-
-    entry = await Criteria441.findOne({
-      where: {
-        session: sessionYear,
-        criteria_code: criteria.criteria_code,
-        year: yearVal
-      }
-    });
-  }
-
-  return res.status(created ? 201 : 200).json(
-    new apiResponse(created ? 201 : 200, entry, created ? "Response created successfully" : "Response updated successfully")
-  );
-});
 
 export{
-  createResponse414,
+  createResponse414_441,
   createResponse423,
   createResponse413,
   createResponse422,
@@ -1763,9 +1805,9 @@ export{
   score424,
   score422,
   score433,
+  score441,
   createResponse424,
   createResponse432,
-  createResponse441,
   getResponsesByCriteriaCode
   
 }

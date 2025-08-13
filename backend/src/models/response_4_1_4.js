@@ -20,7 +20,7 @@ export default class response_4_1_4 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -28,29 +28,29 @@ export default class response_4_1_4 extends Model {
     },
     session: {
       type: DataTypes.INTEGER,
-      allowNull: true
+      allowNull: false
     },
     year: {
       type: DataTypes.INTEGER,
       allowNull: false
     },
-    budget_allocated_infra_aug: {
+    budget_allocated_infra: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },
-    expenditure_infra_aug: {
+    expenditure_infra_lakhs: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },
-    total_expenditure_excl_salary: {
+    total_exp_infra_lakhs: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },
-    expenditure_academic_maint: {
+    exp_maintainance_acad: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },
-    expenditure_physical_maint: {
+    exp_maintainance_physical: {
       type: DataTypes.DECIMAL(10,2),
       allowNull: true
     },

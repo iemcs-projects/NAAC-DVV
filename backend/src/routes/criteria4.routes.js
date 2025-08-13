@@ -2,12 +2,11 @@ import express from 'express';
 const router = express.Router();
 import { 
   createResponse413, 
-  createResponse414,
+  createResponse414_441,
   createResponse422,
   createResponse423,
   createResponse424,
   createResponse432,
-  createResponse441,
   createResponse433,
   score413,
   score414,
@@ -16,6 +15,7 @@ import {
   score424,
   score432,
   score433,
+  score441,
   getResponsesByCriteriaCode 
 } from '../controllers/criteria4.controller.js';
 
@@ -23,8 +23,8 @@ import {
 router.route('/createResponse413')
   .post(createResponse413);
 
-router.route('/createResponse414')
-  .post(createResponse414);
+router.route('/createResponse414_441')
+  .post(createResponse414_441);
 
 router.route('/createResponse422')
   .post(createResponse422);
@@ -37,9 +37,6 @@ router.route('/createResponse424')
 
 router.route('/createResponse432')
   .post(createResponse432);
-
-router.route('/createResponse441')
-  .post(createResponse441);
 
 router.route('/createResponse433')
   .post(createResponse433);
@@ -65,6 +62,9 @@ router.route('/score432')
 
 router.route('/score433')
   .get(score433);
+
+router.route('/score441')
+  .get(score441);
 
 // General purpose route
 router.route('/getResponsesByCriteriaCode/:criteriaCode')

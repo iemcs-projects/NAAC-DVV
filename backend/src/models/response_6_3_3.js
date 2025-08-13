@@ -19,8 +19,8 @@ export default class response_6_3_3 extends Model {
       }
     },
     criteria_code: {
-      type: DataTypes.STRING(10),
-      allowNull: false,
+      type: DataTypes.STRING(20),
+      allowNull: true,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
@@ -31,11 +31,11 @@ export default class response_6_3_3 extends Model {
       allowNull: false
     },
     from_date: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: true
     },
     to_date: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
       allowNull: true
     },
     title_of_prof_dev: {
