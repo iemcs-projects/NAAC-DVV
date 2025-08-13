@@ -1766,6 +1766,6 @@ export{
   createResponse424,
   createResponse432,
   createResponse441,
-  getResponsesByCriteriaCode,
+  getResponsesByCriteriaCode
   
 }
