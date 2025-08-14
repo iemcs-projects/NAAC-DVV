@@ -20,15 +20,15 @@ export default class response_6_5_3 extends Model {
     },
     criteria_code: {
       type: DataTypes.STRING(20),
-      allowNull: true,
+      allowNull: false,
       references: {
         model: 'criteria_master',
         key: 'criteria_code'
       }
     },
     session: {
-      type: DataTypes.INTEGER,
-      allowNull: true
+      type: DataTypes.DATE,
+      allowNull: false
     },
     initiative_type: {
       type: DataTypes.ENUM('0','1','2','3','4'),
@@ -55,7 +55,11 @@ export default class response_6_5_3 extends Model {
       type: DataTypes.STRING(500),
       allowNull: true
     },
-    from_to_date: {
+    from_date: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    to_date: {
       type: DataTypes.DATEONLY,
       allowNull: true
     },
