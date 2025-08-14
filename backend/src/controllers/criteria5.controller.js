@@ -5,6 +5,7 @@ import apiError from "../utils/apiError.js";
 import Sequelize from "sequelize";
 import { Op } from "sequelize";
 
+
 const Criteria511 = db.response_5_1_1;
 const Criteria512 = db.response_5_1_2;
 const Criteria513 = db.response_5_1_3;
@@ -1524,37 +1525,37 @@ const createResponse522 = asyncHandler(async (req, res) => {
   
     const startDate = currentIIQA.session_end_year - 5;
     const endDate = currentIIQA.session_end_year;
-  
+    console.log("Start date:", startDate);
+    console.log("End date:", endDate);
     if (session < startDate || session > endDate) {
       throw new apiError(400, "Session must be between the latest IIQA session and the current year");
     }
   
     // Get count of students progressing to higher education for each year
-    const studentsProgressing = await response_5_2_2.findAll({
+    const studentsProgressing = await Criteria522.findAll({
       attributes: [
-        [Sequelize.fn('YEAR', Sequelize.col('year')), 'year'],
-        [Sequelize.fn('COUNT', Sequelize.col('student_name')), 'progress_count']
+        'year',
+        [Sequelize.fn('COUNT', Sequelize.col('student_name')),'progress_count']
       ],
       where: {
         year: {
-          [Sequelize.Op.between]: [startDate, endDate]
+          [Op.between]: [startDate, endDate]
         }
       },
-      group: [Sequelize.fn('YEAR', Sequelize.col('year'))],
+      group: ['year'],
+      order: [['year', 'DESC']],
       raw: true
     });
+    console.log("Students progressing:", studentsProgressing);
   
     // Get outgoing final year students for each year
     const outgoingStudents = await extended_profile.findAll({
       attributes: ['year', 'outgoing_final_year_students'],
-      where: { 
-        year: { [Sequelize.Op.between]: [startDate, endDate] },
-        outgoing_final_year_students: { [Sequelize.Op.gt]: 0 }
-      },
+      //WHERE CLAUSE MISSING
       order: [['year', 'DESC']],
-      raw: true
+      raw: true,
     });
-  
+  console.log("Outgoing students:", outgoingStudents);
     if (!studentsProgressing.length || !outgoingStudents.length) {
       throw new apiError(404, "No student data found in the session range");
     }
@@ -1587,10 +1588,10 @@ const createResponse522 = asyncHandler(async (req, res) => {
     if (years.length === 0) {
       throw new apiError(400, "No valid data to compute score");
     }
-  
+  console.log(yearlyPercentages);
     const totalPercentage = years.reduce((sum, year) => sum + yearlyPercentages[year], 0);
     const averagePercentage = Number((totalPercentage / years.length).toFixed(3));
-  
+    console.log("Average percentage:", averagePercentage);
     let grade;
     if (averagePercentage >= 70) {
       grade = 4;
@@ -1603,11 +1604,11 @@ const createResponse522 = asyncHandler(async (req, res) => {
     } else {
       grade = 0;
     }
-  
+    console.log("Grade:", grade);
     let [entry, created] = await Score.findOrCreate({
       where: {
         criteria_code: criteria.criteria_code,
-        session: currentYear
+        session: session
       },
       defaults: {
         criteria_code: criteria.criteria_code,
@@ -1616,23 +1617,23 @@ const createResponse522 = asyncHandler(async (req, res) => {
         sub_sub_criteria_id: criteria.sub_sub_criterion_id,
         score_criteria: 0,
         score_sub_criteria: 0,
-        score_sub_sub_criteria: score,
+        score_sub_sub_criteria: averagePercentage,
         sub_sub_cr_grade: grade,
-        session: currentYear,
+        session: session,
         cycle_year: 1
       }
     });
   
     if (!created) {
       await Score.update({
-        score_sub_sub_criteria: score,
+        score_sub_sub_criteria: averagePercentage,
         sub_sub_cr_grade: grade,
-        session: currentYear,
+        session: session,
         cycle_year: 1
       }, {
         where: {
           criteria_code: criteria.criteria_code,
-          session: currentYear
+          session: session
         }
       });
     }
@@ -1640,7 +1641,7 @@ const createResponse522 = asyncHandler(async (req, res) => {
     entry = await Score.findOne({
       where: {
         criteria_code: criteria.criteria_code,
-        session: currentYear
+        session: session
       }
     });
   
@@ -1908,13 +1909,14 @@ const createResponse523 = asyncHandler(async (req, res) => {
   
     const startDate = currentIIQA.session_end_year - 5;
     const endDate = currentIIQA.session_end_year;
-  
+  console.log("Start date:", startDate);
+    console.log("End date:", endDate);
     if (session < startDate || session > endDate) {
       throw new apiError(400, "Session must be between the latest IIQA session and the current year");
     }
   
     // Fetch all award entries for the criteria code and session range
-    const awardEntries = await Response531.findAll({
+    const awardEntries = await Criteria531.findAll({
       attributes: ['award_name', 'year'],
       where: {
         criteria_code: criteria.criteria_code,
@@ -1924,7 +1926,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
       },
       raw: true
     });
-  
+  console.log("Award entries:", awardEntries);
     if (!awardEntries.length) {
       throw new apiError(404, "No award entries found for Criteria 5.3.1 in the session range");
     }
@@ -1932,7 +1934,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     // Group entries by year and count awards
     const awardsByYear = {};
     awardEntries.forEach(entry => {
-      const year = new Date(entry.year).getFullYear();
+      const year = entry.year;
       awardsByYear[year] = (awardsByYear[year] || 0) + 1;
     });
   
