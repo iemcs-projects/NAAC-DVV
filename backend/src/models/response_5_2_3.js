@@ -39,55 +39,55 @@ export default class response_5_2_3 extends Model {
       allowNull: false
     },
     students_appearing: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(100),
       allowNull: true
     },
     exam_net: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_slet: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_gate: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_gmat: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_cat: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_gre: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_jam: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_ielts: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_toefl: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_civil_services: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_state_services: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     exam_other: {
-      type: DataTypes.STRING(500),
+      type: DataTypes.ENUM('YES','NO'),
       allowNull: true
     },
     submitted_at: {

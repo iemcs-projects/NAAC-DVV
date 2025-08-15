@@ -1075,13 +1075,13 @@ const score515 = asyncHandler(async (req, res) => {
     order: [['id', 'DESC']],
     raw: true
   });
-
+console.log("Response:", response);
   if (!response) {
     throw new apiError(404, "No response found for criteria 5.1.5");
   }
 
   const options = Number(response.options);
-
+console.log("Options:", options);
   let score, grade;
   switch (options) {
     case 4:
@@ -1655,12 +1655,12 @@ const createResponse522 = asyncHandler(async (req, res) => {
 
 
 //5.2.3
- 
 const createResponse523 = asyncHandler(async (req, res) => {
   const {
     session,
     year,
     registeration_number,
+    students_appearing, // now storing student name
     exam_net,
     exam_slet,
     exam_gate,
@@ -1679,10 +1679,12 @@ const createResponse523 = asyncHandler(async (req, res) => {
   const isValidAnswer = (val) =>
     typeof val === "string" && ["YES", "NO"].includes(val.toUpperCase());
 
+  // Validation
   if (
     session == null ||
     year == null ||
     !registeration_number ||
+    !students_appearing || // student name must be present
     !isValidAnswer(exam_net) ||
     !isValidAnswer(exam_slet) ||
     !isValidAnswer(exam_gate) ||
@@ -1700,19 +1702,18 @@ const createResponse523 = asyncHandler(async (req, res) => {
   }
 
   const currentYear = new Date().getFullYear();
-
   if (session < 1990 || session > currentYear || year < 1990 || year > currentYear) {
     throw new apiError(400, "Year and session must be between 1990 and the current year");
   }
 
+  // Check for duplicates
   const existingEntry = await Criteria523.findOne({
     where: {
       session,
-      year: new Date(`${year}-01-01`),
+      year,
       registeration_number,
     },
   });
-
   if (existingEntry) {
     throw new apiError(
       409,
@@ -1720,6 +1721,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     );
   }
 
+  // Criteria lookup
   const criteria = await CriteriaMaster.findOne({
     where: {
       criterion_id: "05",
@@ -1727,23 +1729,17 @@ const createResponse523 = asyncHandler(async (req, res) => {
       sub_sub_criterion_id: "050203",
     },
   });
+  if (!criteria) throw new apiError(404, "Criteria details not found");
 
-  if (!criteria) {
-    throw new apiError(404, "Criteria details not found");
-  }
-
+  // IIQA range check
   const latestIIQA = await IIQA.findOne({
     attributes: ["session_end_year"],
     order: [["created_at", "DESC"]],
   });
-
-  if (!latestIIQA) {
-    throw new apiError(404, "No IIQA data found");
-  }
+  if (!latestIIQA) throw new apiError(404, "No IIQA data found");
 
   const iiqaEndYear = latestIIQA.session_end_year;
   const iiqaStartYear = iiqaEndYear - 5;
-
   if (session < iiqaStartYear || session > iiqaEndYear) {
     throw new apiError(
       400,
@@ -1751,15 +1747,8 @@ const createResponse523 = asyncHandler(async (req, res) => {
     );
   }
 
-  // Create date for year field (Jan 1st)
-  const yearDate = new Date(`${year}-01-01`);
-
-  const newEntry = await Criteria523.create({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    year: yearDate,
-    registeration_number,
+  // Convert YES/NO fields to uppercase for storage
+  const exams = {
     exam_net: exam_net.toUpperCase(),
     exam_slet: exam_slet.toUpperCase(),
     exam_gate: exam_gate.toUpperCase(),
@@ -1772,6 +1761,17 @@ const createResponse523 = asyncHandler(async (req, res) => {
     exam_civil_services: exam_civil_services.toUpperCase(),
     exam_state_services: exam_state_services.toUpperCase(),
     exam_other: exam_other.toUpperCase(),
+  };
+
+  // Create entry (students_appearing is now student name)
+  const newEntry = await Criteria523.create({
+    id: criteria.id,
+    criteria_code: criteria.criteria_code,
+    session,
+    year,
+    registeration_number,
+    students_appearing,
+    ...exams,
   });
 
   return res
@@ -1780,10 +1780,176 @@ const createResponse523 = asyncHandler(async (req, res) => {
 });
 
 
+//score 5.2.3
+const score523 = asyncHandler(async (req, res) => {
+  /*
+    1. Get current year as session
+    2. Get criteria from criteria master with the sub sub criterion id 5.2.3
+    3. Get latest IIQA session range
+    4. Check if session is between the latest IIQA session and current year
+    5. Fetch all exam entries for the criteria code and session range
+    6. Group by year and count students with at least one YES
+    7. Calculate average number over the 5-year period
+    8. Create or update score in score table
+    9. Return score
+  */
+
+  const session = new Date().getFullYear();
+  const criteria_code = convertToPaddedFormat("5.2.3");
+
+  // Step 2: Get criteria details
+  const criteria = await CriteriaMaster.findOne({
+    where: { sub_sub_criterion_id: criteria_code }
+  });
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Get the latest IIQA session range
+  const currentIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]]
+  });
+  if (!currentIIQA) throw new apiError(404, "No IIQA form found");
+
+  const startDate = currentIIQA.session_end_year - 5;
+  const endDate = currentIIQA.session_end_year;
+
+  if (session < startDate || session > endDate) {
+    throw new apiError(
+      400,
+      "Session must be between the latest IIQA session and the current year"
+    );
+  }
+
+  // Step 5: Fetch all exam entries in range
+  const examEntries = await Criteria523.findAll({
+    attributes: [
+      "year",
+      "exam_net",
+      "exam_slet",
+      "exam_gate",
+      "exam_gmat",
+      "exam_cat",
+      "exam_gre",
+      "exam_jam",
+      "exam_ielts",
+      "exam_toefl",
+      "exam_civil_services",
+      "exam_state_services",
+      "exam_other"
+    ],
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: { [Sequelize.Op.between]: [startDate, endDate] }
+    },
+    raw: true
+  });
+
+  if (!examEntries.length) {
+    throw new apiError(
+      404,
+      "No exam entries found for Criteria 5.2.3 in the session range"
+    );
+  }
+
+  // Step 6: Group by year and count students who have given at least one YES
+  const studentsByYear = {};
+  examEntries.forEach(entry => {
+    const year = new Date(entry.year).getFullYear();
+    const exams = [
+      entry.exam_net,
+      entry.exam_slet,
+      entry.exam_gate,
+      entry.exam_gmat,
+      entry.exam_cat,
+      entry.exam_gre,
+      entry.exam_jam,
+      entry.exam_ielts,
+      entry.exam_toefl,
+      entry.exam_civil_services,
+      entry.exam_state_services,
+      entry.exam_other
+    ];
+    const hasGivenExam = exams.some(
+      val => typeof val === "string" && val.toUpperCase() === "YES"
+    );
+    if (hasGivenExam) {
+      studentsByYear[year] = (studentsByYear[year] || 0) + 1;
+    }
+  });
+
+  // Step 7: Calculate average
+  const years = Object.keys(studentsByYear);
+  const totalCount = years.reduce(
+    (sum, year) => sum + studentsByYear[year],
+    0
+  );
+  const averageCount = years.length > 0 ? totalCount / years.length : 0;
+
+  // Step 8: Sample grading logic
+  let grade;
+  if (averageCount >= 15) {
+    grade = 4;
+  } else if (averageCount >= 10) {
+    grade = 3;
+  } else if (averageCount >= 5) {
+    grade = 2;
+  } else if (averageCount >= 2) {
+    grade = 1;
+  } else {
+    grade = 0;
+  }
+
+  // Step 9: Create or update score
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: averageCount,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update({
+      score_sub_sub_criteria: averageCount,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: session
+      }
+    });
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
+  });
+
+
+
+  return res.status(200).json(
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
+  );
+});
+
+
   
  //5.3.1
-
-
  const createResponse531 = asyncHandler(async (req, res) => {
     const {
       session,
@@ -2007,7 +2173,6 @@ const createResponse523 = asyncHandler(async (req, res) => {
 
 
 //5.3.3
-
 const createResponse533 = asyncHandler(async (req, res) => {
     const {
       session,
@@ -2093,7 +2258,7 @@ const createResponse533 = asyncHandler(async (req, res) => {
     );
   });
 
-  //score 5.3.3
+//score 5.3.3
   const score533 = asyncHandler(async (req, res) => {
     /*
     1. Get current year as session
@@ -2129,13 +2294,14 @@ const createResponse533 = asyncHandler(async (req, res) => {
   
     const startDate = currentIIQA.session_end_year - 5;
     const endDate = currentIIQA.session_end_year;
-  
+  console.log("Start date:", startDate);
+    console.log("End date:", endDate);
     if (session < startDate || session > endDate) {
       throw new apiError(400, "Session must be between the latest IIQA session and the current year");
     }
   
     // Fetch all event entries for the criteria code and session range
-    const eventEntries = await Response533.findAll({
+    const eventEntries = await Criteria533.findAll({
       attributes: ['event_name', 'session'],
       where: {
         criteria_code: criteria.criteria_code,
@@ -2145,7 +2311,7 @@ const createResponse533 = asyncHandler(async (req, res) => {
       },
       raw: true
     });
-  
+  console.log("Event entries:", eventEntries);
     if (!eventEntries.length) {
       throw new apiError(404, "No event entries found for Criteria 5.3.3 in the session range");
     }
@@ -2156,14 +2322,13 @@ const createResponse533 = asyncHandler(async (req, res) => {
       const year = entry.session;
       eventsByYear[year] = (eventsByYear[year] || 0) + 1;
     });
-  
-    console.log("Events by year:", eventsByYear);
+  console.log("Events by year:", eventsByYear);
   
     // Calculate average number of events per year
     const years = Object.keys(eventsByYear);
     const totalEvents = years.reduce((sum, year) => sum + eventsByYear[year], 0);
     const averageEvents = years.length > 0 ? (totalEvents / years.length) : 0;
-  
+  console.log("Total events:", totalEvents);
     console.log("Average events per year:", averageEvents);
   
     // Grading logic
@@ -2179,7 +2344,7 @@ const createResponse533 = asyncHandler(async (req, res) => {
     } else {
       grade = 0;
     }
-  
+  console.log("Grade:", grade);
     // Create or update score
     let [entry, created] = await Score.findOrCreate({
       where: {
@@ -2301,7 +2466,7 @@ const createResponse533 = asyncHandler(async (req, res) => {
     );
   });
   
-  // score 5.4.2
+// score 5.4.2
   const score542 = asyncHandler(async (req, res) => {
     const criteria_code = convertToPaddedFormat("5.4.2");
     const currentYear = new Date().getFullYear();
@@ -2419,6 +2584,7 @@ const createResponse533 = asyncHandler(async (req, res) => {
     score515,
     score521,
     score522,
+    score523,
     score531,
     score533,
     score542
