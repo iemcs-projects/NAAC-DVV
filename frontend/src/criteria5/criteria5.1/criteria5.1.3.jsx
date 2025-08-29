@@ -35,39 +35,28 @@ const [submittedData, setSubmittedData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Changed to handle multiple selections like in Criteria 4.2.2
-  const [selectedOptions, setSelectedOptions] = useState({
-    option1: false,
-    option2: false,
-    option3: false,
-    option4: false,
-  });
+  // State for selected program
+  const [selectedProgram, setSelectedProgram] = useState('');
 
   const [rows, setRows] = useState([]);
   const [formData, setFormData] = useState({
-    programName: "",
     date: "",
     studentsEnrolled: "",
     agency: "",
   });
 
-  // Updated to handle checkbox changes like in Criteria 4.2.2
-  const handleCheckboxChange = (option) => {
-    setSelectedOptions(prev => ({
-      ...prev,
-      [option]: !prev[option]
-    }));
+  // Handle program selection change
+  const handleProgramChange = (e) => {
+    setSelectedProgram(e.target.value);
   };
 
-  // Function to get grade based on selected options count
-  const getGrade = () => {
-    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
-    if (selectedCount >= 4) return 'A. All of the above';
-    if (selectedCount === 3) return 'B. Any 3 of the above';
-    if (selectedCount === 2) return 'C. Any 2 of the above';
-    if (selectedCount === 1) return 'D. Any 1 of the above';
-    return 'E. None of the above';
-  };
+  // List of available programs
+  const programs = [
+    { id: '1', name: 'Soft skills' },
+    { id: '2', name: 'Language and communication skills' },
+    { id: '3', name: 'Life skills (Yoga, physical fitness, health and hygiene)' },
+    { id: '4', name: 'ICT/computing skills' }
+  ];
 
   const fetchScore = async () => {
     console.log('Fetching score...');
@@ -78,9 +67,9 @@ const [submittedData, setSubmittedData] = useState([]);
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -106,23 +95,33 @@ const [submittedData, setSubmittedData] = useState([]);
   };
 
   const handleSubmit = async () => {
-    const { programName, date, studentsEnrolled, agency } = formData;
+    const { date, studentsEnrolled, agency } = formData;
     const session = currentYear;
     
-    if (!programName || !date || !studentsEnrolled || !agency) {
-      alert("Please fill in all fields");
+    if (!selectedProgram) {
+      alert("Please select a program");
+      return;
+    }
+    
+    if (!date || !studentsEnrolled || !agency) {
+      alert("Please fill in all required fields");
       return;
     }
 
     try {
       // Convert date from DD-MM-YYYY to YYYY-MM-DD format for the database
       const [day, month, year] = date.split('-');
-      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      const implementation_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
+      const selectedProgramObj = programs.find(p => p.id === selectedProgram);
+      
+      // Extract just the first year from the session (e.g., '2024-25' -> '2024')
+      const firstYear = session.split('-')[0];
+      
       const requestBody = {
-        session: parseInt(session, 10), // Ensure session is a number
-        program_name: programName,
-        implementation_date: formattedDate, // YYYY-MM-DD format
+        session: firstYear, // Send only the first year as a string
+        program_name: selectedProgramObj.name,
+        implementation_date,
         students_enrolled: parseInt(studentsEnrolled, 10),
         agency_name: agency,
       };
@@ -143,14 +142,15 @@ const [submittedData, setSubmittedData] = useState([]);
       // Update local state
       setRows(prev => [...prev, { ...formData }]);
       
-      // Show success message
-      alert("Data submitted successfully!");
+      // Show success message and reset form
       setFormData({
-        programName: "",
         date: "",
         studentsEnrolled: "",
         agency: "",
       });
+      
+      // Reset program selection
+      setSelectedProgram('');
       
       fetchScore();
       alert("Data submitted successfully!");
@@ -216,21 +216,29 @@ const [submittedData, setSubmittedData] = useState([]);
             </div>
           </div>
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
-            ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
-            )}
-          </div>
+              {loading ? (
+                <p className="text-gray-600">Loading provisional score...</p>
+              ) : provisionalScore ? (
+                <div>
+                  <p className="text-lg font-semibold text-green-800">
+                    Provisional Score (5.1.3): {typeof provisionalScore.score_sub_sub_criteria === 'number' 
+                      ? provisionalScore.score_sub_sub_criteria.toFixed(2) 
+                      : provisionalScore.score_sub_sub_criteria}%
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Grade: {provisionalScore.sub_sub_cr_grade}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    (Last updated: {new Date(provisionalScore.updatedAt || Date.now()).toLocaleString()})
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+              )}
+              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+            </div>
+
+          
           <div className="mb-4">
             <label className="font-medium text-gray-700 mr-2">Select Year:</label>
             <select
@@ -244,43 +252,6 @@ const [submittedData, setSubmittedData] = useState([]);
             </select>
           </div>
 
-          {/* Multiple Selection Checkboxes */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-4">
-              Select the Capacity Building and Skills Enhancement Initiatives (Multiple selections allowed)
-            </h3>
-            <div className="space-y-3">
-              {[
-                { key: "option1", label: "1. Soft skills" },
-                { key: "option2", label: "2. Language and communication skills" },
-                { key: "option3", label: "3. Life skills (Yoga, physical fitness, health and hygiene)" },
-                { key: "option4", label: "4. ICT/computing skills" }
-              ].map(({ key, label }) => (
-                <div key={key} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={key}
-                    className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    checked={selectedOptions[key]}
-                    onChange={() => handleCheckboxChange(key)}
-                  />
-                  <label htmlFor={key} className="text-sm text-gray-800">{label}</label>
-                </div>
-              ))}
-            </div>
-            
-            {/* Grade Display */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-md">
-              <p className="text-sm font-medium text-blue-800">
-                Option Selected: {getGrade()}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 4 initiatives
-              </p>
-            </div>
-          </div>
-
-          {/* Input Table */}
           <div className="flex justify-center overflow-auto border rounded mb-6">
             <table className="min-w-full border text-sm text-left">
               <thead className="bg-gray-100 font-semibold">
@@ -295,13 +266,19 @@ const [submittedData, setSubmittedData] = useState([]);
               <tbody>
                 <tr>
                   <td className="px-2 py-2 border">
-                    <input
-                      type="text"
-                      value={formData.programName}
-                      onChange={(e) => setFormData({ ...formData, programName: e.target.value })}
+                    <select
+                      value={selectedProgram}
+                      onChange={handleProgramChange}
                       className="w-full px-2 py-1 border rounded text-gray-950"
-                      placeholder="Enter program name"
-                    />
+                      required
+                    >
+                      <option value="">-- Select program --</option>
+                      {programs.map((program) => (
+                        <option key={program.id} value={program.id}>
+                          {program.name}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-2 py-2 border">
                     <input

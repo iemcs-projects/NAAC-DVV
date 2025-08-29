@@ -1,59 +1,121 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import axios from "axios";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria4_2_4 = () => {
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [currentYear, setCurrentYear] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const years = ["2024-25", "2023-24", "2022-23", "2021-22", "2020-21"];
+
+  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [submittedData, setSubmittedData] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const [formData, setFormData] = useState({
     number: "",
-    total: "",
     supportLinks: [""],
   });
 
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [submittedData, setSubmittedData] = useState([]);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  // Session initialization effects
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      setAvailableSessions(sessions);
+      const initialSession = sessions[0];
+      setCurrentYear(initialSession);
+    }
+  }, [sessions]);
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria4/score424");
+      console.log('API Response:', response);
+      console.log('Response data:', response.data);
+      setProvisionalScore(response.data);
+      console.log('provisionalScore after set:', provisionalScore);
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
   const handleChange = (field, value, index = null) => {
     if (field === "supportLinks") {
       const newLinks = [...formData.supportLinks];
       newLinks[index] = value;
       setFormData({ ...formData, supportLinks: newLinks });
+    } else if (field === 'year') {
+      setFormData(prev => ({
+        ...prev,
+        year: value
+      }));
     } else {
-      setFormData({ ...formData, [field]: value });
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
     }
   };
 
-  const handleSubmit = () => {
-    const parsedNumber = parseFloat(formData.number);
-    const parsedTotal = parseFloat(formData.total);
+  const handleSubmit = async () => {
+    const number = formData.number.trim();
+    const year = currentYear.split('-')[0]; // Get year from selected session
+    console.log("Selected Session Year:", year);
 
-    if (
-      formData.number !== "" &&
-      formData.total !== "" &&
-      !isNaN(parsedNumber) &&
-      !isNaN(parsedTotal) &&
-      parsedTotal > 0
-    ) {
-      const entryWithYear = {
-        ...formData,
-        number: parsedNumber,
-        total: parsedTotal,
-        year: selectedYear, // ✅ Include year
-      };
-      setSubmittedData([...submittedData, entryWithYear]);
-      setFormData({
-        number: "",
-        total: "",
-        supportLinks: [""],
+    const parsedNumber = parseFloat(number);
+
+    if (!number || isNaN(parsedNumber) || parsedNumber <= 0) {
+      alert("Please enter a valid number of users.");
+      return;
+    }
+
+    try {
+      const response = await axios.post("http://localhost:3000/api/v1/criteria4/createResponse424", {
+        session: parseInt(year),
+        no_of_teachers_stds: parsedNumber
       });
-    } else {
-      alert("Please fill in all required numeric fields correctly.");
+
+      const resp = response?.data?.data || {};
+      const newEntry = {
+        number: resp.no_of_teachers_stds || parsedNumber,
+      };
+
+      setSubmittedData((prev) => [...prev, newEntry]);
+      
+      // Reset form
+      setFormData(prev => ({
+        ...prev,
+        number: "",
+      }));
+      
+      // Fetch updated score
+      await fetchScore();
+      alert("Library usage data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting library usage data:", error);
+      alert(error.response?.data?.message || error.message || "Failed to submit library usage data");
     }
   };
 
@@ -67,11 +129,18 @@ const Criteria4_2_4 = () => {
     navigate("/criteria1.1.3");
   };
 
-  // ✅ Generate year-wise grouped data
-  const yearData = years.reduce((acc, year) => {
-    acc[year] = submittedData.filter((entry) => entry.year === year);
-    return acc;
-  }, {});
+  // Generate year-wise grouped data using availableSessions
+  const yearData = availableSessions.length > 0 ? 
+    availableSessions.reduce((acc, session) => {
+      const yearKey = session.split('-')[0];
+      acc[session] = submittedData.filter((entry) => entry.year === yearKey);
+      return acc;
+    }, {}) : 
+    pastFiveYears.reduce((acc, year) => {
+      const yearKey = year.split('-')[0];
+      acc[year] = submittedData.filter((entry) => entry.year === yearKey);
+      return acc;
+    }, {});
 
   return (
     <div className="min-h-screen w-[1254px] bg-gray-50 flex flex-col">
@@ -88,6 +157,24 @@ const Criteria4_2_4 = () => {
               <span className="text-gray-600">4.2 Library as a learning Resource</span>
               <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
             </div>
+          </div>
+
+          {/* Provisional Score */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (4.2.4): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -111,16 +198,21 @@ const Criteria4_2_4 = () => {
 
           <h2 className="text-xl font-bold text-gray-500 mb-4">Per day usage of library by teachers and students</h2>
 
+          {/* Year Selector */}
           <div className="mb-4">
-            <label className="text-gray-700 font-medium mr-2">Select Year:</label>
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
             <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className="border border-gray-300 px-3 py-1 rounded text-gray-950"
+              value={currentYear}
+              onChange={(e) => {
+                const newSession = e.target.value;
+                setCurrentYear(newSession);
+                setSelectedYear(newSession);
+              }}
+              className="px-3 py-1 border border-gray-300 rounded text-gray-950"
             >
-              {pastFiveYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
+              {availableSessions.map((session) => (
+                <option key={session} value={session}>
+                  {session}
                 </option>
               ))}
             </select>
@@ -131,23 +223,21 @@ const Criteria4_2_4 = () => {
               <thead className="bg-gray-100 font-semibold text-gray-950">
                 <tr>
                   <th className="px-4 py-2 border">Number of teachers and students using library per day</th>
-                  <th className="px-4 py-2 border">Total number of teachers and students</th>
                   <th className="px-4 py-2 border">Action</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  {["number", "total"].map((field) => (
-                    <td key={field} className="px-2 py-2 border">
-                      <input
-                        type="text"
-                        value={formData[field]}
-                        onChange={(e) => handleChange(field, e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-gray-900 border-black"
-                        placeholder={field}
-                      />
-                    </td>
-                  ))}
+
+                  <td className="px-2 py-2 border">
+                    <input
+                      type="text"
+                      value={formData.number}
+                      onChange={(e) => handleChange("number", e.target.value)}
+                      className="w-full px-2 py-1 border rounded text-gray-900 border-black"
+                      placeholder="Number of users"
+                    />
+                  </td>
                   <td className="px-2 py-2 border">
                     <button
                       onClick={handleSubmit}
@@ -193,7 +283,7 @@ const Criteria4_2_4 = () => {
 
           <div className="mb-8">
             <h3 className="text-lg font-semibold mb-2 text-gray-950">Submitted Entries</h3>
-            {years.map((year) => (
+            {pastFiveYears.map((year) => (
               <div key={year} className="mb-8 border rounded">
                 <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
                 {yearData[year] && yearData[year].length > 0 ? (
@@ -202,15 +292,13 @@ const Criteria4_2_4 = () => {
                       <tr>
                         <th className="px-4 py-2 border text-gray-750">#</th>
                         <th className="px-4 py-2 border text-gray-950">Number of teachers and students using library per day</th>
-                        <th className="px-4 py-2 border text-gray-950">Total number of teachers and students</th>
                       </tr>
                     </thead>
                     <tbody>
                       {yearData[year].map((entry, index) => (
                         <tr key={index} className="even:bg-gray-50 text-gray-950">
                           <td className="px-2 py-2 border border-black">{index + 1}</td>
-                          <td className="px-2 py-2 border border-black">{entry.number}</td>
-                          <td className="px-2 py-2 border border-black">{entry.total}</td>
+                          <td className="px-2 py-2 border border-black">{entry.number} users per day</td>
                         </tr>
                       ))}
                     </tbody>
@@ -238,13 +326,13 @@ const Criteria4_2_4 = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-black px-4 py-2 font-medium text-gray-600">Calculated Score</td>
+                    <td className="border border-black px-4 py-2 font-medium text-gray-600">Users per Day</td>
                     {pastFiveYears.map((year) => {
-                      const entry = submittedData.find((data) => data.year === year);
-                      const score = entry && entry.total > 0 ? ((entry.number / entry.total) * 100).toFixed(2) : "-";
+                      const yearKey = year.split('-')[0];
+                      const entry = submittedData.find((data) => data.year === yearKey);
                       return (
                         <td key={year} className="border border-black px-4 py-2 text-center">
-                          {score}
+                          {entry ? `${entry.number} users` : "-"}
                         </td>
                       );
                     })}

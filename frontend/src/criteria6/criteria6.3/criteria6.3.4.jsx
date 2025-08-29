@@ -31,37 +31,41 @@ const Criteria6_3_4 = () => {
   const [submittedData, setSubmittedData] = useState([]);
 
   const fetchScore = async () => {
-    console.log('Starting to fetch score for 6.3.4...');
+    console.log('Fetching score...');
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score634");
       console.log('API Response:', response);
-      console.log('Response data:', response.data); // Add this line
-      setProvisionalScore(response.data);
+      
+      // Handle different possible response structures
+      const scoreData = response.data?.data?.entry || response.data?.data || response.data;
+      
+      if (scoreData) {
+        console.log('Score data:', scoreData);
+        // Set the entire response data and let the display logic handle it
+        setProvisionalScore(scoreData);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
     } catch (error) {
       console.error("Error fetching provisional score:", error);
       if (error.response) {
-        // The request was made and the server responded with a status code
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-      } else if (error.request) {
-        // The request was made but no response was received
-        console.error('No response received:', error.request);
-      } else {
-        // Something happened in setting up the request
-        console.error('Error:', error.message);
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
       }
       setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchScore();
   }, []);
+
+
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -156,19 +160,20 @@ const Criteria6_3_4 = () => {
           </div>
 
           {/* Provisional Score Section */}
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : error ? (
-              <p className="text-red-600">Error loading score: {error}</p>
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (6.3.4): {provisionalScore.data.score}
-                </p>
-              </div>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.3.4): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
             ) : (
-              <p className="text-gray-600">No score data available.</p>
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
 

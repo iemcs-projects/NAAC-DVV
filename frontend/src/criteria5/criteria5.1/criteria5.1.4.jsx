@@ -11,6 +11,7 @@ import { useEffect } from "react";
 
 const Criteria5_1_4= () => {
   const { sessions: availableSessions } = useContext(SessionContext);
+  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
 
   const [selectedYear, setSelectedYear] = useState(
     availableSessions && availableSessions.length > 0 ? availableSessions[0] : pastFiveYears[0]
@@ -25,7 +26,7 @@ const Criteria5_1_4= () => {
 const [provisionalScore, setProvisionalScore] = useState(null);
 
 
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
+  
 
 
   const [formData, setFormData] = useState({
@@ -55,9 +56,9 @@ const [provisionalScore, setProvisionalScore] = useState(null);
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -232,7 +233,7 @@ examinations and career counselling</li>
               <p className="text-gray-600">Loading provisional score...</p>
             ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
               <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                Provisional Score (5.1.4): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
                   ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
                   : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
                 <span className="ml-2 text-sm font-normal text-gray-500">

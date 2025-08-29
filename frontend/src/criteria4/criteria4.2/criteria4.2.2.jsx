@@ -1,22 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
-import { useContext } from "react";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
-import { useEffect } from "react";
 
 const Criteria4_2_2 = () => {
-  const { sessions: availableSessions } = useContext(SessionContext);
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+  
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [currentYear, setCurrentYear] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);  
+  
+  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   
   // Changed to handle multiple selections
   const [selectedOptions, setSelectedOptions] = useState({
@@ -26,9 +27,57 @@ const Criteria4_2_2 = () => {
     option4: false,
     option5: false,
   });
-  
-  const [rows, setRows] = useState([]);
-  const [nextId, setNextId] = useState(1);
+
+  // Initialize sessions
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      setAvailableSessions(sessions);
+      setCurrentYear(sessions[0]);
+      setSelectedYear(sessions[0]);
+    }
+  }, [sessions]);
+
+  // Fallback to pastFiveYears if no sessions available
+  useEffect(() => {
+    const yearToUse = availableSessions?.length > 0 ? availableSessions[0] : pastFiveYears[0];
+    if (yearToUse && currentYear !== yearToUse) {
+      setCurrentYear(yearToUse);
+      setSelectedYear(yearToUse);
+    }
+  }, [availableSessions, pastFiveYears, currentYear]);
+
+  useEffect(() => {
+    if (!availableSessions?.length && pastFiveYears.length > 0) {
+      setCurrentYear(pastFiveYears[0]);
+      setSelectedYear(pastFiveYears[0]);
+    }
+  }, [availableSessions, pastFiveYears]);
+
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria4/score422");
+      console.log('API Response:', response);
+      console.log('Response data:', response.data);
+      setProvisionalScore(response.data);
+      console.log('provisionalScore after set:', provisionalScore);
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
 
   // Updated to handle checkbox changes
   const handleCheckboxChange = (option) => {
@@ -37,70 +86,6 @@ const Criteria4_2_2 = () => {
       [option]: !prev[option]
     }));
   };
- 
-  const addRow = () => {
-    setRows([...rows, { id: nextId, name: "" }]);
-    setNextId(nextId + 1);
-  };
-
-  const handleRowNameChange = (id, name) => {
-    setRows(rows.map((row) => (row.id === id ? { ...row, name } : row)));
-  };
-
-  const libraryResources = [
-    "Books",
-    "Journals",
-    "e-journals",
-    "e-books",
-    "e-ShodhSindhu",
-    "Shodhganga",
-    "Databases",
-  ];
-
-  const [year1Data, setYear1Data] = useState(
-    libraryResources.map((resource) => ({
-      resource,
-      membershipDetails: "",
-      expenditure: "",
-      totalExpenditure: "",
-      link: "",
-    }))
-  );
-
-  const handleYear1Change = (index, field, value) => {
-    const updated = [...year1Data];
-    updated[index][field] = value;
-    setYear1Data(updated);
-  };
-
-  const [formData, setFormData] = useState({
-      roomno: "",
-      type: "",
-      link: "",
-    });
-    const [submittedData, setSubmittedData] = useState([]);
-  
-    const handleChange = (field, value) => {
-      setFormData({ ...formData, [field]: value });
-    };
-  
-    const handleSubmit = () => {
-      if (
-        formData.roomno &&
-        formData.type &&
-        formData.link 
-        
-      ) {
-        setSubmittedData([...submittedData, formData]);
-        setFormData({
-          roomno: "",
-      type: "",
-      link: "",
-        });
-      } else {
-        alert("Please fill in all required fields.");
-      }
-    };
 
   const navigate = useNavigate()
   const goToNextPage = () => {
@@ -121,8 +106,41 @@ const Criteria4_2_2 = () => {
     return 'E. None of the above';
   };
 
+  const handleSubmit = async () => {
+    try {
+      if (!currentYear) {
+        throw new Error("Please select a year");
+      }
+      
+      const sessionFull = currentYear;
+      const session = sessionFull.split("-")[0];
+      
+      // Count number of selected options (0-5)
+      const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+      console.log("Submitting with session:", session, "selected count:", selectedCount);
+      
+      // No need to prevent submission if no options are selected (0 is valid)
+      
+      const response = await axios.post("http://localhost:3000/api/v1/criteria4/createResponse422", {
+        session: parseInt(session),
+        options: selectedCount
+      });
+
+      if (response.data && response.data.success) {
+        alert("Options submitted successfully!");
+        await fetchScore();
+      } else {
+        throw new Error(response.data?.message || "Failed to submit options");
+      }
+      
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+      alert(`Error: ${error.response?.data?.message || error.message || "An error occurred while submitting"}`);
+    }
+  };
+
   return (
-       <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
       <Header />
       <Navbar />
 
@@ -179,6 +197,43 @@ E. None of the above <br/>
             </div>
           </div>
 
+          {/* Provisional Score */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
+
+          {/* Year Selector */}
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              value={currentYear}
+              onChange={(e) => {
+                setCurrentYear(e.target.value);
+                setSelectedYear(e.target.value);
+              }}
+              className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+            >
+              {availableSessions.map((session) => (
+                <option key={session} value={session}>
+                  {session}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Multiple Selection Checkboxes */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-4">
@@ -205,80 +260,25 @@ E. None of the above <br/>
               ))}
             </div>
             
+            {/* Add Button */}
+            <div className="mt-4">
+              <button
+                onClick={handleSubmit}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Add
+              </button>
+            </div>
+            
             {/* Grade Display */}
             <div className="mt-4 p-3 bg-blue-50 rounded-md">
               <p className="text-sm font-medium text-blue-800">
-                Option Selected: {getGrade()}
+                Current Grade: {getGrade()}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 5 resources
+                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 5 options
               </p>
             </div>
-          </div>
-
-          <div className="p-6 bg-white shadow rounded-md max-w-full overflow-x-auto">
-            <h2 className="text-xl font-bold mb-4 text-gray-800">
-              Library Resources
-            </h2>
-
-            <table className="min-w-full border text-sm text-left">
-              <thead className="bg-gray-100 font-semibold text-gray-950">
-                <tr>
-                  <th className="border text-gray-950 px-3 py-2">Library Resources</th>
-                  <th className="border text-gray-950 px-3 py-2">Membership/Subscription Details</th>
-                  <th className="border text-gray-950 px-3 py-2">Expenditure (in Lakhs)</th>
-                  <th className="border text-gray-950 px-3 py-2">Total Expenditure</th>
-                  <th className="border text-gray-950 px-3 py-2">Link to Document</th>
-                </tr>
-              </thead>
-              <tbody>
-                {year1Data.map((row, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="border text-gray-950 px-3 py-2">{row.resource}</td>
-                    <td className="border text-gray-950 px-3 py-2">
-                      <input
-                        type="text"
-                        className="w-full border rounded text-gray-950 px-2 py-1"
-                        value={row.membershipDetails}
-                        onChange={(e) =>
-                          handleYear1Change(index, "membershipDetails", e.target.value)
-                        }
-                      />
-                    </td>
-                    <td className="border px-3 py-2">
-                      <input
-                        type="number"
-                        className="w-full border text-gray-950 rounded px-2 py-1"
-                        value={row.expenditure}
-                        onChange={(e) =>
-                          handleYear1Change(index, "expenditure", e.target.value)
-                        }
-                      />
-                    </td>
-                    <td className="border px-3 py-2">
-                      <input
-                        type="number"
-                        className="w-full border text-gray-950 rounded px-2 py-1"
-                        value={row.totalExpenditure}
-                        onChange={(e) =>
-                          handleYear1Change(index, "totalExpenditure", e.target.value)
-                        }
-                      />
-                    </td>
-                    <td className="border px-3 py-2">
-                      <input
-                        type="text"
-                        className="w-full border text-gray-950 rounded px-2 py-1"
-                        value={row.link}
-                        onChange={(e) =>
-                          handleYear1Change(index, "link", e.target.value)
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">

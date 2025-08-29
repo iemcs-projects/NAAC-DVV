@@ -16,6 +16,7 @@ const Criteria4_1_4 = () => {
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [submittedData, setSubmittedData] = useState([]);
   const { sessions: availableSessions } = useContext(SessionContext);
   
   const [yearData, setYearData] = useState({});
@@ -91,13 +92,13 @@ const Criteria4_1_4 = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:3000/v1/api/criteria4/createResponse414",
+        "http://localhost:3000/api/v1/criteria4/createResponse414",
         {
           session: parseInt(year, 10),
           year: year,
           budget_allocated_infra_aug: parseFloat(budget) || 0,
           expenditure_infra_aug: parseFloat(expen) || 0,
-          total_expenditure_excl_salary: parseFloat(total) || 0,
+          // total_expenditure_excl_salary: parseFloat(total) || 0,
           expenditure_academic_maint: parseFloat(academic) || 0,
           expenditure_physical_maint: parseFloat(physical) || 0
         },
@@ -113,7 +114,7 @@ const Criteria4_1_4 = () => {
         year: year,
         budget: budget,
         expen: expen,
-        total: total,
+        // total: total,
         academic: academic,
         physical: physical
       };
@@ -129,7 +130,7 @@ const Criteria4_1_4 = () => {
         year: "",
         budget: "",
         expen: "",
-        total: "",
+        // total: "",
         academic: "",
         physical: "",
         supportLinks: [""],
@@ -181,18 +182,21 @@ const Criteria4_1_4 = () => {
 
             {/* Provisional Score */}
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-              {loading ? (
-                <p className="text-gray-600">Loading provisional score...</p>
-              ) : provisionalScore?.data ? (
-                <div>
-                  <p className="text-lg font-semibold text-green-800">
-                    Provisional Score (4.1.4): {provisionalScore.data.score}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-600">No score data available.</p>
-              )}
-            </div>
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
 
             {/* --- Year Selection & Entry Form --- */}
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">

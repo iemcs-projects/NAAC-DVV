@@ -10,8 +10,11 @@ import axios from "axios";
 const Criteria5_4_2 = () => {
   const { sessions: availableSessions } = useContext(SessionContext);
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+  
+  const [selectedYear, setSelectedYear] = useState(
+    availableSessions && availableSessions.length > 0 ? availableSessions[0] : pastFiveYears[0]
+  );
+  const [currentYear, setCurrentYear] = useState(selectedYear);
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,6 +27,62 @@ const Criteria5_4_2 = () => {
     option4: false,
     option5: false,
   });
+     useEffect(() => {
+       if (availableSessions && availableSessions.length > 0) {
+         setCurrentYear(availableSessions[0]);
+         setSelectedYear(availableSessions[0]);
+       }
+     }, [availableSessions]);
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    
+    const year = currentYear.split("-")[0];
+    const session = parseInt(year, 10);
+    
+    try {
+      // Count the number of selected options
+      const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+      
+      // Submit only the count to the backend
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria5/createResponse542",
+        {
+          session,
+          options: selectedCount.toString()
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+      
+      // Show success message
+      alert("Data submitted successfully!");
+      
+      // Refresh the score to show updated data
+      await fetchScore();
+      
+      // Reset the form
+      setSelectedOptions({
+        option1: false,
+        option2: false,
+        option3: false,
+        option4: false,
+        option5: false,
+      });
+      
+    } catch (error) {
+      console.error("Error submitting data:", error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         "Failed to submit data. Please try again.";
+      alert(errorMessage);
+    }
+  };
+
 
   const [files, setFiles] = useState([]);
   const fetchScore = async () => {
@@ -31,13 +90,13 @@ const Criteria5_4_2 = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score533");
+      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score542");
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -56,8 +115,12 @@ const Criteria5_4_2 = () => {
   };
 
   useEffect(() => {
+    if (availableSessions && availableSessions.length > 0) {
+      setCurrentYear(availableSessions[0]);
+      setSelectedYear(availableSessions[0]);
+    }
     fetchScore();
-  }, []);
+  }, [availableSessions]);
 
 
   // Updated to handle checkbox changes
@@ -162,6 +225,19 @@ const Criteria5_4_2 = () => {
             )}
           </div>
 
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              className="border px-3 py-1 rounded text-black"
+              value={currentYear}
+              onChange={(e) => setCurrentYear(e.target.value)}
+            >
+              {availableSessions && availableSessions.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Multiple Selection Checkboxes */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-4">
@@ -189,16 +265,15 @@ const Criteria5_4_2 = () => {
             </div>
             
             {/* Grade Display */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-md">
-              <p className="text-sm font-medium text-blue-800">
-                Option Selected: {getGrade()}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 5 contribution brackets
-              </p>
-            </div>
-          </div>
-
+            <div className="mt-4 flex justify-end">
+    <button
+      onClick={handleSubmit}
+      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+    >
+      Add
+    </button>
+  </div>
+</div>
           {/* File Upload */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             <div className="bg-blue-50 p-4 rounded-md mb-6">

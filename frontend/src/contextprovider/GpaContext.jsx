@@ -1,6 +1,17 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import axios from 'axios';
 
+// Function to create empty criteria data structure
+const createEmptyCriteria = () => [
+  { id: 1, title: 'Curricular Aspects', score: 0, target: 0, status: 'Not Met', max: 150 },
+  { id: 2, title: 'Teaching-Learning and Evaluation', score: 0, target: 0, status: 'Not Met', max: 200 },
+  { id: 3, title: 'Research, Innovations and Extension', score: 0, target: 0, status: 'Not Met', max: 110 },
+  { id: 4, title: 'Infrastructure and Learning Resources', score: 0, target: 0, status: 'Not Met', max: 100 },
+  { id: 5, title: 'Student Support and Progression', score: 0, target: 0, status: 'Not Met', max: 100 },
+  { id: 6, title: 'Governance, Leadership and Management', score: 0, target: 0, status: 'Not Met', max: 100 },
+  { id: 7, title: 'Institutional Values and Best Practices', score: 0, target: 0, status: 'Not Met', max: 100 }
+];
+
 export const GpaContext = createContext();
 
 export const GpaProvider = ({ children }) => {

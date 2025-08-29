@@ -8,30 +8,107 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
 
 const Criteria5_1_5 = () => {
-  const { sessions: availableSessions } = useContext(SessionContext);
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [currentYear, setCurrentYear] = useState("");
+  
+  const pastFiveYears = Array.from(
+    { length: 5 },
+    (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`
+  );
+  
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+  const [yearData, setYearData] = useState({});
+  const [yearScores, setYearScores] = useState(
+    pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
+  );
+  const [yearCount, setYearCount] = useState(5);
+  const [averageScore, setAverageScore] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [submittedData, setSubmittedData] = useState([]);
   
-  // Changed to handle multiple selections for grievance redressal components
-  const [selectedOptions, setSelectedOptions] = useState({
-    option1: false,
-    option2: false,
-    option3: false,
-    option4: false,
-  });
+  // Store selected options per session
+  const [selectedOptions, setSelectedOptions] = useState({});
 
-  // Updated to handle checkbox changes
-  const handleCheckboxChange = (option) => {
-    setSelectedOptions(prev => ({
-      ...prev,
-      [option]: !prev[option]
-    }));
+  // Initialize sessions and current year
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      setAvailableSessions(sessions);
+      // Only set initial year if not already set
+      if (!currentYear) {
+        setCurrentYear(sessions[0]);
+        setSelectedYear(sessions[0]);
+      }
+    } else if (pastFiveYears.length > 0) {
+      // Fallback to pastFiveYears if no sessions available
+      setAvailableSessions(pastFiveYears);
+      if (!currentYear) {
+        setCurrentYear(pastFiveYears[0]);
+        setSelectedYear(pastFiveYears[0]);
+      }
+    }
+  }, [sessions, pastFiveYears, currentYear]);
+
+  // Fetch provisional score
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria5/score515");
+      console.log('API Response:', response);
+      
+      // Check if response has data and the expected score property
+      if (response.data && response.data.data && response.data.data.entry) {
+        console.log('Score data:', response.data.data.entry);
+        setProvisionalScore(response.data.data.entry);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  useEffect(() => {
+    fetchScore();
+  }, []);
+
+  // Handle checkbox changes for the current session
+  const handleCheckboxChange = (option) => {
+    setSelectedOptions(prev => {
+      const currentYearOptions = prev[currentYear] || {};
+      const newValue = !currentYearOptions[option];
+      
+      console.log(`Toggling ${option} to ${newValue} for year ${currentYear}`);
+      
+      const updated = {
+        ...prev,
+        [currentYear]: {
+          ...currentYearOptions,
+          [option]: newValue
+        }
+      };
+      
+      // Debug: Log the updated state structure
+      console.log('Updated selectedOptions:', updated);
+      return updated;
+    });
+  };
+
+  
+  
   const navigate = useNavigate();
   const goToNextPage = () => {
     navigate("/criteria5.2.1");
@@ -41,15 +118,78 @@ const Criteria5_1_5 = () => {
     navigate("/criteria5.1.4");
   };
 
-  // Function to get grade based on selected options count
+  // Function to get grade based on selected options count for current session
   const getGrade = () => {
-    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    const currentSessionOptions = selectedOptions[currentYear] || {};
+    const selectedCount = Object.values(currentSessionOptions).filter(Boolean).length;
     if (selectedCount === 4) return 'All of the above';
     if (selectedCount === 3) return 'Any 3 of the above';
     if (selectedCount === 2) return 'Any 2 of the above';
     if (selectedCount === 1) return 'Any 1 of the above';
     return 'None of the above';
   };
+
+  // Submit selected options
+  // Updated handleSubmit function with clearer logic
+const handleSubmit = async () => {
+  const sessionFull = currentYear;
+  const session = parseInt(sessionFull.split("-")[0]);
+  
+  // Get selected options for current session
+  const currentSessionOptions = selectedOptions[currentYear] || {};
+  
+  // Count the number of selected (true) options
+  const selectedCount = Object.values(currentSessionOptions).filter(option => option === true).length;
+  
+  console.log('Current session options:', currentSessionOptions);
+  console.log('Number of selected options:', selectedCount);
+
+  // Validate that we have a valid count (0-4)
+  if (selectedCount < 0 || selectedCount > 4) {
+    alert("Invalid selection count. Please check your selections.");
+    return;
+  }
+  
+  // Prepare the request payload - pass the exact count of selected options
+  const requestPayload = {
+    session: session,
+    options: selectedCount // This will be 0, 1, 2, 3, or 4 based on selections
+  };
+  
+  console.log('Sending request with payload:', JSON.stringify(requestPayload, null, 2));
+
+  try {
+    console.log('Sending request to backend...');
+    const response = await axios.post(
+      "http://localhost:3000/api/v1/criteria5/createResponse515",
+      requestPayload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: true
+      }
+    );
+
+    const resp = response?.data?.data || {};
+    const newEntry = {
+      year: sessionFull,
+      selectedCount: selectedCount,
+      grade: getGrade()
+    };
+
+    setSubmittedData((prev) => [...prev, newEntry]);
+    
+    // Fetch updated score
+    await fetchScore();
+    
+    // Show success message with count
+    alert(`Grievance redressal data submitted successfully! Selected ${selectedCount} out of 4 components.`);
+  } catch (error) {
+    console.error("Error submitting data:", error);
+    alert(error.response?.data?.message || error.message || "Failed to submit data");
+  }
+};
 
   return (
     <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
@@ -104,12 +244,13 @@ const Criteria5_1_5 = () => {
             </div>
           </div>
 
+          {/* Provisional Score */}
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
             ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
               <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                Provisional Score (5.1.5): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
                   ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
                   : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
                 <span className="ml-2 text-sm font-normal text-gray-500">
@@ -119,6 +260,29 @@ const Criteria5_1_5 = () => {
             ) : (
               <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
+          </div>
+
+          {/* Year Selector */}
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              value={currentYear}
+              onChange={(e) => {
+                setCurrentYear(e.target.value);
+                setSelectedYear(e.target.value);
+              }}
+              className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+            >
+              {availableSessions && availableSessions.length > 0 ? (
+                availableSessions.map((session) => (
+                  <option key={session} value={session}>
+                    {session}
+                  </option>
+                ))
+              ) : (
+                <option value="">No sessions available</option>
+              )}
+            </select>
           </div>
 
           {/* Multiple Selection Checkboxes */}
@@ -138,7 +302,7 @@ const Criteria5_1_5 = () => {
                     type="checkbox"
                     id={key}
                     className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    checked={selectedOptions[key]}
+                    checked={selectedOptions[currentYear]?.[key] || false}
                     onChange={() => handleCheckboxChange(key)}
                   />
                   <label htmlFor={key} className="text-sm text-gray-800">{label}</label>
@@ -152,8 +316,18 @@ const Criteria5_1_5 = () => {
                 Option Selected: {getGrade()}
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 4 components
+                Selected: {Object.values(selectedOptions[currentYear] || {}).filter(Boolean).length} out of 4 components
               </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="mt-4">
+              <button
+                onClick={handleSubmit}
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              >
+                Submit Selection
+              </button>
             </div>
           </div>
 
@@ -177,6 +351,33 @@ const Criteria5_1_5 = () => {
               <span className="ml-3 text-gray-600">No file chosen</span>
             </div>
           </div>
+
+          {/* Submitted Data Display */}
+          {submittedData.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <h3 className="text-blue-600 font-medium mb-4">Submitted Data</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-black text-sm">
+                  <thead className="bg-gray-100 font-semibold">
+                    <tr>
+                      <th className="border px-2 py-1">Year</th>
+                      <th className="border px-2 py-1">Grade</th>
+                      <th className="border px-2 py-1">Components Selected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {submittedData.map((entry, index) => (
+                      <tr key={index} className="even:bg-gray-50">
+                        <td className="border px-2 py-1">{entry.year}</td>
+                        <td className="border px-2 py-1">{entry.grade}</td>
+                        <td className="border px-2 py-1">{entry.selectedCount} out of 4</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

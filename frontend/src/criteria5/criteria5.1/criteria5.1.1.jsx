@@ -33,7 +33,7 @@ const Criteria5_1_1 = () => {
   const [submittedData, setSubmittedData] = useState([]);
 
   const [formData, setFormData] = useState({
-    year: "",
+    year: availableSessions?.[0] || pastFiveYears[0] || "",
     scheme_name: "",
     gov_students_count: "",
     gov_amount: "",
@@ -63,9 +63,9 @@ const Criteria5_1_1 = () => {
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -90,11 +90,14 @@ const Criteria5_1_1 = () => {
   // Fixed: Handle supportLinks properly
   const handleChange = (field, value, index = null) => {
     if (field === "supportLinks") {
-      const updatedLinks = [...formData.supportLinks];
-      updatedLinks[index] = value;
+      const updatedLinks = [...(formData.supportLinks || [])];
+      updatedLinks[index] = value || "";
       setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData(prev => ({
+        ...prev,
+        [field]: value || ""
+      }));
     }
   };
 
@@ -236,21 +239,27 @@ const Criteria5_1_1 = () => {
 
             {/* Provisional Score Display */}
             <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
-            ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
-            )}
-          </div>
+              {loading ? (
+                <p className="text-gray-600">Loading provisional score...</p>
+              ) : provisionalScore ? (
+                <div>
+                  <p className="text-lg font-semibold text-green-800">
+                    Provisional Score (5.1.1): {typeof provisionalScore.score_sub_sub_criteria === 'number' 
+                      ? provisionalScore.score_sub_sub_criteria.toFixed(2) 
+                      : provisionalScore.score_sub_sub_criteria}%
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Grade: {provisionalScore.sub_sub_cr_grade}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    (Last updated: {new Date(provisionalScore.updatedAt || Date.now()).toLocaleString()})
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+              )}
+              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+            </div>
 
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
               <div className="flex justify-between items-center mb-4">

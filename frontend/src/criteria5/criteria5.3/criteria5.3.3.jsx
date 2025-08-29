@@ -50,9 +50,10 @@ const Criteria5_3_3 = () => {
       const response = await axios.get("http://localhost:3000/api/v1/criteria5/score533");
       console.log('API Response:', response);
       
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      // Check if response has data and the expected score property
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);

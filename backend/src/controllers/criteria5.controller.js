@@ -557,6 +557,7 @@ const createResponse513 = asyncHandler(async (req, res) => {
       students_enrolled,
       agency_name,
     } = req.body;
+    console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
     if (
@@ -641,62 +642,61 @@ const createResponse513 = asyncHandler(async (req, res) => {
   });
   // score 5.1.3
   const score513 = asyncHandler(async (req, res) => {
+    const session = new Date().getFullYear();
     const criteria_code = convertToPaddedFormat("5.1.3");
-    const currentYear = new Date().getFullYear();
-    const session = currentYear;
   
-    // Step 1: Fetch criteria metadata
     const criteria = await CriteriaMaster.findOne({
       where: { sub_sub_criterion_id: criteria_code }
     });
   
     if (!criteria) {
-      throw new apiError(404, "Criteria 5.1.3 not found in criteria_master");
+      throw new apiError(404, "Criteria not found");
     }
   
-    // Step 2: Fetch the latest response entry for this criteria
-    const response = await Criteria513.findOne({
-      attributes: ['options'],
-      where: { criteria_code: criteria.criteria_code },
-      order: [['id', 'DESC']],
+    // Get current IIQA session
+    const currentIIQA = await IIQA.findOne({
+      attributes: ["session_end_year"],
+      order: [["created_at", "DESC"]]
+    });
+  
+    if (!currentIIQA) {
+      throw new apiError(404, "No IIQA form found");
+    }
+  
+    const startDate = currentIIQA.session_end_year - 5;
+    const endDate = currentIIQA.session_end_year;
+  
+    console.log("Start Date:", startDate);
+    console.log("End Date:", endDate);
+  
+    if (session < startDate || session > endDate) {
+      throw new apiError(
+        400,
+        "Session must be between the latest IIQA session and the current year"
+      );
+    }
+  
+    // Count distinct program names for this session
+    const programCountResult = await Criteria513.findAll({
+      attributes: [
+        "program_name",
+        [Sequelize.fn("COUNT", Sequelize.col("program_name")), "count"]
+      ],
+      where: { session },
+      group: ["program_name"],
       raw: true
     });
   
-    if (!response) {
-      throw new apiError(404, "No response found for criteria 5.1.3");
-    }
+    console.log("Program Count Result:", programCountResult);
   
-    const optionSelected = Number(response.options);
-    console.log("Option Selected:", optionSelected);
-    let score, grade;
-    switch (optionSelected) {
-      case 4:
-        score = 4;
-        grade = 4;
-        break;
-      case 3:
-        score = 3;
-        grade = 3;
-        break;
-      case 2:
-        score = 2;
-        grade = 2;
-        break;
-      case 1:
-        score = 1;
-        grade = 1;
-        break;
-      default:
-        score = 0;
-        grade = 0;
-    }
+    // Score = number of distinct program names
+    const scoreValue = programCountResult.length;
+    console.log("Final Score (5.1.3):", scoreValue);
   
-    // Step 3: Upsert score into the Score table
-    const [entry, created] = await Score.findOrCreate({
+    let [entry, created] = await Score.findOrCreate({
       where: {
         criteria_code: criteria.criteria_code,
-        session: currentYear,
-        year: currentYear
+        session: session
       },
       defaults: {
         criteria_code: criteria.criteria_code,
@@ -705,47 +705,47 @@ const createResponse513 = asyncHandler(async (req, res) => {
         sub_sub_criteria_id: criteria.sub_sub_criterion_id,
         score_criteria: 0,
         score_sub_criteria: 0,
-        score_sub_sub_criteria: score,
-        sub_sub_cr_grade: grade,
-        session: currentYear,
-        year: currentYear,
+        score_sub_sub_criteria: scoreValue,
+        sub_sub_cr_grade: scoreValue,
+        session: session,
         cycle_year: 1
       }
     });
   
     if (!created) {
-      await Score.update({
-        score_sub_sub_criteria: score,
-        sub_sub_cr_grade: grade,
-        session: currentYear,
-        year: currentYear,
-        cycle_year: 1
-      }, {
-        where: {
-          criteria_code: criteria.criteria_code,
-          session: currentYear,
-          year: currentYear
+      await Score.update(
+        {
+          score_sub_sub_criteria: scoreValue,
+          sub_sub_cr_grade: scoreValue,
+          session: session,
+          cycle_year: 1
+        },
+        {
+          where: {
+            criteria_code: criteria.criteria_code,
+            session: session
+          }
         }
-      });
+      );
     }
   
-    const updatedEntry = await Score.findOne({
+    entry = await Score.findOne({
       where: {
         criteria_code: criteria.criteria_code,
-        session: currentYear,
-        year: currentYear
+        session: session
       }
     });
   
     return res.status(200).json(
-      new apiResponse(200, {
-        score,
-        optionSelected,
-        grade,
-        message: `Grade is ${grade} (Selected option: ${optionSelected})`
-      }, created ? "Score created successfully" : "Score updated successfully")
+      new apiResponse(
+        200,
+        entry,
+        created ? "Score created successfully" : "Score updated successfully"
+      )
     );
   });
+  
+
   
 
 //5.1.4
@@ -756,6 +756,7 @@ const createResponse514 = asyncHandler(async (req, res) => {
       activity_name,
       students_participated,
     } = req.body;
+    console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
     if (
@@ -983,6 +984,7 @@ const createResponse515 = asyncHandler(async (req, res) => {
     session,
     options,
   } = req.body;
+  console.log(req.body);
 
   // Step 1: Field validation (handle 0 values properly)
   if (session == null || options == null) {
@@ -1164,6 +1166,7 @@ const createResponse521 = asyncHandler(async (req, res) => {
       employer_details,
       pay_package_inr,
     } = req.body;
+    console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
     if (
@@ -1421,6 +1424,7 @@ const createResponse522 = asyncHandler(async (req, res) => {
       institution_joined,
       program_admitted_to,
     } = req.body;
+    console.log(req.body)
   
     if (
       session == null ||
@@ -1660,7 +1664,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     session,
     year,
     registeration_number,
-    students_appearing, // now storing student name
+    students_appearing,
     exam_net,
     exam_slet,
     exam_gate,
@@ -1675,6 +1679,8 @@ const createResponse523 = asyncHandler(async (req, res) => {
     exam_other,
   } = req.body;
 
+  console.log(req.body);
+
   // Helper: check valid YES/NO string
   const isValidAnswer = (val) =>
     typeof val === "string" && ["YES", "NO"].includes(val.toUpperCase());
@@ -1684,7 +1690,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     session == null ||
     year == null ||
     !registeration_number ||
-    !students_appearing || // student name must be present
+    !students_appearing ||
     !isValidAnswer(exam_net) ||
     !isValidAnswer(exam_slet) ||
     !isValidAnswer(exam_gate) ||
@@ -1747,7 +1753,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     );
   }
 
-  // Convert YES/NO fields to uppercase for storage
+  // Prepare exams object
   const exams = {
     exam_net: exam_net.toUpperCase(),
     exam_slet: exam_slet.toUpperCase(),
@@ -1763,7 +1769,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     exam_other: exam_other.toUpperCase(),
   };
 
-  // Create entry (students_appearing is now student name)
+  // Create entry
   const newEntry = await Criteria523.create({
     id: criteria.id,
     criteria_code: criteria.criteria_code,
@@ -1778,6 +1784,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     .status(201)
     .json(new apiResponse(201, newEntry, "Response created successfully"));
 });
+
 
 
 //score 5.2.3
@@ -1960,6 +1967,7 @@ const score523 = asyncHandler(async (req, res) => {
       activity_type,
       student_name
     } = req.body;
+    console.log(req.body)
   
     if (
       session == null ||
@@ -2397,6 +2405,8 @@ const createResponse533 = asyncHandler(async (req, res) => {
       session,
       options,
     } = req.body;
+    console.log("Session:", session);
+    console.log("Options:", options);
   
     // Step 1: Field validation (handle 0 values properly)
     if (session == null || options == null) {

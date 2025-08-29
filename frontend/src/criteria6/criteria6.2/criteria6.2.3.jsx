@@ -177,29 +177,39 @@ const Criteria6_2_3 = () => {
   };
 
   const fetchScore = async () => {
-    console.log("Fetching score...");
+    console.log('Fetching score...');
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score623");
-      console.log("API Response:", response);
-      setProvisionalScore(response.data);
+      console.log('API Response:', response);
+      
+      // Handle different possible response structures
+      const scoreData = response.data?.data?.entry || response.data?.data || response.data;
+      
+      if (scoreData) {
+        console.log('Score data:', scoreData);
+        // Set the entire response data and let the display logic handle it
+        setProvisionalScore(scoreData);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
     } catch (error) {
       console.error("Error fetching provisional score:", error);
       if (error.response) {
-        console.error("Error response data:", error.response.data);
-        console.error("Error status:", error.response.status);
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
       }
       setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchScore();
   }, []);
-
   const goToNextPage = () => navigate("/criteria6.3.1");
   const goToPreviousPage = () => navigate("/criteria6.2.2");
 
@@ -271,16 +281,20 @@ const Criteria6_2_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (6.2.3): {provisionalScore.data.score}
-                </p>
-              </div>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
             ) : (
-              <p className="text-gray-600">No score data available.</p>
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
+
 
           {/* Multiple Selection Checkboxes */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">

@@ -18,7 +18,24 @@ const Criteria5_2_3= () => {
    const [error, setError] = useState(null);
    const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
    const { sessions: availableSessions } = useContext(SessionContext);
-   const [studentsAppearing, setStudentsAppearing] = useState("");
+   const [formData, setFormData] = useState({
+    year: "",
+    registration: "",
+    NET: "NO", 
+    SLET: "NO",
+    GATE: "NO", 
+    GMAT: "NO", 
+    CAT: "NO", 
+    GRE: "NO", 
+    JAM: "NO", 
+    IELTS: "NO", 
+    TOEFL: "NO", 
+    Civil: "NO",
+    State: "NO",
+    Other: "NO",
+    supportLinks: [""],
+    students_appearing: ""
+  });
    
    useEffect(() => {
      if (availableSessions && availableSessions.length > 0) {
@@ -26,15 +43,6 @@ const Criteria5_2_3= () => {
        setSelectedYear(availableSessions[0]);
      }
    }, [availableSessions]);
-
-  const [formData, setFormData] = useState({
-    year: "",
-    registration: "",
-    NET:"", SLET:"",GATE:"" ,GMAT:"", CAT:"", GRE:"", JAM:"", IELTS:"", TOEFL:"", Civil:"",
-    State:"",
-    Other :"",
-    supportLinks: [""],
-  });
 
   const fetchScore = async () => {
     console.log('Fetching score...');
@@ -45,12 +53,22 @@ const Criteria5_2_3= () => {
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        const scoreData = response.data.data;
+        console.log('Score data:', scoreData);
+        
+        // Set the score in the format expected by the display logic
+        setProvisionalScore({
+          data: {
+            score_sub_sub_criteria: scoreData.score_sub_sub_criteria || '0.00',
+            score_sub_criteria: scoreData.score_sub_criteria || '0.00',
+            score_criteria: scoreData.score_criteria || '0.00'
+          },
+          timestamp: scoreData.computed_at || new Date().toISOString()
+        });
       } else {
         console.log('No score data found in response');
-        setProvisionalScore(null);
+        setProvisionalScore('0.00');
       }
     } catch (error) {
       console.error("Error fetching provisional score:", error);
@@ -86,10 +104,41 @@ const Criteria5_2_3= () => {
       updatedLinks[index] = value;
       setFormData({ ...formData, supportLinks: updatedLinks });
     } else {
-      // Ensure we're storing strings for exam fields
-      const newValue = field.startsWith('exam_') ? value.toUpperCase() : value;
+      // For exam fields, ensure the value is uppercase
+      const newValue = ['NET', 'SLET', 'GATE', 'GMAT', 'CAT', 'GRE', 'JAM', 'IELTS', 'TOEFL', 'Civil', 'State', 'Other'].includes(field) 
+        ? value.toUpperCase() 
+        : value;
       setFormData({ ...formData, [field]: newValue });
     }
+  };
+
+  // Function to render the appropriate input field
+  const renderInputField = (field) => {
+    const examFields = ['NET', 'SLET', 'GATE', 'GMAT', 'CAT', 'GRE', 'JAM', 'IELTS', 'TOEFL', 'Civil', 'State', 'Other'];
+    
+    if (examFields.includes(field)) {
+      return (
+        <select
+          className="w-full border text-gray-950 border-black rounded px-2 py-1 bg-white"
+          value={formData[field] || ''}
+          onChange={(e) => handleChange(field, e.target.value)}
+          required
+        >
+          <option value="">Select option</option>
+          <option value="YES">YES</option>
+          <option value="NO">NO</option>
+        </select>
+      );
+    }
+    
+    return (
+      <input
+        className="w-full border text-gray-950 border-black rounded px-2 py-1"
+        placeholder={field.replace(/([A-Z])/g, " $1")}
+        value={formData[field] || ''}
+        onChange={(e) => handleChange(field, e.target.value)}
+      />
+    );
   };
   const handleSubmit = async (e) => {
     e?.preventDefault();
@@ -107,39 +156,73 @@ const Criteria5_2_3= () => {
       TOEFL: exam_toefl,
       Civil: exam_civil_services,
       State: exam_state_services,
-      Other: exam_other
+      Other: exam_other,
+      students_appearing
     } = formData;
-    const sessionYear = currentYear.split('-')[0]; // Extract first year from session
   
-    // Convert numbers to "YES"/"NO"
-    const exams = {
-      exam_net: exam_net ? "YES" : "NO",
-      exam_slet: exam_slet ? "YES" : "NO",
-      exam_gate: exam_gate ? "YES" : "NO",
-      exam_gmat: exam_gmat ? "YES" : "NO",
-      exam_cat: exam_cat ? "YES" : "NO",
-      exam_gre: exam_gre ? "YES" : "NO",
-      exam_jam: exam_jam ? "YES" : "NO",
-      exam_ielts: exam_ielts ? "YES" : "NO",
-      exam_toefl: exam_toefl ? "YES" : "NO",
-      exam_civil_services: exam_civil_services ? "YES" : "NO",
-      exam_state_services: exam_state_services ? "YES" : "NO",
-      exam_other: exam_other ? "YES" : "NO"
-    };
+    const year = currentYear.split("-")[0];
+    const session = year;
   
+    // Validate required fields
     if (!registeration_number) {
-      alert("Please fill in registration number.");
+      alert("Please enter the registration number");
       return;
     }
+  
+    // Validate students appearing field
+    if (!students_appearing || students_appearing <= 0) {
+      alert("Please enter a valid number of students appearing in examinations");
+      return;
+    }
+    
+    // Validate exam fields have been selected
+    const examFields = ['NET', 'SLET', 'GATE', 'GMAT', 'CAT', 'GRE', 'JAM', 'IELTS', 'TOEFL', 'Civil', 'State', 'Other'];
+    const hasUnselectedExam = examFields.some(field => !formData[field]);
+    
+    if (hasUnselectedExam) {
+      alert("Please select an option for all exam fields");
+      return;
+    }
+  
+    console.log('Submitting data:', {
+      session: parseInt(session, 10),
+      year,
+      registeration_number,
+      students_appearing: parseInt(students_appearing, 10),
+      exam_net: exam_net.toUpperCase(),
+      exam_slet: exam_slet.toUpperCase(),
+      exam_gate: exam_gate.toUpperCase(),
+      exam_gmat: exam_gmat.toUpperCase(),
+      exam_cat: exam_cat.toUpperCase(),
+      exam_gre: exam_gre.toUpperCase(),
+      exam_jam: exam_jam.toUpperCase(),
+      exam_ielts: exam_ielts.toUpperCase(),
+      exam_toefl: exam_toefl.toUpperCase(),
+      exam_civil_services: exam_civil_services.toUpperCase(),
+      exam_state_services: exam_state_services.toUpperCase(),
+      exam_other: exam_other.toUpperCase()
+    });
   
     try {
       const response = await axios.post(
         "http://localhost:3000/api/v1/criteria5/createResponse523",
         {
-          session: sessionYear,
-          year: sessionYear,
+          session: parseInt(session, 10),
+          year,
           registeration_number,
-          ...exams
+          students_appearing: parseInt(students_appearing, 10),
+          exam_net: exam_net.toUpperCase(),
+          exam_slet: exam_slet.toUpperCase(),
+          exam_gate: exam_gate.toUpperCase(),
+          exam_gmat: exam_gmat.toUpperCase(),
+          exam_cat: exam_cat.toUpperCase(),
+          exam_gre: exam_gre.toUpperCase(),
+          exam_jam: exam_jam.toUpperCase(),
+          exam_ielts: exam_ielts.toUpperCase(),
+          exam_toefl: exam_toefl.toUpperCase(),
+          exam_civil_services: exam_civil_services.toUpperCase(),
+          exam_state_services: exam_state_services.toUpperCase(),
+          exam_other: exam_other.toUpperCase()
         },
         {
           headers: {
@@ -148,12 +231,14 @@ const Criteria5_2_3= () => {
           withCredentials: true
         }
       );
-      
+  
+      console.log('Response:', response);
   
       // Update local state with the new entry
       const newEntry = {
         year,
         registeration_number,
+        students_appearing: parseInt(students_appearing, 10),
         exam_net,
         exam_slet,
         exam_gate,
@@ -178,23 +263,45 @@ const Criteria5_2_3= () => {
       
       // Reset form
       setFormData({
-        year: "",
+        year: currentYear,
         registration: "",
-        NET:"", SLET:"",GATE:"" ,GMAT:"", CAT:"", GRE:"", JAM:"", IELTS:"", TOEFL:"", Civil:"",
-        State:"",
-        Other :"",
+        NET: "NO",
+        SLET: "NO",
+        GATE: "NO",
+        GMAT: "NO",
+        CAT: "NO",
+        GRE: "NO",
+        JAM: "NO",
+        IELTS: "NO",
+        TOEFL: "NO",
+        Civil: "NO",
+        State: "NO",
+        Other: "NO",
         supportLinks: [""],
+        students_appearing: ""
       });
   
       // Refresh the score
-      fetchScore();
-      alert("Data submitted successfully!");
+      await fetchScore();
+      alert("Exam qualification data submitted successfully!");
     } catch (error) {
       console.error("Error submitting:", error);
-      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+        const errorMessage = error.response.data?.message || 
+                           error.response.data?.error || 
+                           `Server error: ${error.response.status}`;
+        alert(`Failed to submit data: ${errorMessage}`);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+        alert("No response from server. Please check your connection.");
+      } else {
+        console.error('Error setting up request:', error.message);
+        alert(`Error: ${error.message}`);
+      }
     }
   };
-
 const goToNextPage = () => {
     navigate("/criteria5.3.1");
   };
@@ -271,8 +378,8 @@ level examinations</li>
                 placeholder="Enter number of students"
                 className="w-40 border border-gray-300 rounded px-3 py-2 text-gray-950 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 min="0"
-                value={studentsAppearing}
-                onChange={(e) => setStudentsAppearing(e.target.value)}
+                value={formData.students_appearing || ''}
+                onChange={(e) => handleChange('students_appearing', e.target.value)}
               />
             </div>
           </div>
@@ -321,12 +428,7 @@ level examinations</li>
                 <tr>
                   {["year", "registration","NET", "SLET", "GATE", "GMAT", "CAT", "GRE", "JAM", "IELTS", "TOEFL", "Civil", "State", "Other"].map((key) => (
                     <td key={key} className="border px-2 py-1">
-                      <input
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
-                        value={formData[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                      />
+                      {renderInputField(key)}
                     </td>
                   ))}
                   <td className="border px-2 py-1 text-center">

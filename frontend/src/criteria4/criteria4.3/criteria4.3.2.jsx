@@ -1,23 +1,80 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria4_3_2 = () => {
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
   const navigate = useNavigate();
 
-  const [yearScores, setYearScores] = useState({
-    2020: 0,
-    2021: 0,
-    2022: 0,
-    2023: 0,
-    2024: 0,
-  });
+  const [availableSessions, setAvailableSessions] = useState([]);
+  const [currentYear, setCurrentYear] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [provisionalScore, setProvisionalScore] = useState(null);
+
+  const pastFiveYears = Array.from(
+    { length: 5 },
+    (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`
+  );
+
+  const [yearScores, setYearScores] = useState(
+    pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
+  );
 
   const [yearCount, setYearCount] = useState(5);
   const [averageScore, setAverageScore] = useState(null);
+
+  const fetchScore = async () => {
+    console.log('Fetching score...');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria4/score432");
+      console.log('API Response:', response);
+      console.log('Response data:', response.data);
+      setProvisionalScore(response.data);
+      console.log('provisionalScore after set:', provisionalScore);
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      if (error.response) {
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
+      }
+      setError(error.message || "Failed to fetch score");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScore();
+  }, []);
+
+  // Handle sessions from context
+  useEffect(() => {
+    if (sessions && sessions.length > 0) {
+      setAvailableSessions(sessions);
+      setCurrentYear(sessions[0]);
+    }
+  }, [sessions]);
+
+  useEffect(() => {
+    const yearToUse = availableSessions?.length > 0 ? availableSessions[0] : pastFiveYears[0];
+    if (yearToUse && currentYear !== yearToUse) {
+      setCurrentYear(yearToUse);
+    }
+  }, [availableSessions, pastFiveYears, currentYear]);
+
+  useEffect(() => {
+    if (!availableSessions?.length && pastFiveYears.length > 0) {
+      setCurrentYear(pastFiveYears[0]);
+    }
+  }, [availableSessions, pastFiveYears]);
 
   const goToNextPage = () => {
     navigate("/criteria1.2.2");
@@ -43,6 +100,39 @@ const Criteria4_3_2 = () => {
               <span className="text-gray-600">4.3 IT Infrastructure</span>
               <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
             </div>
+          </div>
+
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (4.3.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
+
+          {/* Year Selector */}
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              value={currentYear}
+              onChange={(e) => setCurrentYear(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+            >
+              {availableSessions.map((session) => (
+                <option key={session} value={session}>
+                  {session}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Metric Info */}
@@ -73,7 +163,7 @@ const Criteria4_3_2 = () => {
               <thead>
                 <tr className="bg-gray-100 text-gray-600 font-semibold">
                   <th className="border px-4 py-2">Year</th>
-                  {Object.keys(yearScores).map((year) => (
+                  {pastFiveYears.map((year) => (
                     <th key={year} className="border px-4 py-2">
                       {year}
                     </th>
@@ -85,7 +175,7 @@ const Criteria4_3_2 = () => {
                   <td className="border px-4 py-2 font-medium text-gray-600">
                     Calculated Score
                   </td>
-                  {Object.keys(yearScores).map((year) => (
+                  {pastFiveYears.map((year) => (
                     <td key={year} className="border px-4 py-2 text-center">
                       <input
                         type="number"
@@ -176,4 +266,3 @@ const Criteria4_3_2 = () => {
 };
 
 export default Criteria4_3_2;
-

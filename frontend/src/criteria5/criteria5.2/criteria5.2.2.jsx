@@ -16,6 +16,7 @@ const Criteria5_2_2= () => {
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const[submittedData,setSubmittedData]=useState([])
   const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
   const { sessions: availableSessions } = useContext(SessionContext);
   useEffect(() => {
@@ -34,9 +35,9 @@ const Criteria5_2_2= () => {
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -60,12 +61,12 @@ const Criteria5_2_2= () => {
 
 
   const [formData, setFormData] = useState({
-    year: "",
+    year: currentYear || "",
     studentname: "",
     programme: "",
-   institution: "",
+    institution: "",
     pname: "",
-   supportLinks: [""],
+    supportLinks: [""],
   });
 
   const [yearScores, setYearScores] = useState(
@@ -97,8 +98,8 @@ const Criteria5_2_2= () => {
       pname: program_admitted_to
     } = formData;
   
-    const year = currentYear;
-    const session = year.split("-")[0];
+    const year = currentYear.split("-")[0];;
+    const session = year;
   
     if (!student_name || !program_graduated_from || !institution_joined || !program_admitted_to) {
       alert("Please fill in all required fields (Student Name, Programme Graduated From, Institution Joined, and Program Admitted To).");
@@ -262,10 +263,9 @@ education
                   {["year", "studentname", "programme", "institution", "pname"].map((key) => (
                     <td key={key} className="border px-2 py-1">
                       <input
-                        
                         className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
-                        value={formData[key]}
+                        placeholder={key === 'year' ? 'Year' : key.replace(/([A-Z])/g, " $1")}
+                        value={formData[key] || ''}
                         onChange={(e) => handleChange(key, e.target.value)}
                       />
                     </td>

@@ -39,7 +39,7 @@ export default class response_5_2_3 extends Model {
       allowNull: false
     },
     students_appearing: {
-      type: DataTypes.STRING(100),
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     exam_net: {

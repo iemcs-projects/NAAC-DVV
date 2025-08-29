@@ -17,6 +17,7 @@ const Criteria5_2_1= () => {
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [submittedData, setSubmittedData] = useState([]);
   const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
   const { sessions: availableSessions } = useContext(SessionContext);
   useEffect(() => {
@@ -47,9 +48,9 @@ const Criteria5_2_1= () => {
       console.log('API Response:', response);
       
       // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      if (response.data && response.data.data) {
+        console.log('Score data:', response.data.data);
+        setProvisionalScore(response.data.data);
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -100,8 +101,8 @@ const Criteria5_2_1= () => {
       paypackage: pay_package_inr
     } = formData;
   
-    const year = currentYear;
-    const session = year.split("-")[0];
+    const year = currentYear.split("-")[0];
+    const session = year;
   
     if (!student_name_contact || !program_graduated_from || !employer_details || !pay_package_inr) {
       alert("Please fill in all required fields (Student Name, Programme, Employer, and Pay Package).");

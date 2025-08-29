@@ -1,32 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria4_4_1 = () => {
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
+  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+  const navigate = useNavigate();
+   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
+    const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
+    const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
+    const [provisionalScore, setProvisionalScore] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [submittedData, setSubmittedData] = useState([]);
+    const { sessions: availableSessions } = useContext(SessionContext);
 
-  const [yearData, setYearData] = useState({});
+  const [entries, setEntries] = useState([]);
   const [formData, setFormData] = useState({
     year: "",
     budget: "",
+    expen: "",
     total: "",
     academic: "",
     physical: "",
-    supportLinks: [""], // ✅ Initialize with one empty link
+    supportLinks: [""],
   });
-
-  const [yearScores, setYearScores] = useState(
-    pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
-  );
-  const [yearCount, setYearCount] = useState(5);
+  
+  const [yearScores, setYearScores] = useState({});
+  const [yearCount, setYearCount] = useState(1);
   const [averageScore, setAverageScore] = useState(null);
-
-  const navigate = useNavigate();
-  const years = pastFiveYears;
 
   const handleChange = (field, value, index = null) => {
     if (field === "supportLinks") {
@@ -38,49 +44,77 @@ const Criteria4_4_1 = () => {
     }
   };
 
-  const handleSubmit = () => {
-    const {
-      year,
-    budget,
-    total,
-    academic,
-    physical,
-    } = formData;
-
-    if (
-      year &&
-    budget &&
-    total &&
-    academic &&
-    physical 
-    ) {
-      const updatedForm = { ...formData, year: selectedYear }; // ✅ Add year to form data
-
-      const updatedYearData = {
-        ...yearData,
-        [selectedYear]: [...(yearData[selectedYear] || []), updatedForm],
-      };
-
-      setYearData(updatedYearData);
-      setFormData({
-        year: "",
-    budget: "",
-    expen:"",
-    total: "",
-    academic: "",
-    physical: "",
-    supportLinks: [""],
+  const fetchScore = async () => {
+    console.log('fetchScore called for criteria 4.4.1');
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria4/score441");
+      console.log("Fetched score data:", response.data);
+      
+      if (response.data && response.data.data) {
+        const scoreData = response.data.data;
+        
+        // Format the scores with proper defaults
+        const parsedScore = {
+          score_sub_sub_criteria: parseFloat(scoreData.score_sub_sub_criteria) || 0,
+          score_sub_criteria: parseFloat(scoreData.score_sub_criteria) || 0,
+          score_criteria: parseFloat(scoreData.score_criteria) || 0,
+          grade: scoreData.sub_sub_cr_grade || 'N/A'
+        };
+    
+        setProvisionalScore({
+          score: parsedScore,
+          message: response.data.message || "Score loaded successfully"
+        });
+      } else {
+        // Initialize with default values if no data
+        setProvisionalScore({
+          score: {
+            score_sub_sub_criteria: 0,
+            score_sub_criteria: 0,
+            score_criteria: 0,
+            grade: 'N/A'
+          },
+          message: "No score data available"
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching provisional score:", error);
+      setError(error.response?.data?.message || error.message || "Failed to fetch provisional score");
+      
+      // Set default values on error
+      setProvisionalScore({
+        score: {
+          score_sub_sub_criteria: 0,
+          score_sub_criteria: 0,
+          score_criteria: 0,
+          grade: 'N/A'
+        },
+        message: "Error loading score"
       });
-    } else {
-      alert("Please fill in all fields.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const goToNextPage = () => navigate("/criteria4.4.2");
-  const goToPreviousPage = () => navigate("/criteria4.3.3s");
+  useEffect(() => {
+    fetchScore();
+  }, []);
+  
 
-  const totalPrograms = years.reduce((acc, year) => acc + (yearData[year]?.length || 0), 0);
-  const averagePrograms = (totalPrograms / years.length).toFixed(2);
+    useEffect(() => {
+      if (availableSessions && availableSessions.length > 0) {
+        setCurrentYear(availableSessions[0]);
+        setSelectedYear(availableSessions[0]);
+      }
+    }, [availableSessions]);
+
+
+  const goToNextPage = () => navigate("/criteria4.4.2");
+  const goToPreviousPage = () => navigate("/criteria4.3.3");
+
+  const totalEntries = entries.length;
 
   return (
     <div className="w-[1690px] min-h-screen bg-gray-50 overflow-x-hidden">
@@ -98,6 +132,8 @@ const Criteria4_4_1 = () => {
             <div className="text-sm text-gray-600">4.4 Maintenance of Campus Infrastructure</div>
           </div>
 
+
+
           {/* --- Metric Info --- */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-2">4.4.1 Metric Information</h3>
@@ -113,47 +149,87 @@ salary component during the last five years(INR in Lakhs)
             </ul>
           </div>
 
+          <div className="bg-white text-black p-4 border border-green-300 rounded shadow">
+            <h3 className="text-green-700 text-lg font-semibold mb-2">
+              Maintenance Expenditure Score:
+            </h3>
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+              {loading ? (
+                <p className="text-gray-600">Loading provisional score...</p>
+              ) : provisionalScore?.score?.score_sub_sub_criteria > 0 ? (
+                <div>
+                  <p className="text-lg font-semibold text-green-800">
+                    Provisional Score (4.4.1): {provisionalScore.score.score_sub_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Sub-criteria Score: {provisionalScore.score.score_sub_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Overall Criteria Score: {provisionalScore.score.score_criteria.toFixed(2)} %
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Grade: {provisionalScore.score.grade}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-gray-600">No score data available.</p>
+              )}
+            </div>
+          </div>
+
+
           {/* --- Year Selection & Entry Table --- */}
           <div className="border rounded mb-8">
             <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
               <h2 className="text-xl font-bold">Average percentage of expenditure incurred on maintenance of
 infrastructure (physical and academic support facilities) excluding
-salary component during the last five years(INR in Lakhs)</h2>
-              <div>
-                <label className="mr-2 font-medium">Select Year:</label>
+salary component (INR in Lakhs)</h2>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="mb-4">
+                <label className="font-medium text-gray-700 mr-2">Select Year:</label>
                 <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border px-3 py-1 rounded text-gray-950"
+                  className="border px-3 py-1 rounded text-black"
+                  value={currentYear}
+                  onChange={(e) => setCurrentYear(e.target.value)}
                 >
-                  {years.map((year) => (
+                  {availableSessions && availableSessions.map((year) => (
                     <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
               </div>
-            </div>
+              </div>
 
-            {/* Input Row */}
+            {/* Input Row
             <table className="w-full border text-sm">
               <thead className="bg-gray-100 text-gray-950">
                 <tr>
                   <th className="border px-2 py-2">Year</th>
-                  <th className="border px-2 py-2">budget</th>
-                  <th className="border px-2 py-2">expen</th>
-                  <th className="border px-2 py-2">total</th>
-                  <th className="border px-2 py-2">academic</th>
-                  <th className="border px-2 py-2">physical</th>
+                  <th className="border px-2 py-2">Budget</th>
+                  <th className="border px-2 py-2">Expenditure</th>
+                  <th className="border px-2 py-2">Total</th>
+                  <th className="border px-2 py-2">Academic</th>
+                  <th className="border px-2 py-2">Physical</th>
                   <th className="border px-2 py-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="px-2 py-1 text-gray-900 text-center">{selectedYear}</td>
-                  {["schemename", "govtstudents", "govtamount", "inststudents", "instamount"].map((key) => (
+                  <td className="px-2 py-1">
+                    <input
+                      type="text"
+                      value={formData.year}
+                      onChange={(e) => handleChange("year", e.target.value)}
+                      className="w-full px-2 py-1 border rounded text-center"
+                      placeholder="e.g., 2023-24"
+                    />
+                  </td>
+                  {["budget", "expen", "total", "academic", "physical"].map((key) => (
                     <td key={key} className="border px-2 py-1">
                       <input
                         className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder={key.replace(/([A-Z])/g, " $1")}
+                        placeholder={key.charAt(0).toUpperCase() + key.slice(1)}
                         value={formData[key]}
                         onChange={(e) => handleChange(key, e.target.value)}
                       />
@@ -169,7 +245,7 @@ salary component during the last five years(INR in Lakhs)</h2>
                   </td>
                 </tr>
               </tbody>
-            </table>
+            </table> */}
           </div>
 
           {/* Support Links */}
@@ -198,42 +274,38 @@ salary component during the last five years(INR in Lakhs)</h2>
             </div>
           </div>
 
-          {/* Display Table Per Year */}
-          {years.map((year) => (
-            <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
-              {yearData[year]?.length > 0 ? (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-200">
-                    <tr>
-                      <th className="border text-gray-900 px-2 py-1">#</th>
-                      <th className="border text-gray-900 px-2 py-1">Year</th>
-                      <th className="border text-gray-900 px-2 py-1">budget</th>
-                      <th className="border text-gray-900 px-2 py-1">expen</th>
-                      <th className="border text-gray-900 px-2 py-1">total</th>
-                      <th className="border text-gray-900 px-2 py-1">academic</th>
-                      <th className="border text-gray-900 px-2 py-1">physical</th>
+          {/* Display Entries */}
+          {entries.length > 0 && (
+            <div className="mb-8 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Entered Data</h3>
+              <table className="w-full text-sm border">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="border text-gray-900 px-2 py-1">#</th>
+                    <th className="border text-gray-900 px-2 py-1">Year</th>
+                    <th className="border text-gray-900 px-2 py-1">Budget</th>
+                    <th className="border text-gray-900 px-2 py-1">Expenditure</th>
+                    <th className="border text-gray-900 px-2 py-1">Total</th>
+                    <th className="border text-gray-900 px-2 py-1">Academic</th>
+                    <th className="border text-gray-900 px-2 py-1">Physical</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((entry, idx) => (
+                    <tr key={idx} className="even:bg-gray-50">
+                      <td className="border text-gray-900 border-black px-2 py-1">{idx + 1}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.year}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.budget}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.expen}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.total}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.academic}</td>
+                      <td className="border text-gray-900 border-black px-2 py-1">{entry.physical}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {yearData[year].map((entry, idx) => (
-                      <tr key={idx} className="even:bg-gray-50">
-                        <td className="border text-gray-900 border-black px-2 py-1">{idx + 1}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.year}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.budget}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.expen}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.total}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.academic}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.physical}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-gray-600 p-4">No data available for {year}.</p>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
 
           {/* Average Calculator */}
           <div className="overflow-auto border rounded p-4">

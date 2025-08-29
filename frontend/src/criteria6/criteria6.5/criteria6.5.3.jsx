@@ -29,19 +29,19 @@ const Criteria6_5_3 = () => {
   const [error, setError] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState(null);
 
-  // Single row data for the table - user only inputs the year
-  const [qualityData, setQualityData] = useState({
+  // Form data state
+  const [formData, setFormData] = useState({
     year: "",
-    iqacMeetings: "",
-    conferences: "",
-    collaborativeInitiatives: "",
-    nirfParticipation: "",
-    orientationProgramme: "",
-    qualityAudit: "",
+    reg_meetings_of_the_IQAC_head: "",
+    conf_seminar_workshops_on_quality_edu: "",
+    collab_quality_initiatives: "",
+    participation_in_NIRF: "",
+    from_to_date: "",
+    other_quality_audit: ""
   });
 
-  const handleQualityDataChange = (field, value) => {
-    setQualityData(prev => ({
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
       ...prev,
       [field]: value
     }));
@@ -75,28 +75,70 @@ const Criteria6_5_3 = () => {
   };
 
   const handleSubmit = async () => {
+    // Get the initiative type based on selected options
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    const initiative_type = 
+      selectedCount >= 4 ? 'A' :
+      selectedCount === 3 ? 'B' :
+      selectedCount === 2 ? 'C' :
+      selectedCount === 1 ? 'D' : 'E';
+
+    // Prepare the request body
+    const requestBody = {
+      session: currentYear.split('-')[0],
+      initiative_type,
+      year: formData.year,
+      reg_meetings_of_the_IQAC_head: formData.reg_meetings_of_the_IQAC_head,
+      conf_seminar_workshops_on_quality_edu: formData.conf_seminar_workshops_on_quality_edu,
+      collab_quality_initiatives: formData.collab_quality_initiatives,
+      participation_in_NIRF: formData.participation_in_NIRF,
+      from_to_date: formData.from_to_date,
+      other_quality_audit: formData.other_quality_audit
+    };
+
+    // Validate required fields
+    if (!formData.year || !formData.reg_meetings_of_the_IQAC_head) {
+      alert("Please fill in all required fields");
+      return;
+    }
+  
     try {
-      const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
-      const implimentationValue = selectedCount >= 4 ? 4 : selectedCount;
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria6/createResponse653", 
+        requestBody
+      );
 
-      const requestBody = {
-        session,
-        implimentation: implimentationValue,
-        area_of_e_governance: [
-          "Regular meeting of Internal Quality Assurance Cell (IQAC); Feedback collected, analysed and used for improvements",
-          "Collaborative quality intitiatives with other institution(s) and Accounts",
-          "Participation in NIRF",
-          "any other quality audit recognized by state, national or international agencies (ISO Certification, NBA)",
-        ],
-        year_of_implementation: yearOfImplementation,
-      };
-
-      const response = await axios.post("http://localhost:3000/api/v1/criteria6/createResponse623", requestBody);
       console.log("Submission successful:", response.data);
+      
+      // Add to submitted data
+      const newEntry = { ...formData, initiative_type };
+      setSubmittedData(prev => [...prev, newEntry]);
+      
+      // Reset form
+      setFormData({
+        year: "",
+        reg_meetings_of_the_IQAC_head: "",
+        conf_seminar_workshops_on_quality_edu: "",
+        collab_quality_initiatives: "",
+        participation_in_NIRF: "",
+        from_to_date: "",
+        other_quality_audit: ""
+      });
+      
+      // Reset checkboxes
+      setSelectedOptions({
+        option1: false,
+        option2: false,
+        option3: false,
+        option4: false
+      });
+      
+      // Fetch updated score
+      await fetchScore();
       alert("Data submitted successfully!");
     } catch (error) {
-      console.error("Submission failed:", error);
-      alert("Submission failed!");
+      console.error("Error submitting data:", error);
+      alert(error.response?.data?.message || error.message || "Failed to submit data");
     }
   };
 
@@ -109,25 +151,36 @@ const Criteria6_5_3 = () => {
   }, [sessions]);
 
   const fetchScore = async () => {
-    console.log("Fetching score...");
+    console.log('Fetching score...');
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score653");
-      console.log("API Response:", response);
-      setProvisionalScore(response.data);
+      console.log('API Response:', response);
+      
+      // Handle different possible response structures
+      const scoreData = response.data?.data?.entry || response.data?.data || response.data;
+      
+      if (scoreData) {
+        console.log('Score data:', scoreData);
+        // Set the entire response data and let the display logic handle it
+        setProvisionalScore(scoreData);
+      } else {
+        console.log('No score data found in response');
+        setProvisionalScore(null);
+      }
     } catch (error) {
       console.error("Error fetching provisional score:", error);
       if (error.response) {
-        console.error("Error response data:", error.response.data);
-        console.error("Error status:", error.response.status);
+        console.error('Error response data:', error.response.data);
+        console.error('Error status:', error.response.status);
       }
       setError(error.message || "Failed to fetch score");
+      setProvisionalScore(null);
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     fetchScore();
   }, []);
@@ -154,21 +207,22 @@ const Criteria6_5_3 = () => {
 
           {/* Information Box */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                {loading ? (
-                  <span className="text-gray-500">Loading provisional score...</span>
-                ) : error ? (
-                  <span className="text-red-500">Error: {error}</span>
-                ) : provisionalScore ? (
-                  <div className="text-blue-600 text-lg font-bold">
-                    Provisional Score: {provisionalScore.data?.score || "N/A"}
-                  </div>
-                ) : (
-                  <span className="text-gray-500">Score not available</span>
-                )}
-              </div>
-            </div>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
 
             <div className="mb-6">
               <h3 className="text-blue-600 font-medium mb-2">6.5.3 Metric Information</h3>
@@ -260,62 +314,73 @@ const Criteria6_5_3 = () => {
                     <input
                       type="text"
                       className="w-full border rounded text-gray-950 px-2 py-1"
-                      value={qualityData.year}
-                      onChange={(e) => handleQualityDataChange("year", e.target.value)}
+                      value={formData.year}
+                      onChange={(e) => handleInputChange("year", e.target.value)}
                       placeholder="Enter year (e.g., 2023-24)"
+                      required
                     />
                   </td>
                   <td className="border text-gray-950 px-3 py-2">
                     <input
                       type="text"
                       className="w-full border rounded text-gray-950 px-2 py-1"
-                      value={qualityData.iqacMeetings}
-                      onChange={(e) => handleQualityDataChange("iqacMeetings", e.target.value)}
+                      value={formData.reg_meetings_of_the_IQAC_head}
+                      onChange={(e) => handleInputChange("reg_meetings_of_the_IQAC_head", e.target.value)}
+                      required
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={qualityData.conferences}
-                      onChange={(e) => handleQualityDataChange("conferences", e.target.value)}
+                      value={formData.conf_seminar_workshops_on_quality_edu}
+                      onChange={(e) => handleInputChange("conf_seminar_workshops_on_quality_edu", e.target.value)}
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={qualityData.collaborativeInitiatives}
-                      onChange={(e) => handleQualityDataChange("collaborativeInitiatives", e.target.value)}
+                      value={formData.collab_quality_initiatives}
+                      onChange={(e) => handleInputChange("collab_quality_initiatives", e.target.value)}
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={qualityData.nirfParticipation}
-                      onChange={(e) => handleQualityDataChange("nirfParticipation", e.target.value)}
+                      value={formData.participation_in_NIRF}
+                      onChange={(e) => handleInputChange("participation_in_NIRF", e.target.value)}
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={qualityData.orientationProgramme}
-                      onChange={(e) => handleQualityDataChange("orientationProgramme", e.target.value)}
+                      value={formData.from_to_date}
+                      onChange={(e) => handleInputChange("from_to_date", e.target.value)}
+                      placeholder="DD-MM-YYYY to DD-MM-YYYY"
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={qualityData.qualityAudit}
-                      onChange={(e) => handleQualityDataChange("qualityAudit", e.target.value)}
+                      value={formData.other_quality_audit}
+                      onChange={(e) => handleInputChange("other_quality_audit", e.target.value)}
                     />
                   </td>
                 </tr>
               </tbody>
             </table>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleSubmit}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
+              >
+                <i className="fas fa-plus mr-2"></i> Add
+              </button>
+            </div>
           </div>
 
           {/* File Upload */}

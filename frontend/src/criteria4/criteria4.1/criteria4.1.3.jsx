@@ -119,7 +119,7 @@ const Criteria4_1_3 = () => {
         "http://localhost:3000/api/v1/criteria4/createResponse413",
         {
           session: parseInt(session, 10),
-          criteria_code: "4.1.3",
+          // criteria_code: "4.1.3",
           room_identifier: room_identifier.trim(),
           typeict_facility: typeict_facility.trim(),
           ict_facilities_count: parseInt(ict_facilities_count, 10),
@@ -206,16 +206,20 @@ const Criteria4_1_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (4.1.3): {provisionalScore.data.score}
-                </p>
-              </div>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
             ) : (
-              <p className="text-gray-600">No score data available.</p>
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
+
 
           {/* Main Form Section */}
           <div className="border rounded mb-6">
