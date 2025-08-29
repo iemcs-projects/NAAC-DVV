@@ -721,13 +721,15 @@ const createResponse433 = asyncHandler(async (req, res) => {
   const endYear = latestIIQA.session_end_year;
   const startYear = endYear - 5;
 
+  const optionSelected = String(options);
+
   if (sessionYear < startYear || sessionYear > endYear) {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
   const duplicate = await Criteria433.findOne({
-    where: { session, options }
-  }); 
+    where: { session, options: optionSelected }
+  });
 
   if (duplicate) {
     throw new apiError(409, "Entry already exists for this session and options");
@@ -738,20 +740,20 @@ const createResponse433 = asyncHandler(async (req, res) => {
     where: {
       session: session,
       criteria_code: criteria.criteria_code,
-      options: options,
+      options: optionSelected,
     },
     defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session: session,
-      options: options,
+      options: optionSelected,
     }
   });
 
   // If already exists, update values
   if (!created) {
     await Criteria433.update({
-      options: options
+      options: optionSelected
     }, {
       where: {
         session: session,
@@ -763,7 +765,7 @@ const createResponse433 = asyncHandler(async (req, res) => {
       where: {
         session: session,
         criteria_code: criteria.criteria_code,
-        options: options
+        options: optionSelected
       }
     });
   }
@@ -1145,7 +1147,7 @@ const score422 = asyncHandler(async (req, res) => {
     throw new apiError(404, "No response found for criteria 4.2.2");
   }
 
-  const optionSelected = Number(response.options);
+  const optionSelected = String(response.options);
 
   let score, grade;
   switch (optionSelected) {
