@@ -1601,8 +1601,6 @@ const createResponse342 = asyncHandler(async (req, res) => {
         [Sequelize.Op.or]: [
           { institution_name },
           { year_of_mou },
-          { duration },
-          { activities_list }
         ]
       }
     });
@@ -1620,22 +1618,6 @@ const createResponse342 = asyncHandler(async (req, res) => {
         throw new apiError(400, "Year of MOU already exists for this session and year");
       } else {
         throw new apiError(400, "Duration already exists for this session and year");
-      }
-    }
-    
-    if (existingRecord) {
-      if (existingRecord.duration === duration) {
-        throw new apiError(400, "Duration already exists for this session and year");
-      } else {
-        throw new apiError(400, "Activities list already exists for this session and year");
-      }
-    }
-    
-    if (existingRecord) {
-      if (existingRecord.activities_list === activities_list) {
-        throw new apiError(400, "Activities list already exists for this session and year");
-      } else {
-        throw new apiError(400, "Institution name already exists for this session and year");
       }
     }
 
