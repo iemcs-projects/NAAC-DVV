@@ -35,8 +35,8 @@ export default class response_7_1_10 extends Model {
       allowNull: false
     },
     year: {
-      type: DataTypes.DATE,
-      allowNull: false
+      type: DataTypes.INTEGER,
+      allowNull: true
     },
     code_published: {
       type: DataTypes.BOOLEAN,

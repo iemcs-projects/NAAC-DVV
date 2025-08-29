@@ -11,6 +11,7 @@ const Criteria717 = db.response_7_1_7;
 const Criteria7110 = db.response_7_1_10;
 const Score = db.scores;
 const CriteriaMaster = db.criteria_master;
+const IIQA = db.iiqa_form;
 
 // Helper function to convert criteria code to padded format
 const convertToPaddedFormat = (code) => {
@@ -71,58 +72,107 @@ const getResponsesByCriteriaCode = asyncHandler(async (req, res) => {
 // 7.1.2
 
 const createResponse712 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    facility_type,
-    photo_link,
-    additional_info,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, facility_type, photo_link, additional_info } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || facility_type == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate facility_type is a number between 0-4
-  const facilityTypeNum = Number(facility_type);
-  if (isNaN(facilityTypeNum) || facilityTypeNum < 0 || facilityTypeNum > 4) {
-    throw new apiError(400, "facility_type must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  if (facility_type < 0 || facility_type > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
+  }
+
+  const facilityTypeString = String(facility_type);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070102'
-    }
+      sub_sub_criterion_id: "070102",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria712.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    facility_type: facilityTypeNum,
-    photo_link: photo_link || null,
-    additional_info: additional_info || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria712.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      facility_type: facilityTypeString,
+      photo_link,
+      additional_info,
+    },
   });
-  
+
+  if (!created) {
+    await Criteria712.update(
+      {
+        facility_type: facilityTypeString,
+        photo_link,
+        additional_info,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria712.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
 });
+
 // score 7.1.2
 const score712 = asyncHandler(async (req, res) => {
   const criteria_code = '070102'; // Directly using the code since we know it
@@ -190,57 +240,108 @@ const score712 = asyncHandler(async (req, res) => {
 // 7.1.4
 
 const createResponse714 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    facility_type,
-    photo_link,
-    additional_info,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, facility_type, photo_link, additional_info } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || facility_type == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate facility_type is a number between 0-4
-  const facilityTypeNum = Number(facility_type);
-  if (isNaN(facilityTypeNum) || facilityTypeNum < 0 || facilityTypeNum > 4) {
-    throw new apiError(400, "facility_type must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  if (facility_type < 0 || facility_type > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
+  }
+
+  const facilityTypeString = String(facility_type);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070104'
-    }
+      sub_sub_criterion_id: "070104",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria714.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    facility_type: facilityTypeNum,
-    photo_link: photo_link || null,
-    additional_info: additional_info || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria714.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      facility_type: facilityTypeString,
+      photo_link,
+      additional_info,
+    },
   });
+
+  if (!created) {
+    await Criteria714.update(
+      {
+        facility_type: facilityTypeString,
+        photo_link,
+        additional_info,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria714.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
 });
+
+
 // score 7.1.4
 const score714 = asyncHandler(async (req, res) => {
   const criteria_code = '070104'; // Directly using the code since we know it
@@ -305,53 +406,102 @@ const score714 = asyncHandler(async (req, res) => {
 // 7.1.5
 
 const createResponse715 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    initiative,
-    photo_link,
-    document_link,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, initiative, photo_link, document_link } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || initiative == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate initiative is a number between 0-4
-  const initiativeNum = Number(initiative);
-  if (isNaN(initiativeNum) || initiativeNum < 0 || initiativeNum > 4) {
-    throw new apiError(400, "initiative must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  if (initiative < 0 || initiative > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
+  }
+
+  const initiativeString = String(initiative);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070105'
-    }
+      sub_sub_criterion_id: "070105",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria715.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    initiative: initiativeNum,
-    photo_link: photo_link || null,
-    document_link: document_link || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria715.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      initiative: initiativeString,
+      photo_link,
+      document_link,
+    },
   });
+
+  if (!created) {
+    await Criteria715.update(
+      {
+        initiative: initiativeString,
+        photo_link,
+        document_link,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria715.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
@@ -422,55 +572,104 @@ const score715 = asyncHandler(async (req, res) => {
 // 7.1.6
 
 const createResponse716 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    audit_type,
-    report_link,
-    certification,
-    additional_info,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, audit_type, report_link, certification, additional_info } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || audit_type == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate audit_type is a number between 0-4
-  const auditTypeNum = Number(audit_type);
-  if (isNaN(auditTypeNum) || auditTypeNum < 0 || auditTypeNum > 4) {
-    throw new apiError(400, "audit_type must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  if (audit_type < 0 || audit_type > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
+  }
+
+  const auditTypeString = String(audit_type);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070106'
-    }
+      sub_sub_criterion_id: "070106",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria716.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    audit_type: auditTypeNum,
-    report_link: report_link || null,
-    certification: certification || null,
-    additional_info: additional_info || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria716.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      audit_type: auditTypeString,
+      report_link,
+      certification,
+      additional_info,
+    },
   });
+
+  if (!created) {
+    await Criteria716.update(
+      {
+        audit_type: auditTypeString,
+        report_link,
+        certification,
+        additional_info,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria716.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
@@ -540,55 +739,104 @@ const score716 = asyncHandler(async (req, res) => {
 // 7.1.7
 
 const createResponse717 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    feature,
-    photo_link,
-    support_document,
-    software_used,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, feature, photo_link, support_document, software_used } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || feature == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate feature is a number between 0-4
-  const featureNum = Number(feature);
-  if (isNaN(featureNum) || featureNum < 0 || featureNum > 4) {
-    throw new apiError(400, "feature must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
+  if (feature < 0 || feature > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
+  }
+
+  const featureString = String(feature);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070107'
-    }
+      sub_sub_criterion_id: "070107",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria717.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    feature: featureNum,
-    photo_link: photo_link || null,
-    support_document: support_document || null,
-    software_used: software_used || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria717.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      feature: featureString,
+      photo_link,
+      support_document,
+      software_used,
+    },
   });
+
+  if (!created) {
+    await Criteria717.update(
+      {
+        feature: featureString,
+        photo_link,
+        support_document,
+        software_used,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria717.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
@@ -658,73 +906,116 @@ const score717 = asyncHandler(async (req, res) => {
 // 7.1.10
 
 const createResponse7110 = asyncHandler(async (req, res) => {
-  let {
-    session,
-    options,
-    year,
-    code_published,
-    monitoring_committee,
-    ethics_programs,
-    awareness_programs,
-    additional_info,
-  } = req.body;
+  /*
+  1. Get the user input from the req body
+  2. Validate the user input (check missing data, year between 1990 and current year, facility_type 0–4)
+  3. Query the criteria_master table to get id & criteria_code
+  4. Fetch the latest IIQA session
+  5. Check if the session is within the valid IIQA session window
+  6. Create a new response or update the existing one
+  7. Return the response
+  */
 
-  // Input validation
-  session = parseInt(session, 10);
-  if (isNaN(session) || session < 2000 || session > new Date().getFullYear() + 1) {
-    throw new apiError(400, "Invalid session year");
+  const { session, options, year, code_published, monitoring_committee, ethics_programs, awareness_programs, additional_info } = req.body;
+
+  // Step 1: Validate inputs
+  if (!session || options == null ) {
+    throw new apiError(400, "Missing required fields");
   }
 
-  // Validate options is a number between 0-4
-  const optionsNum = Number(options);
-  if (isNaN(optionsNum) || optionsNum < 0 || optionsNum > 4) {
-    throw new apiError(400, "options must be a number between 0 and 4");
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session year must be between 1990 and current year");
   }
 
-  // Validate year if provided
-  if (year !== undefined) {
-    const yearNum = Number(year);
-    if (isNaN(yearNum) || yearNum < 1990 || yearNum > new Date().getFullYear()) {
-      throw new apiError(400, "Invalid year");
-    }
+ 
+  if (options < 0 || options > 4) {
+    throw new apiError(400, "Facility type must be between 0 and 4");
   }
 
+  const optionsString = String(options);
+
+  // Step 2: Fetch criteria from criteria_master
   const criteria = await CriteriaMaster.findOne({
     where: {
-      criterion_id: '07',
-      sub_criterion_id: '0701',
-      sub_sub_criterion_id: '070110' // Fixed: Changed from 0701010 to 070110
-    }
+      sub_sub_criterion_id: "070110",
+      sub_criterion_id: "0701",
+      criterion_id: "07",
+    },
   });
 
-  if (!criteria?.id) {
-    throw new apiError(404, "Criteria not found or incomplete");
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Step 3: Fetch latest IIQA session
+  const latestIIQA = await IIQA.findOne({
+    attributes: ["session_end_year"],
+    order: [["created_at", "DESC"]],
+  });
+
+  if (!latestIIQA) throw new apiError(404, "No IIQA form found");
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
-  const [record, created] = await Criteria7110.upsert({
-    id: criteria.id,
-    criteria_code: criteria.criteria_code,
-    session,
-    options: optionsNum,
-    year: year ? Number(year) : null,
-    code_published: code_published || null,
-    monitoring_committee: monitoring_committee || null,
-    ethics_programs: ethics_programs || null,
-    awareness_programs: awareness_programs || null,
-    additional_info: additional_info || null
-  }, {
-    conflictFields: ['session', 'criteria_code'],
-    returning: true
+  // Step 4: Create or update entry
+  let [entry, created] = await Criteria7110.findOrCreate({
+    where: {
+      session,
+      criteria_code: criteria.criteria_code,
+    },
+    defaults: {
+      id: criteria.id,
+      criteria_code: criteria.criteria_code,
+      session,
+      options: optionsString,
+      year,
+      code_published,
+      monitoring_committee,
+      ethics_programs,
+      awareness_programs,
+      additional_info,
+    },
   });
+
+  if (!created) {
+    await Criteria7110.update(
+      {
+        options: optionsString,
+        year,
+        code_published,
+        monitoring_committee,
+        ethics_programs,
+        awareness_programs,
+        additional_info,
+      },
+      {
+        where: {
+          session,
+          criteria_code: criteria.criteria_code,
+        },
+      }
+    );
+
+    entry = await Criteria7110.findOne({
+      where: {
+        session,
+        criteria_code: criteria.criteria_code,
+      },
+    });
+  }
 
   return res.status(created ? 201 : 200).json(
     new apiResponse(
       created ? 201 : 200,
-      record,
+      entry,
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
 });
+
 
 const score7110 = asyncHandler(async (req, res) => {
   const criteria_code = '070110'; // Fixed: Changed from 0701010 to 070110
