@@ -27,7 +27,7 @@ export default class response_6_3_3 extends Model {
       }
     },
     session: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     from_date: {
@@ -50,6 +50,10 @@ export default class response_6_3_3 extends Model {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    no_of_participants: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
   }, {
     sequelize,
