@@ -1094,7 +1094,7 @@ const createResponse7110 = asyncHandler(async (req, res) => {
       criteria_code: criteria.criteria_code,
       session,
       options: optionsString,
-      year,
+      year:year||null,
       code_published,
       monitoring_committee,
       ethics_programs,
@@ -1107,7 +1107,7 @@ const createResponse7110 = asyncHandler(async (req, res) => {
     await Criteria7110.update(
       {
         options: optionsString,
-        year,
+        year:year||null,
         code_published,
         monitoring_committee,
         ethics_programs,

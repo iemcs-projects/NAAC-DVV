@@ -1032,16 +1032,16 @@ const score642 = asyncHandler(async (req, res) => {
   let score;
   let grade;
   
-  if (averageGrantPerYear >= 100) {
+  if (averageGrantPerYear >= 20) {
     score = 4;
     grade = 4;
-  } else if (averageGrantPerYear >=80 && averageGrantPerYear < 100) {
+  } else if (averageGrantPerYear >=15 && averageGrantPerYear < 20) {
     score = 3;
     grade = 3;
-  } else if (averageGrantPerYear >= 60 && averageGrantPerYear < 80) {
+  } else if (averageGrantPerYear >= 10 && averageGrantPerYear < 15) {
     score = 2;
     grade = 2;
-  } else if (averageGrantPerYear >=30 && averageGrantPerYear < 60) {
+  } else if (averageGrantPerYear >=1 && averageGrantPerYear < 10) {
     score = 1;
     grade = 1;
   } else {

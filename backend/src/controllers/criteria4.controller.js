@@ -139,13 +139,13 @@ const score413 = asyncHandler(async (req, res) => {
   const score = (noOfRooms / totalRooms) * 100;
 
   let grade;
-  if (score >= 25) {
+  if (score >= 75) {
     grade = 4;
-  } else if (score >= 20) {
+  } else if (score >= 60) {
     grade = 3;
-  } else if (score >= 10) {
+  } else if (score >= 40) {
     grade = 2;
-  } else if (score >= 1) {
+  } else if (score >= 10) {
     grade = 1;
   } else {
     grade = 0;
@@ -506,8 +506,8 @@ const score414 = asyncHandler(async (req, res) => {
   // Step 6: Grade mapping
   let grade;
   if (score >= 25) grade = 4;
-  else if (score >= 20) grade = 3;
-  else if (score >= 10) grade = 2;
+  else if (score >= 10) grade = 3;
+  else if (score >= 5) grade = 2;
   else if (score >= 1) grade = 1;
   else grade = 0;
 
@@ -1287,10 +1287,10 @@ const score423 = asyncHandler(async (req, res) => {
   else if (avgExpenditure >=6 && avgExpenditure < 8) {
     grade = 2;
   }
-  else if (avgExpenditure >=4 && avgExpenditure < 6) {
+  else if (avgExpenditure >=2 && avgExpenditure < 6) {
     grade = 1;
   }
-  else if (avgExpenditure >=2 && avgExpenditure < 4) {
+  else if (avgExpenditure < 2) {
     grade = 0;
   }
 
@@ -1533,16 +1533,16 @@ const score424 = asyncHandler(async (req, res) => {
   const score = (numerator / denominator).toFixed(3)*100;
   let grade = 0; // No grading logic provided
 
-  if(score < 2){
-    grade = 0;
-  }else if(score >= 2 && score <= 6){
-    grade = 1;
-  }else if(score >= 6 && score <= 8){
-    grade = 2;
-  }else if(score >= 8 && score <= 10){
-    grade = 3;
-  }else if(score >= 10){
+  if(score >=75){
     grade = 4;
+  }else if(score >= 60 && score <= 75){
+    grade = 3;
+  }else if(score >= 40 && score <= 60){
+    grade = 2;
+  }else if(score >= 10 && score <= 40){
+    grade = 1;
+  }else if(score < 10){
+    grade = 0;
   }
 
   // Step 6: Store or update score in the scores table

@@ -723,7 +723,9 @@ console.log("Average Teachers:", avgTeachers);
   if (scoreValue >= 10) grade = 4;
   else if (scoreValue >= 5) grade = 3;
   else if (scoreValue >= 3) grade = 2;
-  else if (scoreValue > 0) grade = 1;
+  else if (scoreValue > 1) grade = 1;
+  else grade = 0;
+
   console.log("Score Value 3.2.1:", scoreValue);
   console.log("Grade 3.2.1:", grade);
   // Step 9: Insert or update score in DB
@@ -1093,13 +1095,13 @@ const score332 = asyncHandler(async (req, res) => {
 
   // Step 4: Scoring logic based on thresholds
   let score, grade;
-  if (totalAwards >= 30) {
+  if (totalAwards >= 10) {
     score = 4; grade = 4;
-  } else if (totalAwards >= 20) {
-    score = 3; grade = 3;
-  } else if (totalAwards >= 10) {
-    score = 2; grade = 2;
   } else if (totalAwards >= 5) {
+    score = 3; grade = 3;
+  } else if (totalAwards >= 3) {
+    score = 2; grade = 2;
+  } else if (totalAwards >= 1) {
     score = 1; grade = 1;
   } else {
     score = 0; grade = 0;
@@ -1345,13 +1347,13 @@ const score333 = asyncHandler(async (req, res) => {
 
   // Step 4: Scoring logic based on thresholds
   let score, grade;
-  if (totalGrants > 75) {
+  if (totalGrants > 40) {
     score = 4; grade = 4;
-  } else if (totalGrants >= 60) {
+  } else if (totalGrants >= 20) {
     score = 3; grade = 3;
-  } else if (totalGrants >= 40) {
-    score = 2; grade = 2;
   } else if (totalGrants >= 10) {
+    score = 2; grade = 2;
+  } else if (totalGrants >= 5) {
     score = 1; grade = 1;
   } else {
     score = 0; grade = 0;
@@ -2215,7 +2217,7 @@ const fundedDepartmentCount = fundedDepartments.department_count;
   else if (percent >= 60) grade = 3;
   else if (percent >= 40) grade = 2;
   else if (percent >= 10) grade = 1;
-
+  else grade = 0;
   console.log("Grade", grade)
   // Step 5: Insert or update score
   let [entry, created] = await Score.findOrCreate({
@@ -2514,10 +2516,10 @@ const score334 = asyncHandler(async (req, res) => {
 
   // Step 6: Grade mapping
   let grade = 0;
-  if (averagePercentage >= 30) grade = 4;
-  else if (averagePercentage >= 20) grade = 3;
-  else if (averagePercentage >= 10) grade = 2;
-  else if (averagePercentage >= 5) grade = 1;
+  if (averagePercentage >= 75) grade = 4;
+  else if (averagePercentage >= 60) grade = 3;
+  else if (averagePercentage >= 40) grade = 2;
+  else if (averagePercentage >= 10) grade = 1;
   else grade = 0;
 
   // Step 7: Insert or update Score

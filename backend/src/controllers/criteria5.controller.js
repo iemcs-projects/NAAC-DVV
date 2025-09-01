@@ -1288,15 +1288,15 @@ console.log(startDate, endDate);
   // Get all student contacts for each year
   const studentContacts = await Criteria521.findAll({
     attributes: [
-      [Sequelize.fn('YEAR', Sequelize.col('year')), 'year'],
+      'session',  // Just use the session directly since it's already a year
       [Sequelize.fn('COUNT', Sequelize.col('student_name_contact')), 'contact_count']
     ],
     where: {
-      year: {
+      session: {
         [Sequelize.Op.between]: [startDate, endDate]
       }
     },
-    group: [Sequelize.fn('YEAR', Sequelize.col('year'))],
+    group: ['session'],  // Group by session directly
     raw: true
   });
 console.log(studentContacts);
@@ -1323,28 +1323,28 @@ console.log(profiles);
   // Create a map of year to contact count
   const yearToContactCount = {};
   studentContacts.forEach(item => {
-    yearToContactCount[item.year] = parseInt(item.contact_count, 10);
+    yearToContactCount[item.session] = parseInt(item.contact_count, 10);
   });
-console.log(yearToContactCount);
+console.log("yearToContactCount", yearToContactCount);
   // Create a map of year to outgoing students
   const yearToOutgoingStudents = {};
   profiles.forEach(item => {
     yearToOutgoingStudents[item.year] = item.outgoing_final_year_students;
   });
-console.log(yearToOutgoingStudents);
+console.log("yearToOutgoingStudents", yearToOutgoingStudents);
 
   // Calculate percentage for each year
   const yearlyPercentages = {};
   Object.keys(yearToOutgoingStudents).forEach(year => {
     const contacts = yearToContactCount[year] || 0;
     const outgoing = yearToOutgoingStudents[year] || 0;
-    
+    console.log("year", year, "contacts", contacts, "outgoing", outgoing);
     if (outgoing > 0) {
       const percentage = (contacts / outgoing) * 100;
       yearlyPercentages[year] = percentage;
     }
   });
-console.log(yearlyPercentages);
+console.log("yearlyPercentages", yearlyPercentages);
   const years = Object.keys(yearlyPercentages).map(Number).sort((a, b) => b - a);
   if (years.length === 0) {
     throw new apiError(400, "No valid data to compute score");
@@ -1352,15 +1352,15 @@ console.log(yearlyPercentages);
 
   const totalPercentage = years.reduce((sum, year) => sum + yearlyPercentages[year], 0);
   const averagePercentage = Number((totalPercentage / years.length).toFixed(3));
-console.log(averagePercentage);
+console.log("averagePercentage", averagePercentage);
   let grade;
-  if (averagePercentage >= 70) {
+  if (averagePercentage >= 60) {
     grade = 4;
-  } else if (averagePercentage >= 60) {
+  } else if (averagePercentage >=40) {
     grade = 3;
-  } else if (averagePercentage >= 50) {
+  } else if (averagePercentage >= 30) {
     grade = 2;
-  } else if (averagePercentage >= 40) {
+  } else if (averagePercentage >= 10) {
     grade = 1;
   } else {
     grade = 0;
@@ -1597,13 +1597,13 @@ const createResponse522 = asyncHandler(async (req, res) => {
     const averagePercentage = Number((totalPercentage / years.length).toFixed(3));
     console.log("Average percentage:", averagePercentage);
     let grade;
-    if (averagePercentage >= 70) {
+    if (averagePercentage >= 60) {
       grade = 4;
-    } else if (averagePercentage >= 60) {
-      grade = 3;
-    } else if (averagePercentage >= 50) {
-      grade = 2;
     } else if (averagePercentage >= 40) {
+      grade = 3;
+    } else if (averagePercentage >= 30) {
+      grade = 2;
+    } else if (averagePercentage >= 10) {
       grade = 1;
     } else {
       grade = 0;
@@ -1894,13 +1894,13 @@ const score523 = asyncHandler(async (req, res) => {
 
   // Step 8: Sample grading logic
   let grade;
-  if (averageCount >= 15) {
+  if (averageCount >= 10) {
     grade = 4;
-  } else if (averageCount >= 10) {
+  } else if (averageCount >= 7) {
     grade = 3;
-  } else if (averageCount >= 5) {
+  } else if (averageCount >= 4) {
     grade = 2;
-  } else if (averageCount >= 2) {
+  } else if (averageCount >= 1) {
     grade = 1;
   } else {
     grade = 0;
@@ -2123,13 +2123,13 @@ const score523 = asyncHandler(async (req, res) => {
   
     // Sample grading logic (to be updated with actual criteria)
     let grade;
-    if (averageAwards >= 15) {
+    if (averageAwards >= 30) {
       grade = 4;
-    } else if (averageAwards >= 10) {
+    } else if (averageAwards >= 20) {
       grade = 3;
-    } else if (averageAwards >= 5) {
+    } else if (averageAwards >= 10) {
       grade = 2;
-    } else if (averageAwards >= 2) {
+    } else if (averageAwards >= 5) {
       grade = 1;
     } else {
       grade = 0;
@@ -2341,13 +2341,13 @@ const createResponse533 = asyncHandler(async (req, res) => {
   
     // Grading logic
     let grade;
-    if (averageEvents >= 15) {
+    if (averageEvents >= 30) {
       grade = 4;
-    } else if (averageEvents >= 10) {
+    } else if (averageEvents >= 20) {
       grade = 3;
-    } else if (averageEvents >= 5) {
+    } else if (averageEvents >= 10) {
       grade = 2;
-    } else if (averageEvents >= 2) {
+    } else if (averageEvents >= 5) {
       grade = 1;
     } else {
       grade = 0;
