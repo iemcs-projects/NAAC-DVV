@@ -457,113 +457,7 @@ const score26 = asyncHandler(async (req, res) => {
 });
 
 
-//score2
-const score2 = asyncHandler(async (req, res) => {
-  const session = new Date().getFullYear().toString();
-  const criteria_id = "02";
 
-  let scores = await Score.findAll({
-    attributes: [
-      'sub_criteria_id',
-      'score_sub_criteria',
-      'score_sub_sub_criteria',
-      'sub_sub_criteria_id'
-    ],
-    where: {
-      criteria_id: criteria_id,
-      session: session,
-      [Sequelize.Op.or]: [
-        { score_sub_criteria: { [Sequelize.Op.gt]: 0 } },
-        { score_sub_sub_criteria: { [Sequelize.Op.gt]: 0 } }
-      ]
-    },
-    raw: true
-  });
-
-  // Fill missing sub_criteria_id using sub_sub_criteria_id from CriteriaMaster
-  for (let i = 0; i < scores.length; i++) {
-    if (!scores[i].sub_criteria_id && scores[i].sub_sub_criteria_id) {
-      const criteriaMap = await CriteriaMaster.findOne({
-        where: { sub_sub_criterion_id: scores[i].sub_sub_criteria_id },
-        attributes: ['sub_criterion_id'],
-        raw: true
-      });
-      if (criteriaMap) {
-        scores[i].sub_criteria_id = criteriaMap.sub_criterion_id;
-      }
-    }
-  }
-
-  const subCriteriaScores = {};
-  scores.forEach(score => {
-    const subId = score.sub_criteria_id;
-    if (subId) {
-      const maxScore = Math.max(
-        score.score_sub_criteria || 0,
-        score.score_sub_sub_criteria || 0
-      );
-      if (!subCriteriaScores[subId] || subCriteriaScores[subId] < maxScore) {
-        subCriteriaScores[subId] = maxScore;
-      }
-    }
-  });
-
-  const totalScore = Object.values(subCriteriaScores).reduce((sum, score) => sum + parseFloat(score), 0);
-  const cri_score = totalScore / 225;
-  const weighted_cri_score = cri_score * 0.3;
-  console.log("cri_score:", cri_score);
-  console.log("weighted_cri_score:", weighted_cri_score);
-  const adjustedWeightedCriScore = weighted_cri_score * 1000;
-  const criteria = await CriteriaMaster.findOne({ where: { criterion_id: criteria_id } });
-  if (!criteria) throw new apiError(404, "Criteria not found");
-
-  // Update or create a placeholder row (this helps if you still want to keep one main entry)
-const [entry, created] = await Score.findOrCreate({
-  where: {
-    criteria_code: criteria.criteria_code,
-    session: session,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id
-  },
-  defaults: {
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: cri_score,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: 0,
-    weighted_cr_score: adjustedWeightedCriScore,
-    session: session
-  }
-});
-
-// Always update all rows with this criteria_id
-await Score.update(
-  { score_criteria: cri_score,
-    weighted_cr_score: adjustedWeightedCriScore,
-   },
-  {
-    where: {
-      criteria_id: criteria_id,
-      session: session
-    }
-  }
-);
-
-
-  return res.status(200).json(
-    new apiResponse(200, {
-      score: cri_score,
-      totalSubCriteriaScore: totalScore,
-      adjustedWeightedCriScore: adjustedWeightedCriScore,
-      weightedCRScore: weighted_cri_score,
-      subCriteriaScores: Object.entries(subCriteriaScores).map(([id, score]) => ({
-        sub_criteria_id: id,
-        score_sub_criteria: score
-      }))
-    }, created ? "Score created successfully" : "Score updated successfully")
-  );
-});
 
 //score1.1
 const score11 = asyncHandler(async (req, res) => {
@@ -1838,6 +1732,114 @@ const score34 = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new apiResponse(200, finalScores, "Score sub_criteria updated for 3.4")
+  );
+});
+
+//score2
+const score2 = asyncHandler(async (req, res) => {
+  const session = new Date().getFullYear().toString();
+  const criteria_id = "02";
+
+  let scores = await Score.findAll({
+    attributes: [
+      'sub_criteria_id',
+      'score_sub_criteria',
+      'score_sub_sub_criteria',
+      'sub_sub_criteria_id'
+    ],
+    where: {
+      criteria_id: criteria_id,
+      session: session,
+      [Sequelize.Op.or]: [
+        { score_sub_criteria: { [Sequelize.Op.gt]: 0 } },
+        { score_sub_sub_criteria: { [Sequelize.Op.gt]: 0 } }
+      ]
+    },
+    raw: true
+  });
+
+  // Fill missing sub_criteria_id using sub_sub_criteria_id from CriteriaMaster
+  for (let i = 0; i < scores.length; i++) {
+    if (!scores[i].sub_criteria_id && scores[i].sub_sub_criteria_id) {
+      const criteriaMap = await CriteriaMaster.findOne({
+        where: { sub_sub_criterion_id: scores[i].sub_sub_criteria_id },
+        attributes: ['sub_criterion_id'],
+        raw: true
+      });
+      if (criteriaMap) {
+        scores[i].sub_criteria_id = criteriaMap.sub_criterion_id;
+      }
+    }
+  }
+
+  const subCriteriaScores = {};
+  scores.forEach(score => {
+    const subId = score.sub_criteria_id;
+    if (subId) {
+      const maxScore = Math.max(
+        score.score_sub_criteria || 0,
+        score.score_sub_sub_criteria || 0
+      );
+      if (!subCriteriaScores[subId] || subCriteriaScores[subId] < maxScore) {
+        subCriteriaScores[subId] = maxScore;
+      }
+    }
+  });
+
+  const totalScore = Object.values(subCriteriaScores).reduce((sum, score) => sum + parseFloat(score), 0);
+  const cri_score = totalScore / 225;
+  const weighted_cri_score = cri_score * 0.3;
+  console.log("cri_score:", cri_score);
+  console.log("weighted_cri_score:", weighted_cri_score);
+  const adjustedWeightedCriScore = weighted_cri_score * 1000;
+  const criteria = await CriteriaMaster.findOne({ where: { criterion_id: criteria_id } });
+  if (!criteria) throw new apiError(404, "Criteria not found");
+
+  // Update or create a placeholder row (this helps if you still want to keep one main entry)
+const [entry, created] = await Score.findOrCreate({
+  where: {
+    criteria_code: criteria.criteria_code,
+    session: session,
+    sub_sub_criteria_id: criteria.sub_sub_criterion_id
+  },
+  defaults: {
+    criteria_code: criteria.criteria_code,
+    criteria_id: criteria.criterion_id,
+    sub_criteria_id: criteria.sub_criterion_id,
+    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+    score_criteria: cri_score,
+    score_sub_criteria: 0,
+    score_sub_sub_criteria: 0,
+    weighted_cr_score: adjustedWeightedCriScore,
+    session: session
+  }
+});
+
+// Always update all rows with this criteria_id
+await Score.update(
+  { score_criteria: cri_score,
+    weighted_cr_score: adjustedWeightedCriScore,
+   },
+  {
+    where: {
+      criteria_id: criteria_id,
+      session: session
+    }
+  }
+);
+
+
+  return res.status(200).json(
+    new apiResponse(200, {
+      score: cri_score,
+      totalSubCriteriaScore: totalScore,
+      adjustedWeightedCriScore: adjustedWeightedCriScore,
+      weightedCRScore: weighted_cri_score,
+      subCriteriaScores: Object.entries(subCriteriaScores).map(([id, score]) => ({
+        sub_criteria_id: id,
+        score_sub_criteria: score
+      }))
+    }, created ? "Score created successfully" : "Score updated successfully")
   );
 });
 
@@ -3474,75 +3476,19 @@ const scoreTotal = asyncHandler(async (req, res) => {
 
 const radarGrade = asyncHandler(async (req, res) => {
   const weightedTargetMap = {
-    "1": {
-      "A++": 0.2455,
-      "A+": 0.2205,
-      "A": 0.204,
-      "B++": 0.188,
-      "B+": 0.1715,
-      "B": 0.147,
-      "C": 0.1145
-    },
-    "2": {
-      "A++": 0.7365,
-      "A+": 0.6615,
-      "A": 0.612,
-      "B++": 0.564,
-      "B+": 0.5145,
-      "B": 0.441,
-      "C": 0.3435
-    },
-    "3": {
-      "A++": 0.491,
-      "A+": 0.441,
-      "A": 0.408,
-      "B++": 0.376,
-      "B+": 0.343,
-      "B": 0.294,
-      "C": 0.229
-    },
-    "4": {
-      "A++": 0.2455,
-      "A+": 0.2205,
-      "A": 0.204,
-      "B++": 0.188,
-      "B+": 0.1715,
-      "B": 0.147,
-      "C": 0.1145
-    },
-    "5": {
-      "A++": 0.2455,
-      "A+": 0.2205,
-      "A": 0.204,
-      "B++": 0.188,
-      "B+": 0.1715,
-      "B": 0.147,
-      "C": 0.1145
-    },
-    "6": {
-      "A++": 0.2455,
-      "A+": 0.2205,
-      "A": 0.204,
-      "B++": 0.188,
-      "B+": 0.1715,
-      "B": 0.147,
-      "C": 0.1145
-    },
-    "7": {
-      "A++": 0.2455,
-      "A+": 0.2205,
-      "A": 0.204,
-      "B++": 0.188,
-      "B+": 0.1715,
-      "B": 0.147,
-      "C": 0.1145
-    }
+    "1": { "A++": 24.55, "A+": 22.05, "A": 20.4, "B++": 18.8, "B+": 17.15, "B": 14.7, "C": 11.45 },
+    "2": { "A++": 73.65, "A+": 66.15, "A": 61.2, "B++": 56.4, "B+": 51.45, "B": 44.1, "C": 34.35 },
+    "3": { "A++": 49.1, "A+": 44.1, "A": 40.8, "B++": 37.6, "B+": 34.3, "B": 29.4, "C": 22.9 },
+    "4": { "A++": 24.55, "A+": 22.05, "A": 20.4, "B++": 18.8, "B+": 17.15, "B": 14.7, "C": 11.45 },
+    "5": { "A++": 24.55, "A+": 22.05, "A": 20.4, "B++": 18.8, "B+": 17.15, "B": 14.7, "C": 11.45 },
+    "6": { "A++": 24.55, "A+": 22.05, "A": 20.4, "B++": 18.8, "B+": 17.15, "B": 14.7, "C": 11.45 },
+    "7": { "A++": 24.55, "A+": 22.05, "A": 20.4, "B++": 18.8, "B+": 17.15, "B": 14.7, "C": 11.45 }
   };
-  
-  const session = new Date().getFullYear();
-  const collegeId = 1; // Or get from request if needed
 
-  // 1️⃣ Get desired grade from IIQA form
+  const session = new Date().getFullYear();
+  const collegeId = 1;
+
+  // 1️⃣ Get desired grade from IIQA
   const iiqaForm = await IIQA.findOne({
     attributes: ['desired_grade'],
     where: { institution_id: collegeId },
@@ -3551,24 +3497,20 @@ const radarGrade = asyncHandler(async (req, res) => {
   });
   const desiredGrade = iiqaForm?.dataValues?.desired_grade || "A";
 
-  // 2️⃣ Fetch all criteria scores for the current session
+  // 2️⃣ Fetch all criteria scores for session
   const criteriaScores = await Score.findAll({
     where: {
-      session: session,
-      criteria_id: {
-        [Sequelize.Op.in]: ['01', '02', '03', '04', '05', '06', '07']
-      }
+      session,
+      criteria_id: { [Sequelize.Op.in]: ['01','02','03','04','05','06','07'] }
     },
-    attributes: ['criteria_id', 'weighted_cr_score'],
+    attributes: ['criteria_id','weighted_cr_score'],
     raw: true
   });
 
-  // 3️⃣ Get criteria names from CriteriaMaster
+  // 3️⃣ Criteria names
   const criteriaList = await CriteriaMaster.findAll({
     where: {
-      criterion_id: {
-        [Sequelize.Op.in]: ['01', '02', '03', '04', '05', '06', '07']
-      }
+      criterion_id: { [Sequelize.Op.in]: ['01','02','03','04','05','06','07'] }
     },
     attributes: [
       'criterion_id',
@@ -3578,44 +3520,40 @@ const radarGrade = asyncHandler(async (req, res) => {
     raw: true
   });
 
-  // 4️⃣ Process current scores
+  // 4️⃣ Normalize current scores → percentage (0–100)
   const currentScores = Array(7).fill(0);
   criteriaScores.forEach(score => {
     const index = parseInt(score.criteria_id) - 1;
     if (index >= 0 && index < 7) {
-      console.log(score.weighted_cr_score);
-      currentScores[index] = parseFloat(score.weighted_cr_score)/1000 || 0;
+      // weighted_cr_score was multiplied by 1000 earlier → bring it back
+      const normalized = (parseFloat(score.weighted_cr_score) / 10).toFixed(2); // now % scale
+      currentScores[index] = Math.min(100, Math.max(0, parseFloat(normalized)));
     }
   });
 
-  // 5️⃣ Get target scores based on desired grade
+  // 5️⃣ Target scores (already converted above into %)
   const targetScores = Array(7).fill(0).map((_, index) => {
     const criteriaId = (index + 1).toString();
-    return weightedTargetMap[criteriaId]?.[desiredGrade] || 0; // Convert to percentage
+    return weightedTargetMap[criteriaId]?.[desiredGrade] || 0;
   });
 
   // 6️⃣ Prepare response
   const criteriaData = {
-    criteria: criteriaList.map(criteria => ({
-      id: parseInt(criteria.criterion_id),
-      name: criteria.criterion_name || `Criterion ${criteria.criterion_id}`,
-      max: 1
-    })).sort((a, b) => a.id - b.id), // Ensure proper ordering
+    criteria: criteriaList.map(c => ({
+      id: parseInt(c.criterion_id),
+      name: c.criterion_name || `Criterion ${c.criterion_id}`,
+      max: 100
+    })).sort((a, b) => a.id - b.id),
     
     scores: [
-      {
-        name: 'Current Score',
-        values: currentScores.map(score => Math.min(100, Math.max(0, score))) // Ensure scores are within 0-100 range
-      },
-      {
-        name: 'Target Score',
-        values: targetScores
-      }
+      { name: 'Current Score', values: currentScores },
+      { name: 'Target Score', values: targetScores }
     ]
   };
 
   return res.status(200).json(criteriaData);
 });
+
 
 
 export { score21, score22, score23, score24, score26, score2, 
