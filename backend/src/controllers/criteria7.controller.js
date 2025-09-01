@@ -177,6 +177,7 @@ const createResponse712 = asyncHandler(async (req, res) => {
 const score712 = asyncHandler(async (req, res) => {
   const criteria_code = '070102'; // Directly using the code since we know it
   const currentYear = new Date().getFullYear();
+  const session = currentYear;
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -207,31 +208,56 @@ const score712 = asyncHandler(async (req, res) => {
   const score = facilityTypeNumber; // Score directly maps to facility_type
   const grade = facilityTypeNumber; // Grade directly maps to facility_type
 
-  const [entry, created] = await Score.upsert({
-    
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session, // Use the session from the response
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      facility_type: facilityTypeNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${facilityTypeNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
 
@@ -345,7 +371,7 @@ const createResponse714 = asyncHandler(async (req, res) => {
 // score 7.1.4
 const score714 = asyncHandler(async (req, res) => {
   const criteria_code = '070104'; // Directly using the code since we know it
-  const currentYear = new Date().getFullYear();
+  const session = new Date().getFullYear();
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -376,33 +402,57 @@ const score714 = asyncHandler(async (req, res) => {
   const score = facilityTypeNumber; // Score directly maps to facility_type
   const grade = facilityTypeNumber; // Grade directly maps to facility_type
 
-  const [entry, created] = await Score.upsert({
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session, // Use the session from the response
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      facility_type: facilityTypeNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${facilityTypeNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
-
 // 7.1.5
 
 const createResponse715 = asyncHandler(async (req, res) => {
@@ -509,7 +559,7 @@ const createResponse715 = asyncHandler(async (req, res) => {
 // score 7.1.5
 const score715 = asyncHandler(async (req, res) => {
   const criteria_code = '070105'; // Directly using the code since we know it
-  const currentYear = new Date().getFullYear();
+  const session = new Date().getFullYear();
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -540,30 +590,55 @@ const score715 = asyncHandler(async (req, res) => {
   const score = initiativeNumber; // Score directly maps to initiative
   const grade = initiativeNumber; // Grade directly maps to initiative
 
-  const [entry, created] = await Score.upsert({
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session,
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      initiative: initiativeNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${initiativeNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
 
@@ -677,7 +752,7 @@ const createResponse716 = asyncHandler(async (req, res) => {
 
 const score716 = asyncHandler(async (req, res) => {
   const criteria_code = '070106'; // Directly using the code since we know it
-  const currentYear = new Date().getFullYear();
+  const session = new Date().getFullYear();
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -708,33 +783,57 @@ const score716 = asyncHandler(async (req, res) => {
   const score = auditTypeNumber; // Score directly maps to audit_type
   const grade = auditTypeNumber; // Grade directly maps to audit_type
 
-  const [entry, created] = await Score.upsert({
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session, // Use the session from the response
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      audit_type: auditTypeNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${auditTypeNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
-
 
 // 7.1.7
 
@@ -844,7 +943,7 @@ const createResponse717 = asyncHandler(async (req, res) => {
 
 const score717 = asyncHandler(async (req, res) => {
   const criteria_code = '070107'; // Directly using the code since we know it
-  const currentYear = new Date().getFullYear();
+  const session = new Date().getFullYear();
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -875,33 +974,57 @@ const score717 = asyncHandler(async (req, res) => {
   const score = featureNumber; // Score directly maps to feature
   const grade = featureNumber; // Grade directly maps to feature
 
-  const [entry, created] = await Score.upsert({
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session, // Use the session from the response
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      feature: featureNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${featureNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
-
 
 // 7.1.10
 
@@ -1019,7 +1142,7 @@ const createResponse7110 = asyncHandler(async (req, res) => {
 
 const score7110 = asyncHandler(async (req, res) => {
   const criteria_code = '070110'; // Fixed: Changed from 0701010 to 070110
-  const currentYear = new Date().getFullYear();
+  const session = new Date().getFullYear();
 
   const criteria = await CriteriaMaster.findOne({
     where: { 
@@ -1050,30 +1173,55 @@ const score7110 = asyncHandler(async (req, res) => {
   const score = optionsNumber; // Score directly maps to options
   const grade = optionsNumber; // Grade directly maps to options
 
-  const [entry, created] = await Score.upsert({
-    criteria_code: criteria.criteria_code,
-    criteria_id: criteria.criterion_id,
-    sub_criteria_id: criteria.sub_criterion_id,
-    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-    score_criteria: 0,
-    score_sub_criteria: 0,
-    score_sub_sub_criteria: score,
-    sub_sub_cr_grade: grade,
-    session: response.session, // Use the session from the response
-    year: currentYear,
-    cycle_year: 1
-  }, {
-    conflictFields: ['criteria_code', 'session', 'year'],
-    returning: true
+  let [entry, created] = await Score.findOrCreate({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: session,
+      cycle_year: 1
+    }
+  });
+
+  if (!created) {
+    await Score.update(
+      {
+        score_sub_sub_criteria: score,
+        sub_sub_cr_grade: grade,
+        session: session,
+        cycle_year: 1
+      },
+      {
+        where: {
+          criteria_code: criteria.criteria_code,
+          session: session
+        }
+      }
+    );
+  }
+
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      options: optionsNumber,
-      grade,
-      message: `Grade is ${grade} (Selected option: ${optionsNumber})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      entry,
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
 
