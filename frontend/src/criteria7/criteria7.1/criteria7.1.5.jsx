@@ -1,18 +1,156 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria7_1_5 = () => {
-  const [selectedOption, setSelectedOption] = useState("");
-  const [selectedYear, setSelectedYear] = useState("2024-25");
+  const { sessions: availableSessions } = useContext(SessionContext);
+  const [selectedYear, setSelectedYear] = useState("");
+  const [currentYear, setCurrentYear] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState({
+    option1: false,
+    option2: false,
+    option3: false,
+    option4: false,
+    option5: false,
+  });
+  const [additionalInfo, setAdditionalInfo] = useState("");
+  const [photoLink, setPhotoLink] = useState("");
+  const [documentLink, setDocumentLink] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [formData, setFormData] = useState({
+    year: ""
+  });
 
   const navigate = useNavigate();
 
-  const handleRadioChange = (option) => {
-    setSelectedOption(option);
+  useEffect(() => {
+    if (currentYear) {
+      const year = currentYear.split('-')[0];
+      setFormData(prev => ({
+        ...prev,
+        year: year
+      }));
+      setSelectedYear(currentYear);
+    }
+  }, [currentYear]);
+
+  // Set initial selected year when availableSessions changes
+  useEffect(() => {
+    if (availableSessions.length > 0) {
+      setSelectedYear(availableSessions[0]);
+      setCurrentYear(availableSessions[0]);
+    }
+  }, [availableSessions]);
+
+  const handleCheckboxChange = (option) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [option]: !prev[option]
+    }));
+  };
+
+  // Function to get grade based on selected options count
+  const getGrade = () => {
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    if (selectedCount >= 4) return 'A. Any 4 or more of the above';
+    if (selectedCount === 3) return 'B. Any 3 of the above';
+    if (selectedCount === 2) return 'C. Any 2 of the above';
+    if (selectedCount === 1) return 'D. Any 1 of the above';
+    return 'E. None of the above';
+  };
+
+  const fetchScore = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get("http://localhost:3000/api/v1/criteria7/score715");
+      console.log('Score response:', response.data);
+      setProvisionalScore(response.data);
+    } catch (err) {
+      setError(err.message || "Failed to fetch score");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch score on mount and when currentYear changes
+  useEffect(() => {
+    fetchScore();
+  }, [currentYear]);
+
+  const handleSubmit = async () => {
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    const session = selectedYear ? selectedYear.split('-')[0] : '';
+    
+    if (!session) {
+      setError("Please select a valid session");
+      return;
+    }
+
+    if (selectedCount === 0) {
+      setError("Please select at least one option.");
+      return;
+    }
+
+    const body = {
+      session: parseInt(session),
+      initiative: selectedCount,
+      photo_link: null,
+      additional_info: null,
+    };
+
+    try {
+      setLoading(true);
+      console.log('Submitting form data:', body);
+      
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria7/createResponse715",
+        body,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+      
+      console.log('Submit response:', response);
+      
+      if (response.status === 200 || response.status === 201) {
+        setSuccessMessage("Data submitted successfully!");
+        // Reset form
+        setSelectedOptions({
+          option1: false,
+          option2: false,
+          option3: false,
+          option4: false,
+          option5: false,
+        });
+        setPhotoLink("");
+        setAdditionalInfo("");
+        setDocumentLink("");
+        // Refresh the score after submission
+        await fetchScore();
+      } else {
+        throw new Error(`Unexpected status code: ${response.status}`);
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      const errorMessage = err.response?.data?.message || 
+                         err.message || 
+                         'Failed to submit response. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const goToNextPage = () => {
@@ -22,8 +160,6 @@ const Criteria7_1_5 = () => {
   const goToPreviousPage = () => {
     navigate("/criteria7.1.4");
   };
-
-  const years = ["2024-25", "2023-24", "2022-23", "2021-22", "2020-21"];
 
   return (
     <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
@@ -46,13 +182,15 @@ const Criteria7_1_5 = () => {
 
           {/* Year Dropdown */}
           <div className="mb-6">
-            <label className="font-medium text-gray-700 mr-2">Select Academic Year:</label>
+            <label className="font-medium text-gray-700 mr-2">
+              Select Academic Year:
+            </label>
             <select
               className="border px-3 py-1 rounded text-black"
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
             >
-              {years.map((year) => (
+              {availableSessions.map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
@@ -62,91 +200,124 @@ const Criteria7_1_5 = () => {
 
           {/* Metric Info */}
           <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-blue-600 font-semibold mb-2">7.1.5 Metric Information</h3>
+            <h3 className="text-blue-600 font-semibold mb-2">
+              7.1.5 Metric Information
+            </h3>
             <p className="text-sm text-gray-700">
-              The institutional initiatives for greening the campus are as follows:<br />
-              1. Restricted entry of automobiles<br />
-              2. Use of Bicycles/ Battery powered vehicles<br />
-              3. Pedestrian Friendly pathways<br />
-              4. Ban on use of Plastic<br />
+              The institutional initiatives for greening the campus are as
+              follows:
+              <br />
+              1. Restricted entry of automobiles
+              <br />
+              2. Use of Bicycles/ Battery powered vehicles
+              <br />
+              3. Pedestrian Friendly pathways
+              <br />
+              4. Ban on use of Plastic
+              <br />
               5. Landscaping with trees and plants
             </p>
           </div>
 
-          {/* Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-gray-700 mb-1">Department</label>
-              <select className="w-full px-4 py-2 border rounded text-gray-950">
-                <option value="">Select department</option>
-                <option>Computer Science</option>
-                <option>Mathematics</option>
-                <option>Physics</option>
-                <option>Chemistry</option>
-                <option>Biology</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-1">Faculty ID</label>
-              <input className="w-full px-4 py-2 border rounded text-gray-950" placeholder="Enter faculty ID" />
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-1">Faculty Name</label>
-              <input className="w-full px-4 py-2 border rounded text-gray-950" placeholder="Enter faculty name" />
-            </div>
-          </div>
-
-          {/* Radio Buttons */}
-          <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-blue-600 font-semibold mb-2">Select the Options</h3>
+          {/* Checkboxes */}
+          <div className="space-y-2">
             {[
-              "All of the above",
-              "Any 3 of the above",
-              "Any 2 of the above",
-              "Any 1 of the above",
-              "None of the above",
-            ].map((label, index) => {
-              const optionKey = `option${index + 1}`;
-              return (
-                <div key={optionKey} className="flex items-center mb-2">
-                  <input
-                    type="radio"
-                    id={optionKey}
-                    name="participation"
-                    className="mr-2"
-                    checked={selectedOption === optionKey}
-                    onChange={() => handleRadioChange(optionKey)}
-                  />
-                  <label htmlFor={optionKey} className="text-sm text-gray-800">
-                    {label}
-                  </label>
-                </div>
-              );
-            })}
+              'Restricted entry of automobiles',
+              'Use of Bicycles/ Battery powered vehicles',
+              'Pedestrian Friendly pathways',
+              'Ban on use of Plastic',
+              'Landscaping with trees and plants'
+            ].map((option, index) => (
+              <div key={index} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`option${index + 1}`}
+                  checked={selectedOptions[`option${index + 1}`]}
+                  onChange={() => handleCheckboxChange(`option${index + 1}`)}
+                  className="h-4 w-4 text-blue-600 rounded"
+                />
+                <label htmlFor={`option${index + 1}`} className="ml-2 text-gray-700">
+                  {option}
+                </label>
+              </div>
+            ))}
+            <div className="mt-4 p-3 bg-gray-50 rounded">
+              <p className="font-medium">Selected Grade: {getGrade()}</p>
+            </div>
           </div>
 
           {/* File Upload Section */}
           <div className="bg-white p-6 rounded shadow mb-6">
             <ul className="list-disc text-sm text-gray-700 mb-4 pl-5">
-              <li>Upload: Geotagged Photographs / videos of the facilities</li>
-              <li>Upload: Various policy documents / decisions circulated for implementation</li>
+              <li>
+                Upload: Geotagged Photographs / videos of the facilities
+              </li>
+              <li>
+                Upload: Various policy documents / decisions circulated for
+                implementation
+              </li>
               <li>Upload: Any other relevant information</li>
             </ul>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-            <div className="flex items-center mb-4">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
-                <i className="fas fa-upload mr-2"></i>Choose Files
-                <input type="file" className="hidden" multiple />
-              </label>
-              <span className="ml-3 text-gray-600">No file chosen</span>
-            </div>
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">Additional Info (Link)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Photo Link
+            </label>
+            <input
+              type="text"
+              placeholder="Enter photo link"
+              value={photoLink}
+              onChange={(e) => setPhotoLink(e.target.value)}
+              className="w-full px-4 py-2 border rounded text-gray-900 mb-4"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Document Link
+            </label>
+            <input
+              type="text"
+              placeholder="Enter document link"
+              value={documentLink}
+              onChange={(e) => setDocumentLink(e.target.value)}
+              className="w-full px-4 py-2 border rounded text-gray-900 mb-4"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Info (Link)
+            </label>
             <input
               type="text"
               placeholder="Enter URL here"
+              value={additionalInfo}
+              onChange={(e) => setAdditionalInfo(e.target.value)}
               className="w-full px-4 py-2 border rounded text-gray-900"
             />
+          </div>
+
+          {/* Score */}
+          <div className="mb-4">
+            {loading && <p className="text-blue-600">Loading...</p>}
+            {error && <p className="text-red-600">{error}</p>}
+            {provisionalScore && (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (7.1.5): {provisionalScore?.score_sub_sub_criteria || provisionalScore?.data?.score_sub_sub_criteria || provisionalScore?.score || provisionalScore?.data?.score || 0}
+                </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore?.sub_sub_cr_grade || provisionalScore?.data?.sub_sub_cr_grade || provisionalScore?.grade || provisionalScore?.data?.grade || 'N/A'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Submit */}
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {loading ? "Submitting..." : "Submit"}
+            </button>
           </div>
 
           {/* Bottom Buttons */}

@@ -26,47 +26,46 @@ export const GpaProvider = ({ children }) => {
     error: null,
   });
 
-// In GpaContext.jsx
-const fetchGpaData = useCallback(async () => {
-  try {
-    setGpaData(prev => ({ ...prev, isLoading: true, error: null }));
-    const response = await axios.get('http://localhost:3000/api/v1/scores/radarGrade');
-    
-    const { criteria: criteriaData, scores } = response.data;
-    const currentScores = scores.find(s => s.name === 'Current Score')?.values || [];
-    const targetScores = scores.find(s => s.name === 'Target Score')?.values || [];
+  const fetchGpaData = useCallback(async () => {
+    try {
+      setGpaData(prev => ({ ...prev, isLoading: true, error: null }));
+      const response = await axios.get('http://localhost:3000/api/v1/scores/radarGrade');
+      
+      const { criteria: criteriaData, scores } = response.data;
+      const currentScores = scores?.find(s => s.name === 'Current Score')?.values || [];
+      const targetScores = scores?.find(s => s.name === 'Target Score')?.values || [];
 
-    const processedCriteria = criteriaData.map((criteria, index) => ({
-      id: criteria.id,
-      title: criteria.name,
-      score: currentScores[index] || 0,
-      target: targetScores[index] || 0,
-      status: currentScores[index] >= targetScores[index] ? 'Met' : 'Not Met',
-      max: criteria.max
-    }));
+      const processedCriteria = (criteriaData || []).map((criteria, index) => ({
+        id: criteria?.id || `criteria-${index}`,
+        title: criteria?.name || `Criteria ${index + 1}`,
+        score: currentScores[index] || 0,
+        target: targetScores[index] || 0,
+        status: (currentScores[index] || 0) >= (targetScores[index] || 0) ? 'Met' : 'Not Met',
+        max: criteria?.max || 0
+      }));
 
-    // Calculate current and target GPA (average of all criteria scores)
-    const currentGPA = currentScores.reduce((sum, score) => sum + (score || 0), 0) / Math.max(1, currentScores.length);
-    const targetGPA = targetScores.reduce((sum, score) => sum + (score || 0), 0) / Math.max(1, targetScores.length);
+      // Calculate current and target GPA (average of all criteria scores)
+      const currentGPA = currentScores.reduce((sum, score) => sum + (score || 0), 0) / Math.max(1, currentScores.length);
+      const targetGPA = targetScores.reduce((sum, score) => sum + (score || 0), 0) / Math.max(1, targetScores.length);
 
-    setGpaData(prev => ({
-      ...prev,
-      currentGPA,
-      targetGPA,
-      criteria: processedCriteria,
-      isLoading: false,
-      error: null
-    }));
-  } catch (error) {
-    console.error('Error fetching GPA data:', error);
-    setGpaData(prev => ({
-      ...prev,
-      isLoading: false,
-      error: error.message || 'Failed to load GPA data',
-      criteria: createEmptyCriteria()
-    }));
-  }
-}, []);
+      setGpaData(prev => ({
+        ...prev,
+        currentGPA,
+        targetGPA,
+        criteria: processedCriteria,
+        isLoading: false,
+        error: null
+      }));
+    } catch (error) {
+      console.error('Error fetching GPA data:', error);
+      setGpaData(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error.response?.data?.message || error.message || 'Failed to load GPA data',
+        criteria: createEmptyCriteria()
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     fetchGpaData();
