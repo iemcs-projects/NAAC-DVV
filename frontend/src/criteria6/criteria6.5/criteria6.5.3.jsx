@@ -36,8 +36,12 @@ const Criteria6_5_3 = () => {
     conf_seminar_workshops_on_quality_edu: "",
     collab_quality_initiatives: "",
     participation_in_NIRF: "",
+<<<<<<< Updated upstream
     from_date: "",
     to_date: "",
+=======
+    from_to_date: "",
+>>>>>>> Stashed changes
     other_quality_audit: ""
   });
 
@@ -77,22 +81,40 @@ const Criteria6_5_3 = () => {
   };
 
   const handleSubmit = async () => {
+<<<<<<< Updated upstream
     // Get the count of selected options
     const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
     const options = selectedCount;
+=======
+    // Get the initiative type based on selected options
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    const initiative_type = 
+      selectedCount >= 4 ? 'A' :
+      selectedCount === 3 ? 'B' :
+      selectedCount === 2 ? 'C' :
+      selectedCount === 1 ? 'D' : 'E';
+>>>>>>> Stashed changes
 
     // Prepare the request body
     const requestBody = {
       session: currentYear.split('-')[0],
+<<<<<<< Updated upstream
       options,
+=======
+      initiative_type,
+>>>>>>> Stashed changes
       year: formData.year,
       reg_meetings_of_the_IQAC_head: formData.reg_meetings_of_the_IQAC_head,
       conf_seminar_workshops_on_quality_edu: formData.conf_seminar_workshops_on_quality_edu,
       collab_quality_initiatives: formData.collab_quality_initiatives,
       participation_in_NIRF: formData.participation_in_NIRF,
+<<<<<<< Updated upstream
       orientation_program: formData.orientation_program,
       from_date: formData.from_date,
       to_date: formData.to_date,
+=======
+      from_to_date: formData.from_to_date,
+>>>>>>> Stashed changes
       other_quality_audit: formData.other_quality_audit
     };
 
@@ -111,7 +133,11 @@ const Criteria6_5_3 = () => {
       console.log("Submission successful:", response.data);
       
       // Add to submitted data
+<<<<<<< Updated upstream
       const newEntry = { ...formData, options };
+=======
+      const newEntry = { ...formData, initiative_type };
+>>>>>>> Stashed changes
       setSubmittedData(prev => [...prev, newEntry]);
       
       // Reset form
@@ -121,9 +147,13 @@ const Criteria6_5_3 = () => {
         conf_seminar_workshops_on_quality_edu: "",
         collab_quality_initiatives: "",
         participation_in_NIRF: "",
+<<<<<<< Updated upstream
         orientation_program: "",
         from_date: "",
         to_date: "",
+=======
+        from_to_date: "",
+>>>>>>> Stashed changes
         other_quality_audit: ""
       });
       
@@ -212,11 +242,19 @@ const Criteria6_5_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
+<<<<<<< Updated upstream
             ) : provisionalScore?.data?.score !== undefined || provisionalScore?.score !== undefined ? (
               <p className="text-lg font-semibold text-green-800">
                 Provisional Score (6.2.3): {typeof (provisionalScore.data?.score ?? provisionalScore.score) === 'number'
                   ? (provisionalScore.data?.score ?? provisionalScore.score).toFixed(2)
                   : (provisionalScore.data?.score ?? provisionalScore.score)} %
+=======
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+>>>>>>> Stashed changes
                 <span className="ml-2 text-sm font-normal text-gray-500">
                   (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
                 </span>
@@ -361,15 +399,22 @@ const Criteria6_5_3 = () => {
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
+<<<<<<< Updated upstream
                       value={formData.orientation_program}
                       onChange={(e) => handleInputChange("orientation_program", e.target.value)}
                       placeholder="Enter program details"
+=======
+                      value={formData.from_to_date}
+                      onChange={(e) => handleInputChange("from_to_date", e.target.value)}
+                      placeholder="DD-MM-YYYY to DD-MM-YYYY"
+>>>>>>> Stashed changes
                     />
                   </td>
                   <td className="border px-3 py-2">
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
+<<<<<<< Updated upstream
                       value={formData.from_date}
                       onChange={(e) => handleInputChange("from_date", e.target.value)}
                       placeholder="DD-MM-YYYY"
@@ -388,6 +433,8 @@ const Criteria6_5_3 = () => {
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
+=======
+>>>>>>> Stashed changes
                       value={formData.other_quality_audit}
                       onChange={(e) => handleInputChange("other_quality_audit", e.target.value)}
                     />

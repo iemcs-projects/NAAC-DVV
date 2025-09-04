@@ -1,7 +1,7 @@
 import express from 'express';
 const router = express.Router();
 
-import {iqacRegister, userLogin, refreshAccessToken, getAuthStatus, logout} from '../controllers/auth.controller.js';
+import {iqacRegister, userLogin, refreshAccessToken, getAuthStatus, logout, userRegister, getPendingUsers, approveUser, rejectUser} from '../controllers/auth.controller.js';
 //http://localhost:3000/api/v1/auth/iqacRegister
 import verifyToken from '../middlewares/auth.middlewares.js';
 router.route('/iqacRegister')
@@ -18,5 +18,17 @@ router.route('/me')
 
 router.route('/logout')
     .post(logout);
+
+router.route('/userRegister')
+    .post(userRegister);
+
+router.route('/getPendingUsers')
+    .get(getPendingUsers);
+
+router.route('/approveUser/:uuid')
+    .post(approveUser);
+
+router.route('/rejectUser/:uuid')
+    .post(rejectUser);
 
 export default router;

@@ -44,6 +44,27 @@ const Criteria5_2_3= () => {
      }
    }, [availableSessions]);
 
+<<<<<<< Updated upstream
+=======
+  const [formData, setFormData] = useState({
+    year: "",
+    registration: "",
+    NET: "", 
+    SLET: "",
+    GATE: "", 
+    GMAT: "", 
+    CAT: "", 
+    GRE: "", 
+    JAM: "", 
+    IELTS: "", 
+    TOEFL: "", 
+    Civil: "",
+    State: "",
+    Other: "",
+    supportLinks: [""],
+  });
+
+>>>>>>> Stashed changes
   const fetchScore = async () => {
     console.log('Fetching score...');
     setLoading(true);
@@ -166,6 +187,18 @@ const Criteria5_2_3= () => {
     // Validate required fields
     if (!registeration_number) {
       alert("Please enter the registration number");
+<<<<<<< Updated upstream
+=======
+      return;
+    }
+    
+    // Validate exam fields have been selected
+    const examFields = ['NET', 'SLET', 'GATE', 'GMAT', 'CAT', 'GRE', 'JAM', 'IELTS', 'TOEFL', 'Civil', 'State', 'Other'];
+    const hasUnselectedExam = examFields.some(field => !formData[field]);
+    
+    if (hasUnselectedExam) {
+      alert("Please select an option for all exam fields");
+>>>>>>> Stashed changes
       return;
     }
   
@@ -210,7 +243,10 @@ const Criteria5_2_3= () => {
           session: parseInt(session, 10),
           year,
           registeration_number,
+<<<<<<< Updated upstream
           students_appearing: parseInt(students_appearing, 10),
+=======
+>>>>>>> Stashed changes
           exam_net: exam_net.toUpperCase(),
           exam_slet: exam_slet.toUpperCase(),
           exam_gate: exam_gate.toUpperCase(),
@@ -231,8 +267,11 @@ const Criteria5_2_3= () => {
           withCredentials: true
         }
       );
+<<<<<<< Updated upstream
   
       console.log('Response:', response);
+=======
+>>>>>>> Stashed changes
   
       // Update local state with the new entry
       const newEntry = {

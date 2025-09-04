@@ -558,6 +558,7 @@ const createResponse513 = asyncHandler(async (req, res) => {
       agency_name,
     } = req.body;
     console.log(req.body)
+    console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
     if (
@@ -756,6 +757,7 @@ const createResponse514 = asyncHandler(async (req, res) => {
       activity_name,
       students_participated,
     } = req.body;
+    console.log(req.body)
     console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
@@ -1167,6 +1169,7 @@ const createResponse521 = asyncHandler(async (req, res) => {
       pay_package_inr,
     } = req.body;
     console.log(req.body)
+    console.log(req.body)
   
     // Step 1: Field validation (handle 0 values properly)
     if (
@@ -1424,6 +1427,7 @@ const createResponse522 = asyncHandler(async (req, res) => {
       institution_joined,
       program_admitted_to,
     } = req.body;
+    console.log(req.body)
     console.log(req.body)
   
     if (
@@ -1717,6 +1721,7 @@ const createResponse523 = asyncHandler(async (req, res) => {
     where: {
       session,
       year,
+      year,
       registeration_number,
     },
   });
@@ -1967,6 +1972,7 @@ const score523 = asyncHandler(async (req, res) => {
       activity_type,
       student_name
     } = req.body;
+    console.log(req.body)
     console.log(req.body)
   
     if (

@@ -84,6 +84,63 @@ const Criteria5_4_2 = () => {
   };
 
 
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    
+    const year = currentYear.split("-")[0];
+    const session = parseInt(year, 10);
+    
+    // Get the selected options as an array of true values
+    const selectedOptionKeys = Object.entries(selectedOptions)
+      .filter(([_, value]) => value)
+      .map(([key]) => key);
+  
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria5/createResponse542",
+        {
+          session,
+          options: selectedOptionKeys
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true
+        }
+      );
+  
+      // Update local state if needed
+      const newEntry = {
+        year,
+        options: selectedOptionKeys,
+        grade: getGrade() // Optional: include the grade in the UI state
+      };
+  
+      setYearData(prev => ({
+        ...prev,
+        [year]: [...(prev[year] || []), newEntry]
+      }));
+  
+      // Reset form
+      setSelectedOptions({
+        option1: false,
+        option2: false,
+        option3: false,
+        option4: false,
+        option5: false,
+      });
+  
+      // Refresh score
+      fetchScore();
+      alert("Data submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting:", error);
+      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+    }
+  };
+
+
   const [files, setFiles] = useState([]);
   const fetchScore = async () => {
     console.log('Fetching score...');

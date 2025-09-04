@@ -203,6 +203,7 @@ const Criteria6_2_3 = () => {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score623");
       console.log('API Response:', response);
       
+<<<<<<< Updated upstream
       // Extract score data from the response
       const responseData = response.data?.data;
       
@@ -217,6 +218,14 @@ const Criteria6_2_3 = () => {
             distinctAreas: responseData.distinctAreas
           }
         };
+=======
+      // Handle different possible response structures
+      const scoreData = response.data?.data?.entry || response.data?.data || response.data;
+      
+      if (scoreData) {
+        console.log('Score data:', scoreData);
+        // Set the entire response data and let the display logic handle it
+>>>>>>> Stashed changes
         setProvisionalScore(scoreData);
       } else {
         console.log('No score data found in response');
@@ -308,6 +317,7 @@ const Criteria6_2_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
+<<<<<<< Updated upstream
             ) : provisionalScore?.data ? (
               <div>
                 <p className="text-lg font-semibold text-green-800">
@@ -327,14 +337,53 @@ const Criteria6_2_3 = () => {
                   </div>
                 )}
               </div>
+=======
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+>>>>>>> Stashed changes
             ) : (
               <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
 
+<<<<<<< Updated upstream
           {/* Data Entry Section */}
           <div className="mb-8">
             <h2 className="text-xl font-bold text-gray-700 mb-4">E-Governance Implementation</h2>
+=======
+
+          {/* Multiple Selection Checkboxes */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 className="text-blue-600 font-medium mb-4">
+              Select the E-Governance Areas Implemented (Multiple selections allowed)
+            </h3>
+            <div className="space-y-3">
+              {[
+                { key: "administration", label: "1. Administration" },
+                { key: "financeAccounts", label: "2. Finance and Accounts" },
+                { key: "studentAdmissionSupport", label: "3. Student Admission and Support" },
+                { key: "examination", label: "4. Examination" }
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={key}
+                    className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    checked={selectedOptions[key]}
+                    onChange={() => handleCheckboxChange(key)}
+                  />
+                  <label htmlFor={key} className="text-sm text-gray-800">{label}</label>
+                </div>
+              ))}
+            </div>
+>>>>>>> Stashed changes
             
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
               <h3 className="text-lg font-semibold mb-4 text-gray-800">Areas of E-Governance Implementation</h3>

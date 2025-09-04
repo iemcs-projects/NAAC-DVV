@@ -209,6 +209,7 @@ const createResponse414_441 = asyncHandler(async (req, res) => {
     exp_maintainance_physical
   } = req.body;
   console.log("Session",req.body)
+  console.log("Session",req.body)
 
   const sessionYear = Number(session);
   const yearVal = Number(year);
@@ -689,6 +690,7 @@ const score441 = asyncHandler(async (req, res) => {
 const createResponse433 = asyncHandler(async (req, res) => {
   const {session, options}= req.body;
   console.log(req.body);
+  console.log(req.body);
 
   if(!session || !options){
     throw new apiError(400, "Missing required fields");
@@ -919,6 +921,7 @@ const createResponse423 = asyncHandler(async (req, res) => {
 
   const { session, resource_type, subscription_detail, expenditure_lakhs, total_expenditure } = req.body;
   console.log(req.body);
+  console.log(req.body);
 
   // Step 2: Validate required fields
   if (
@@ -1040,6 +1043,7 @@ const createResponse422 = asyncHandler(async (req, res) => {
   */
 
   const { session, options } = req.body;
+  console.log(req.body);
   console.log(req.body);
 
   if (!session || !options) {
@@ -1360,9 +1364,11 @@ const createResponse424 = asyncHandler(async (req, res) => {
     no_of_teachers_stds,
   } = req.body;
   console.log("Session",req.body)
+  console.log("Session",req.body)
 
   const sessionYear = Number(session);
   const noOfTeachers = Number(no_of_teachers_stds);
+  
   
 
   if (!sessionYear || !noOfTeachers) {
@@ -1598,6 +1604,7 @@ const createResponse432 = asyncHandler(async (req, res) => {
     working_computers,
     student_computer_ratio
   } = req.body;
+console.log("Session",req.body)
 console.log("Session",req.body)
 
   const sessionYear = Number(session);

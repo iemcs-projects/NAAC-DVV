@@ -50,6 +50,21 @@ const [submittedData, setSubmittedData] = useState([]);
     setSelectedProgram(e.target.value);
   };
 
+  // Function to get selected program names based on checkboxes
+  const getSelectedPrograms = () => {
+    const programs = [
+      { key: 'option1', name: 'Soft skills' },
+      { key: 'option2', name: 'Language and communication skills' },
+      { key: 'option3', name: 'Life skills (Yoga, physical fitness, health and hygiene)' },
+      { key: 'option4', name: 'ICT/computing skills' }
+    ];
+    
+    return programs
+      .filter(program => selectedOptions[program.key])
+      .map(program => program.name)
+      .join(', ');
+  };
+
   // List of available programs
   const programs = [
     { id: '1', name: 'Soft skills' },
@@ -98,30 +113,20 @@ const [submittedData, setSubmittedData] = useState([]);
     const { date, studentsEnrolled, agency } = formData;
     const session = currentYear;
     
-    if (!selectedProgram) {
-      alert("Please select a program");
-      return;
-    }
-    
-    if (!date || !studentsEnrolled || !agency) {
-      alert("Please fill in all required fields");
+    if (!programName || !date || !studentsEnrolled || !agency) {
+      alert("Please fill in all fields");
       return;
     }
 
     try {
       // Convert date from DD-MM-YYYY to YYYY-MM-DD format for the database
       const [day, month, year] = date.split('-');
-      const implementation_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      const formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
-      const selectedProgramObj = programs.find(p => p.id === selectedProgram);
-      
-      // Extract just the first year from the session (e.g., '2024-25' -> '2024')
-      const firstYear = session.split('-')[0];
-      
       const requestBody = {
-        session: firstYear, // Send only the first year as a string
-        program_name: selectedProgramObj.name,
-        implementation_date,
+        session: parseInt(session, 10), // Ensure session is a number
+        program_name: programName,
+        implementation_date: formattedDate, // YYYY-MM-DD format
         students_enrolled: parseInt(studentsEnrolled, 10),
         agency_name: agency,
       };
@@ -148,9 +153,6 @@ const [submittedData, setSubmittedData] = useState([]);
         studentsEnrolled: "",
         agency: "",
       });
-      
-      // Reset program selection
-      setSelectedProgram('');
       
       fetchScore();
       alert("Data submitted successfully!");
