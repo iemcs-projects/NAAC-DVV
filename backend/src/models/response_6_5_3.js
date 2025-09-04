@@ -27,16 +27,16 @@ export default class response_6_5_3 extends Model {
       }
     },
     session: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
-    initiative_type: {
+    options: {
       type: DataTypes.ENUM('0','1','2','3','4'),
       allowNull: false,
       primaryKey: true
     },
     year: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     reg_meetings_of_the_IQAC_head: {

@@ -190,15 +190,27 @@ const Criteria6_3_2 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (6.3.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
+            ) : provisionalScore?.averagePercentage !== undefined ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (6.3.2): {typeof provisionalScore.averagePercentage === 'number' 
+                    ? provisionalScore.averagePercentage.toFixed(2) 
+                    : provisionalScore.averagePercentage}%
+                </p>
+                {provisionalScore.grade !== undefined && (
+                  <p className="text-md text-gray-700 mt-1">
+                    Grade: {provisionalScore.grade}
+                  </p>
+                )}
+                {provisionalScore.totalTeachers && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Total Teachers: {provisionalScore.totalTeachers}
+                  </p>
+                )}
+                <p className="text-sm text-gray-500 mt-2">
+                  {provisionalScore.message}
+                </p>
+              </div>
             ) : (
               <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}

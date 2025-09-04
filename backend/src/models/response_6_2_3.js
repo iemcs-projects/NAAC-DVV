@@ -30,10 +30,7 @@ export default class response_6_2_3 extends Model {
       type: DataTypes.INTEGER,
       allowNull: true
     },
-    implimentation: {
-      type: DataTypes.ENUM('0','1','2','3','4'),
-      allowNull: false
-    },
+    
     area_of_e_governance: {
       type: DataTypes.STRING(100),
       allowNull: true

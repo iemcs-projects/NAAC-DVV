@@ -10,6 +10,7 @@ const createEmptyCriteria = () => [
   { id: 5, title: 'Student Support and Progression', score: 0, target: 0, status: 'Not Met', max: 100 },
   { id: 6, title: 'Governance, Leadership and Management', score: 0, target: 0, status: 'Not Met', max: 100 },
   { id: 7, title: 'Institutional Values and Best Practices', score: 0, target: 0, status: 'Not Met', max: 100 }
+  
 ];
 
 export const GpaContext = createContext();

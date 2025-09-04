@@ -21,11 +21,15 @@ const Criteria6_2_3 = () => {
     examination: false,
   });
 
+  const eGovernanceAreas = [
+    "Administration",
+    "Finance and Accounts",
+    "Student Admission and Support",
+    "Examination"
+  ];
+
   const [governanceData, setGovernanceData] = useState([
-    { area: "Administration", year: "" },
-    { area: "Finance and Accounts", year: "" },
-    { area: "Student Admission and Support", year: "" },
-    { area: "Examination", year: "" },
+    { area: "", year: "" }
   ]);
 
   const [loading, setLoading] = useState(false);
@@ -51,10 +55,27 @@ const Criteria6_2_3 = () => {
     });
   };
 
+  const handleAreaChange = (index, value) => {
+    const updatedData = [...governanceData];
+    updatedData[index].area = value;
+    setGovernanceData(updatedData);
+  };
+
   const handleYearChange = (index, value) => {
     const updatedData = [...governanceData];
     updatedData[index].year = value;
     setGovernanceData(updatedData);
+  };
+
+  const addNewRow = () => {
+    setGovernanceData([...governanceData, { area: "", year: "" }]);
+  };
+
+  const removeRow = (index) => {
+    if (governanceData.length > 1) {
+      const updatedData = governanceData.filter((_, i) => i !== index);
+      setGovernanceData(updatedData);
+    }
   };
 
   // Function to get grade based on selected options count
@@ -69,26 +90,24 @@ const Criteria6_2_3 = () => {
 
   const handleSubmit = async () => {
     try {
-      // Validate that at least one option is selected
-      const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
-      console.log('Selected governance areas:', selectedOptions);
-      
-      if (selectedCount === 0) {
-        alert("Please select at least one governance area");
+      // Validate that all rows have both area and year filled
+      const hasEmptyFields = governanceData.some(item => !item.area.trim() || !item.year.trim());
+      if (hasEmptyFields) {
+        alert("Please fill in all fields for each row");
         return;
       }
 
-      // Filter out items with empty years (only submit rows with data)
-      const filledData = governanceData.filter(item => item.year.trim() !== '');
-      console.log('Filled data to submit:', filledData);
+      // Filter out any empty rows that might have been added
+      const filledData = governanceData.filter(item => item.area.trim() !== '' && item.year.trim() !== '');
       
       if (filledData.length === 0) {
-        alert("Please enter at least one year of implementation");
+        alert("Please add at least one entry");
         return;
       }
 
-      // Show alert if no options are selected
-      if (selectedCount === 0) {
+      // Check if at least one area is selected in the table
+      const hasSelectedAreas = governanceData.some(item => item.area.trim() !== '');
+      if (!hasSelectedAreas) {
         alert("Please select at least one governance area before submitting");
         return;
       }
@@ -106,9 +125,9 @@ const Criteria6_2_3 = () => {
       const requests = filledData.map((item, index) => {
         const requestBody = {
           session: parseInt(currentYear.split('-')[0], 10),
-          implimentation: implementationCount,
+          // implimentation: implementationCount,
           area_of_e_governance: item.area,
-          year_of_implementation: parseInt(currentYear.split('-')[0])
+          year_of_implementation: parseInt(item.year) || new Date().getFullYear()
         };
         
         console.log('Request body for', item.area, ':', requestBody);
@@ -143,7 +162,7 @@ const Criteria6_2_3 = () => {
       const responses = await Promise.all(requests);
       console.log('All responses:', responses);
       
-      const successMessage = `Successfully submitted data for ${filledData.length} area(s) with ${selectedCount} governance areas selected`;
+      const successMessage = `Successfully submitted data for ${filledData.length} area(s) with ${implementationCount} governance areas selected`;
       console.log(successMessage);
       alert(successMessage);
       
@@ -184,12 +203,20 @@ const Criteria6_2_3 = () => {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score623");
       console.log('API Response:', response);
       
-      // Handle different possible response structures
-      const scoreData = response.data?.data?.entry || response.data?.data || response.data;
+      // Extract score data from the response
+      const responseData = response.data?.data;
       
-      if (scoreData) {
-        console.log('Score data:', scoreData);
-        // Set the entire response data and let the display logic handle it
+      if (responseData) {
+        console.log('Score data:', responseData);
+        // The backend now returns an object with score, grade, and distinctAreas
+        // Map it to the expected format for the frontend
+        const scoreData = {
+          data: {
+            score_sub_sub_criteria: responseData.score,
+            sub_sub_cr_grade: responseData.grade,
+            distinctAreas: responseData.distinctAreas
+          }
+        };
         setProvisionalScore(scoreData);
       } else {
         console.log('No score data found in response');
@@ -281,88 +308,122 @@ const Criteria6_2_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (6.2.3): {provisionalScore.data.score_sub_sub_criteria} / 4
+                  <span className="ml-2 text-sm font-normal text-gray-600">
+                    (Grade: {provisionalScore.data.sub_sub_cr_grade})
+                  </span>
+                </p>
+                {provisionalScore.data.distinctAreas?.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-gray-700">Selected Areas:</p>
+                    <ul className="list-disc list-inside text-sm text-gray-600 mt-1">
+                      {provisionalScore.data.distinctAreas.map((area, index) => (
+                        <li key={index}>{area}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
 
-
-          {/* Multiple Selection Checkboxes */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-4">
-              Select the E-Governance Areas Implemented (Multiple selections allowed)
-            </h3>
-            <div className="space-y-3">
-              {[
-                { key: "administration", label: "1. Administration" },
-                { key: "financeAccounts", label: "2. Finance and Accounts" },
-                { key: "studentAdmissionSupport", label: "3. Student Admission and Support" },
-                { key: "examination", label: "4. Examination" }
-              ].map(({ key, label }) => (
-                <div key={key} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={key}
-                    className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    checked={selectedOptions[key]}
-                    onChange={() => handleCheckboxChange(key)}
-                  />
-                  <label htmlFor={key} className="text-sm text-gray-800">{label}</label>
-                </div>
-              ))}
-            </div>
+          {/* Data Entry Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-700 mb-4">E-Governance Implementation</h2>
             
-            {/* Grade Display */}
-            <div className="mt-4 p-3 bg-blue-50 rounded-md">
-              <p className="text-sm font-medium text-blue-800">
-                Option Selected: {getGrade()}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Selected: {Object.values(selectedOptions).filter(Boolean).length} out of 4 governance areas
-              </p>
-            </div>
-          </div>
-
-          {/* E-Governance Implementation Details Table */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-4">E-Governance Implementation Details</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="py-2 px-4 border-b text-left">Area of Governance</th>
-                    <th className="py-2 px-4 border-b text-left">Year of Implementation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {governanceData.map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="py-3 text-black px-4 border-b">{item.area}</td>
-                      <td className="py-3 text-black px-4 border-b">
-                        <div className="flex flex-col">
+            <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+              <h3 className="text-lg font-semibold mb-4 text-gray-800">Areas of E-Governance Implementation</h3>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
+                        Areas of e-governance
+                      </th>
+                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
+                        Year of Implementation
+                      </th>
+                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {governanceData.map((item, index) => (
+                      <tr key={index} className="bg-white hover:bg-gray-50">
+                        <td className="px-4 py-3 border border-gray-300">
+                          <select
+                            value={item.area}
+                            onChange={(e) => handleAreaChange(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Select Area</option>
+                            {eGovernanceAreas.map((area, i) => (
+                              <option 
+                                key={i} 
+                                value={area}
+                                disabled={governanceData.some((item, idx) => item.area === area && idx !== index)}
+                              >
+                                {area}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 border border-gray-300">
                           <input
-                            type="text"
-                            className="w-full px-3 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Enter full session year (e.g., 2022-23)"
+                            type="number"
                             value={item.year}
                             onChange={(e) => handleYearChange(index, e.target.value)}
+                            placeholder="e.g. 2023"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            min="2000"
+                            max={new Date().getFullYear()}
                           />
-                          <small className="text-gray-500 mt-1">First year: {currentYear ? currentYear.split('-')[0] : ''}</small>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </td>
+                        <td className="px-4 py-3 border border-gray-300 text-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={handleSubmit}
+                            className="text-green-600 hover:text-green-800"
+                            title="Add entry"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                            </svg>
+                          </button>
+                          {governanceData.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeRow(index)}
+                              className="text-red-600 hover:text-red-800 ml-2"
+                              title="Remove row"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={addNewRow}
+                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-medium"
+                  >
+                    + Add Another Area
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 

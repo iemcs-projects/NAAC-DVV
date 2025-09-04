@@ -3,18 +3,11 @@ import {
   FaSearch, 
   FaChevronRight, 
   FaCheck, 
-  FaFilePdf, 
-  FaDownload, 
-  FaFileWord, 
-  FaFileExcel, 
   FaPlay, 
-  FaClock,
   FaEnvelope,
   FaPhone,
-  FaMapMarkerAlt,
-  FaFacebook,
-  FaTwitter,
-  FaLinkedin
+  FaCheckCircle,
+  FaQuestionCircle
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from './components/iqac-sidebar';

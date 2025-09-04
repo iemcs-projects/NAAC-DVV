@@ -82,15 +82,13 @@ const getTotalStudents = async () => {
 const createResponse623 = asyncHandler(async (req, res) => {
   const {
     session,
-    implimentation,
     area_of_e_governance,
     year_of_implementation
   } = req.body;
 
   // Step 1: Field validation
   if (
-    session === undefined ||
-    implimentation === undefined
+    session === undefined 
   ) {
     throw new apiError(400, "Missing required fields");
   }
@@ -100,10 +98,7 @@ const createResponse623 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Session must be between 1990 and current year");
   }
 
-  if (implimentation < 0 || implimentation > 4) {
-    throw new apiError(400, "Implementation must be between 0 and 4");
-  }
-
+ 
   // Step 2: Fetch criteria details
   const criteria = await CriteriaMaster.findOne({
     where: {
@@ -144,15 +139,12 @@ const createResponse623 = asyncHandler(async (req, res) => {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session,
-      implimentation,
       area_of_e_governance,
       year_of_implementation
     }
   });
 
-  if (!created) {
-    await entry.update({ implimentation });
-  }
+ 
 
   // Step 5: Return API response
   return res.status(201).json(
@@ -168,59 +160,35 @@ const createResponse623 = asyncHandler(async (req, res) => {
 const score623 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("6.2.3");
   const currentYear = new Date().getFullYear();
-  const session = currentYear;
 
   // Step 1: Get criteria details
   const criteria = await CriteriaMaster.findOne({
-    where: {
-      sub_sub_criterion_id: criteria_code
-    }
+    where: { sub_sub_criterion_id: criteria_code }
   });
 
   if (!criteria) {
     throw new apiError(404, "Criteria 6.2.3 not found in criteria_master");
   }
 
-  // Step 2: Get latest response
-  const response = await Criteria623.findOne({
-    where: {
-      criteria_code: criteria.criteria_code
-    },
-    order: [['id', 'DESC']],
+  // Step 2: Count distinct areas selected for the latest session
+  const responseData = await Criteria623.findAll({
+    where: { criteria_code: criteria.criteria_code, session: currentYear },
+    attributes: [
+      "session",
+      "area_of_e_governance"
+    ],
     raw: true
   });
 
-  if (!response) {
-    throw new apiError(404, "No response found for criteria 6.2.3");
-  }
+  console.log("Raw response data:", responseData);
 
-  const implementation = Number(response.implimentation); // Get the implementation value
+  // Get distinct areas for the session
+  const distinctAreas = [...new Set(responseData.map(r => r.area_of_e_governance))];
+  console.log("Distinct areas selected:", distinctAreas);
 
-  let score, grade;
-
-  // Map implementation to score and grade (0-4 scale)
-  switch (implementation) {
-    case 4:
-      score = 4;
-      grade = 4;
-      break;
-    case 3:
-      score = 3;
-      grade = 3;
-      break;
-    case 2:
-      score = 2;
-      grade = 2;
-      break;
-    case 1:
-      score = 1;
-      grade = 1;
-      break;
-    case 0:
-    default:
-      score = 0;
-      grade = 0;
-  }
+  const score = distinctAreas.length; // number of options selected
+  const grade = score; // grade same as score
+  console.log(`Final score for session ${currentYear}:`, score);
 
   // Step 3: Create or update score entry
   const [entry, created] = await Score.upsert({
@@ -236,16 +204,15 @@ const score623 = asyncHandler(async (req, res) => {
     year: currentYear,
     cycle_year: 1
   }, {
-    conflictFields: ['criteria_code', 'session', 'year']
+    conflictFields: ["criteria_code", "session", "year"]
   });
 
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      implementation,
-      grade,
-      message: `Grade is ${grade} (Implementation level: ${implementation})`
-    }, created ? "Score created successfully" : "Score updated successfully")
+    new apiResponse(
+      200,
+      { score, grade, distinctAreas },
+      created ? "Score created successfully" : "Score updated successfully"
+    )
   );
 });
  //6.3.2
@@ -461,10 +428,22 @@ const score632 = asyncHandler(async (req, res) => {
   else grade = 0;
 
   // 9. Upsert into Score table
-  let entry = await Score.findOne({
+  let  [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
       session
+    },
+    defaults: {
+      criteria_code: criteria.criteria_code,
+      criteria_id: criteria.criterion_id,
+      sub_criteria_id: criteria.sub_criterion_id,
+      sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+      score_criteria: 0,
+      score_sub_criteria: 0,
+      score_sub_sub_criteria: averagePercentage,
+      sub_sub_cr_grade: grade,
+      session,
+      cycle_year: 1
     }
   });
 
@@ -505,24 +484,24 @@ const score632 = asyncHandler(async (req, res) => {
 const createResponse633 = asyncHandler(async (req, res) => {
   const {
     session,
-    from_to_date,
+    from_date,
+    to_date,
     title_of_prof_dev,
-    title_of_add_training
+    title_of_add_training,
+    no_of_participants
   } = req.body;
+  console.log(req.body);
 
   // Step 1: Field validation
-  if (!session || !from_to_date || !title_of_prof_dev || !title_of_add_training) {
+  if (!session || !from_date || !to_date || !title_of_prof_dev || !title_of_add_training || !no_of_participants) {
     throw new apiError(400, "Missing required fields");
   }
 
-  const currentYear = new Date().getFullYear();
-  if (session < 1990 || session > currentYear) {
-    throw new apiError(400, "Session must be between 1990 and current year");
-  }
+
 
   // Step 2: Prevent duplicate entries
   const duplicate = await Criteria633.findOne({
-    where: { session, from_to_date, title_of_prof_dev, title_of_add_training }
+    where: { session, from_date, to_date, title_of_prof_dev, title_of_add_training }
   });
 
   if (duplicate) {
@@ -564,9 +543,11 @@ const createResponse633 = asyncHandler(async (req, res) => {
     id: criteria.id,
     criteria_code: criteria.criteria_code,
     session,
-    from_to_date,
+    from_date,
+    to_date,
     title_of_prof_dev,
-    title_of_add_training
+    title_of_add_training,
+    no_of_participants
   });
 
   return res.status(201).json(
@@ -597,7 +578,7 @@ const score633 = asyncHandler(async (req, res) => {
     throw new apiError(404, "No IIQA form found");
   }
 
-  const startYear = currentIIQA.session_end_year - 4; // 5 years total
+  const startYear = currentIIQA.session_end_year - 5; // 5 years total
   const endYear = currentIIQA.session_end_year;
 
   if (session < startYear || session > endYear) {
@@ -640,15 +621,12 @@ const score633 = asyncHandler(async (req, res) => {
   else grade = 0;
 
   // 7. Create or update score
-  let entry = await Score.findOne({
+  let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
       session
-    }
-  });
-
-  if (!entry) {
-    entry = await Score.create({
+    },
+    defaults: {
       criteria_code: criteria.criteria_code,
       criteria_id: criteria.criterion_id,
       sub_criteria_id: criteria.sub_criterion_id,
@@ -659,19 +637,16 @@ const score633 = asyncHandler(async (req, res) => {
       sub_sub_cr_grade: grade,
       session,
       cycle_year: 1
-    });
-  } else {
+    }
+  });
+
+  if (!created) {
     await Score.update({
       score_sub_sub_criteria: score,
-      sub_sub_cr_grade: grade
+      sub_sub_cr_grade: grade,
+      session,
+      cycle_year: 1
     }, {
-      where: {
-        criteria_code: criteria.criteria_code,
-        session
-      }
-    });
-
-    entry = await Score.findOne({
       where: {
         criteria_code: criteria.criteria_code,
         session
@@ -679,15 +654,19 @@ const score633 = asyncHandler(async (req, res) => {
     });
   }
 
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session
+    }
+  });
+
+
+
   return res.status(200).json(
-    new apiResponse(200, {
-      score,
-      grade,
-      totalValidEntries,
-      message: `Score calculated successfully with ${totalValidEntries} valid entries over 5 years`
-    }, "Score 6.3.3 calculated and updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
-});
+}); 
 
 
 //6.3.4
@@ -697,11 +676,15 @@ const createResponse634 = asyncHandler(async (req, res) => {
     session,
     teacher_name,
     program_title,
-    from_to_date
+    from_date,
+    to_date
   } = req.body;
+  console.log(req.body)
+  console.log(from_date)
+  console.log(typeof from_date)
 
   // Step 1: Field validation
-  if (!session || !teacher_name || !program_title || !from_to_date) {
+  if (!session || !teacher_name || !program_title || !from_date || !to_date) {
     throw new apiError(400, "Missing required fields");
   }
 
@@ -756,7 +739,8 @@ const createResponse634 = asyncHandler(async (req, res) => {
     session,
     teacher_name,
     program_title,
-    from_to_date
+    from_date,
+    to_date
   });
 
   return res.status(201).json(
@@ -856,15 +840,12 @@ const score634 = asyncHandler(async (req, res) => {
   else grade = 0;
 
   // 9. Upsert into Score table
-  let entry = await Score.findOne({
+  let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
-      session
-    }
-  });
-
-  if (!entry) {
-    entry = await Score.create({
+      session: session
+    },
+    defaults: {
       criteria_code: criteria.criteria_code,
       criteria_id: criteria.criterion_id,
       sub_criteria_id: criteria.sub_criterion_id,
@@ -873,24 +854,35 @@ const score634 = asyncHandler(async (req, res) => {
       score_sub_criteria: 0,
       score_sub_sub_criteria: averagePercentage,
       sub_sub_cr_grade: grade,
-      session,
+      session: session,
       cycle_year: 1
-    });
-  } else {
-    await entry.update({
+    }
+  });
+
+  if (!created) {
+    await Score.update({
       score_sub_sub_criteria: averagePercentage,
-      sub_sub_cr_grade: grade
+      sub_sub_cr_grade: grade,
+      cycle_year: 1
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: session
+      }
     });
   }
 
+  entry = await Score.findOne({
+    where: {
+      criteria_code: criteria.criteria_code,
+      session: session
+    }
+  });
+
+
+
   return res.status(200).json(
-    new apiResponse(200, {
-      averagePercentage,
-      grade,
-      yearlyBreakdown: yearlyPercentages,
-      totalTeachers,
-      message: `Average ${averagePercentage}% of teachers received support over the last 5 years`
-    }, "Score 6.3.4 calculated and updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
 
@@ -1050,15 +1042,12 @@ const score642 = asyncHandler(async (req, res) => {
   }
 
   // 7. Create or update score
-  let entry = await Score.findOne({
+  let [entry, created] = await Score.findOrCreate({
     where: {
       criteria_code: criteria.criteria_code,
       session
-    }
-  });
-
-  if (!entry) {
-    entry = await Score.create({
+    },
+    defaults: {
       criteria_code: criteria.criteria_code,
       criteria_id: criteria.criterion_id,
       sub_criteria_id: criteria.sub_criterion_id,
@@ -1069,11 +1058,15 @@ const score642 = asyncHandler(async (req, res) => {
       sub_sub_cr_grade: grade,
       session,
       cycle_year: 1
-    });
-  } else {
+    }
+  });
+
+  if (!created) {
     await Score.update({
       score_sub_sub_criteria: score,
-      sub_sub_cr_grade: grade
+      sub_sub_cr_grade: grade,
+      session,
+      cycle_year: 1
     }, {
       where: {
         criteria_code: criteria.criteria_code,
@@ -1090,15 +1083,10 @@ const score642 = asyncHandler(async (req, res) => {
   }
 
   return res.status(200).json(
-    new apiResponse(200, {
-      totalGrantAmount: parseFloat(totalGrantAmount.toFixed(2)),
-      averageGrantPerYear: parseFloat(averageGrantPerYear),
-      score,
-      grade,
-      message: `Average grant amount of ₹${averageGrantPerYear} lakhs per year over 5 years`
-    }, "Score 6.4.2 calculated and updated successfully")
+    new apiResponse(200, entry, created ? "Score created successfully" : "Score updated successfully")
   );
 });
+
 
 
 //6.5.3
@@ -1107,26 +1095,29 @@ const score642 = asyncHandler(async (req, res) => {
 const createResponse653 = asyncHandler(async (req, res) => {
   const {
     session,
-    initiative_type,
+    options,
     year,
     reg_meetings_of_the_IQAC_head,
     conf_seminar_workshops_on_quality_edu,
     collab_quality_initiatives,
     participation_in_NIRF,
-    from_to_date,
-    other_quality_audit,
+    from_date,
+    to_date,
+    other_quality_audit,   
   } = req.body;
+  console.log(req.body)
 
   // Step 1: Validate input fields
   if (
     session === undefined ||
-    initiative_type === undefined ||
+    options === undefined ||
     year === undefined ||
     reg_meetings_of_the_IQAC_head === undefined ||
     conf_seminar_workshops_on_quality_edu === undefined ||
     collab_quality_initiatives === undefined ||
     participation_in_NIRF === undefined ||
-    from_to_date === undefined ||
+    from_date === undefined ||
+    to_date === undefined ||
     other_quality_audit === undefined
   ) {
     throw new apiError(400, "Missing required fields");
@@ -1137,7 +1128,7 @@ const createResponse653 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Session and year must be between 1990 and current year");
   }
 
-  if (initiative_type < 0 || initiative_type > 4) {
+  if (options < 0 || options > 4) {
     throw new apiError(400, "Initiative type must be between 0 and 4");
   }
 
@@ -1177,7 +1168,7 @@ const createResponse653 = asyncHandler(async (req, res) => {
 
   if (existingRecord) {
     await Criteria653.update(
-      { initiative_type },
+      { options },
       { where: { session } }
     );
     entry = await Criteria653.findOne({ where: { session } });
@@ -1186,13 +1177,14 @@ const createResponse653 = asyncHandler(async (req, res) => {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session,
-      initiative_type,
+      options,
       year,
       reg_meetings_of_the_IQAC_head,
       conf_seminar_workshops_on_quality_edu,
       collab_quality_initiatives,
       participation_in_NIRF,
-      from_to_date,
+      from_date,
+      to_date,
       other_quality_audit,
     });
   }
@@ -1231,13 +1223,13 @@ const score653 = asyncHandler(async (req, res) => {
     throw new apiError(404, "No response found for criteria 6.5.3");
   }
 
-  const initiativeType = Number(response.initiative_type); // Get the initiative_type value
+  const options = Number(response.options); // Get the initiative_type value
 
   let score, grade;
 
   // Map initiative_type to score and grade (0-4 scale)
   // The mapping is direct since initiative_type is already in 0-4 scale
-  switch (initiativeType) {
+  switch (options) {
     case 4:
       score = 4;
       grade = 4;
@@ -1261,7 +1253,7 @@ const score653 = asyncHandler(async (req, res) => {
   }
 
   // Step 3: Create or update score entry
-  const [entry, created] = await Score.upsert({
+  let [entry, created] = await Score.upsert({
     criteria_code: criteria.criteria_code,
     criteria_id: criteria.criterion_id,
     sub_criteria_id: criteria.sub_criterion_id,
@@ -1273,16 +1265,56 @@ const score653 = asyncHandler(async (req, res) => {
     session: currentYear,
     year: currentYear,
     cycle_year: 1
-  }, {
+  }, 
+  {
+    defaults: {
+    criteria_code: criteria.criteria_code,
+    criteria_id: criteria.criterion_id,
+    sub_criteria_id: criteria.sub_criterion_id,
+    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+    score_criteria: 0,
+    score_sub_criteria: 0,
+    score_sub_sub_criteria: score,
+    sub_sub_cr_grade: grade,
+    session: currentYear,
+    year: currentYear,
+    cycle_year: 1
+  },
     conflictFields: ['criteria_code', 'session', 'year']
   });
+
+  if (!created) {
+    await Score.update({
+      score_sub_sub_criteria: score,
+      sub_sub_cr_grade: grade,
+      session: currentYear,
+      year: currentYear,
+      cycle_year: 1
+    }, {
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: currentYear,
+        year: currentYear,
+        cycle_year: 1
+      }
+    });
+
+    entry = await Score.findOne({
+      where: {
+        criteria_code: criteria.criteria_code,
+        session: currentYear,
+        year: currentYear,
+        cycle_year: 1
+      }
+    });
+  }
 
   return res.status(200).json(
     new apiResponse(200, {
       score,
-      initiativeType,
+      options,
       grade,
-      message: `Grade is ${grade} (Initiative type: ${initiativeType})`
+      message: `Grade is ${grade} (Initiative type: ${options})`
     }, created ? "Score created successfully" : "Score updated successfully")
   );
 });
@@ -1290,7 +1322,7 @@ const score653 = asyncHandler(async (req, res) => {
 const getResponsesByCriteriaCode = asyncHandler(async (req, res) => {
   const { criteriaCode } = req.params;
 
-  const responses = await Criteria6.findAll({
+  const responses = await Criteria653.findAll({
     where: { criteria_code: criteriaCode }
   });
 
@@ -1300,7 +1332,7 @@ const getResponsesByCriteriaCode = asyncHandler(async (req, res) => {
 });
 
 const getAllCriteria6 = asyncHandler(async (req, res) => {
-  const responses = await Criteria6.findAll();
+  const responses = await Criteria653.findAll();
 
   return res.status(200).json(
     new apiResponse(200, responses, "Responses retrieved successfully")

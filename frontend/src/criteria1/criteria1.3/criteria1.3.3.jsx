@@ -127,19 +127,7 @@ const Criteria1_3_3 = () => {
             <div className="text-sm text-gray-600">1.3 - Curriculum Enrichment</div>
           </div>
 
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (1.3.3): {provisionalScore.data.score}
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-600">No score data available.</p>
-            )}
-          </div>
+          
 
           <div className="bg-white p-6 rounded shadow mb-6">
             <h3 className="text-blue-600 font-semibold mb-2">1.3.3 Metric Information</h3>
@@ -165,6 +153,19 @@ const Criteria1_3_3 = () => {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (1.3.3): {provisionalScore.data.score}
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
           </div>
 
           <div className="overflow-auto border rounded mb-6">
@@ -280,44 +281,7 @@ const Criteria1_3_3 = () => {
             <p className="text-gray-600 mb-6">No data submitted yet.</p>
           )}
 
-          <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-lg font-semibold mb-4 text-gray-800">Calculation Table (Last 5 Years)</h3>
-            <div className="overflow-auto">
-              <table className="min-w-full border text-sm">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-4 py-2 text-left">YEAR</th>
-                    {pastFiveYears.map((year) => (
-                      <th key={year} className="border border-gray-300 px-4 py-2">
-                        {year}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="border border-gray-300 px-4 py-2 font-medium">
-                      Calculated Score
-                    </td>
-                    {pastFiveYears.map((year) => (
-                      <td key={`score-${year}`} className="border border-gray-300 px-4 py-2 text-center">
-                        -
-                      </td>
-                    ))}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end mt-4">
-              <button 
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-                onClick={fetchScore}
-              >
-                Calculate Score
-              </button>
-            </div>
-            <p className="text-sm text-gray-600 mt-2">Total number of years considered: {pastFiveYears.length}</p>
-          </div>
+     
 
           <div className="mt-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

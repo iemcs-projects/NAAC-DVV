@@ -103,8 +103,8 @@ const Criteria6_3_4 = () => {
           session: parseInt(sessionYear, 10),
           teacher_name: name.trim(),
           program_title: title.trim(),
-          date_from: dateFrom.trim(),
-          date_to: dateTo.trim()
+          from_date: dateFrom.trim(),
+          to_date: dateTo.trim()
         },
         {
           headers: {

@@ -245,7 +245,7 @@ function App() {
           <Route
             path='/criteria1.1.3'
             element={
-              <PrivateRoute allowedRoles={['iqac', 'admin']}>
+              <PrivateRoute allowedRoles={['admin']}>
                 <Criteria1_1_3 />
               </PrivateRoute>
             }

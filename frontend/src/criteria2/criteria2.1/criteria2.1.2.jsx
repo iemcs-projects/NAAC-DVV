@@ -21,6 +21,8 @@ const Criteria2_1_2 = () => {
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+    const [editKey, setEditKey] = useState(null);
 
   // Fetch score when component mounts
   useEffect(() => {

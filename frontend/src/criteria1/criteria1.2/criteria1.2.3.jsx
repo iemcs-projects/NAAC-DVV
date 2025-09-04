@@ -191,244 +191,26 @@ const Criteria1_2_3 = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                <span className="font-semibold text-gray-700">Provisional Score:&nbsp;</span>
-                {scoreLoading ? (
-                  <span className="text-gray-500">Loading...</span>
-                ) : scoreError ? (
-                  <span className="text-red-500">Error: {scoreError}</span>
-                ) : provisionalScore ? (
-                  <div className="text-center">
-                    <div className="text-blue-600 text-lg font-bold">
-                      Score: {provisionalScore.data?.score || 'N/A'}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-gray-500">Score not available</span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded">
-            <p className="font-semibold">
-              Fill in the inputs in 2.4.1 to get the corresponding results.
-            </p>
-          </div>
-
-          {/* Data entry
-          <div className="border rounded mb-8">
-            <div className="flex items-center justify-between bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">
-                Add On Programs
-              </h2>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {averageScore !== null ? (
               <div>
-                <label className="text-gray-700 font-medium mr-2">Select Year:</label>
-                <select
-                  value={selectedSession}
-                  onChange={(e) => setSelectedSession(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950"
-                >
-                  {(sessions?.length ? sessions : fallbackYears).map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
+                <p className="text-lg font-semibold text-green-800">
+                  Average Score: {averageScore}%
+                </p>
               </div>
-            </div>
-            <table className="w-full border text-sm border-black">
-              <thead className="bg-gray-100 text-gray-950">
-                <tr>
-                  <th className="border px-2 py-2">Program Name</th>
-                  <th className="border px-2 py-2">Program Code</th>
-                  <th className="border px-2 py-2">Year of Offering</th>
-                  <th className="border px-2 py-2">Times Offered</th>
-                  <th className="border px-2 py-2">Duration</th>
-                  <th className="border px-2 py-2">Students Enrolled</th>
-                  <th className="border px-2 py-2">Students Completed</th>
-                  <th className="border px-2 py-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="text"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Program Name"
-                      value={formData.program_name}
-                      onChange={(e) => handleChange("program_name", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="text"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Program Code"
-                      value={formData.course_code}
-                      onChange={(e) => handleChange("course_code", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="text"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Year of Offering"
-                      value={formData.year_of_offering}
-                      onChange={(e) => handleChange("year_of_offering", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="text"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Times Offered"
-                      value={formData.no_of_times_offered}
-                      onChange={(e) => handleChange("no_of_times_offered", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="text"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Duration"
-                      value={formData.duration}
-                      onChange={(e) => handleChange("duration", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="number"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Students Enrolled"
-                      value={formData.no_of_students_enrolled}
-                      onChange={(e) => handleChange("no_of_students_enrolled", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1">
-                    <input
-                      type="number"
-                      className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                      placeholder="Students Completed"
-                      value={formData.no_of_students_completed}
-                      onChange={(e) => handleChange("no_of_students_completed", e.target.value)}
-                    />
-                  </td>
-                  <td className="border px-2 py-1 text-center">
-                    <button
-                      className="!bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                      onClick={handleSubmit}
-                    >
-                      Add
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div> */}
-
-          {/* Submitted rows
-          {(sessions?.length ? sessions : Object.keys(yearData)).map((year) => (
-            <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
-              {yearData[year] && yearData[year].length > 0 ? (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-200">
-                    <tr>
-                      <th className="border text-gray-950 px-4 py-2">#</th>
-                      <th className="border text-gray-950 px-4 py-2">Program Name</th>
-                      <th className="border text-gray-950 px-4 py-2">Code</th>
-                      <th className="border text-gray-950 px-4 py-2">Year</th>
-                      <th className="border text-gray-950 px-4 py-2">Times</th>
-                      <th className="border text-gray-950 px-4 py-2">Duration</th>
-                      <th className="border text-gray-950 px-4 py-2">Students Enrolled</th>
-                      <th className="border text-gray-950 px-4 py-2">Students Completed</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {yearData[year].map((entry, index) => (
-                      <tr key={index} className="even:bg-gray-50">
-                        <td className="border text-gray-950 px-2 py-1">{index + 1}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.program_name}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.course_code}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.year_of_offering}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.no_of_times_offered}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.duration}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.no_of_students_enrolled}</td>
-                        <td className="border text-gray-950 px-2 py-1">{entry.no_of_students_completed}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-gray-600 px-4 py-2">No data submitted for this year.</p>
-              )}
-            </div>
-          ))} */}
-
-          {/* Calculation Table */}
-          <div className="overflow-auto border rounded p-4">
-            <h2 className="text-lg font-semibold mb-2 text-gray-700">
-              Calculation Table (Last 5 Years)
-            </h2>
-            <table className="table-auto border-collapse w-full ">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 font-semibold">
-                  <th className="border px-4 py-2">Year</th>
-                  {Object.keys(yearScores).map((year) => (
-                    <th key={year} className="border px-4 py-2">{year}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-4 py-2 font-medium text-gray-600">
-                    Calculated Score
-                  </td>
-                  {Object.keys(yearScores).map((year) => (
-                    <td key={year} className="border px-4 py-2 text-center border-black text-gray-950">
-                      <input
-                        type="number"
-                        value={yearScores[year]}
-                        onChange={(e) =>
-                          setYearScores({ ...yearScores, [year]: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-20 text-center border px-1 rounded"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2 mt-4">
-              <label className="text-sm font-medium text-gray-700">
-                Enter number of years for average:
-              </label>
-              <input
-                type="number"
-                value={yearCount}
-                min={1}
-                max={5}
-                onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                className="w-20 border px-2 py-1 rounded text-center text-gray-950"
-              />
-              <button
-                className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:bg-green-700"
-                onClick={() => {
-                  const values = Object.values(yearScores).slice(0, yearCount);
-                  const sum = values.reduce((acc, val) => acc + val, 0);
-                  setAverageScore((sum / yearCount).toFixed(2));
-                }}
-              >
-                Calculate Average
-              </button>
-            </div>
-            {averageScore !== null && (
-              <div className="mt-4 text-blue-700 font-semibold">
-                Average Score for last {yearCount} year(s): {averageScore}%
-              </div>
+            ) : (
+              <p className="text-gray-600">No score data available. Please enter scores and calculate the average.</p>
             )}
           </div>
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-900 p-3 rounded mb-6 text-sm">
+            This section displays the calculated score based on data from <strong>1.2.2</strong>.
+            The score is automatically calculated based on the average teaching experience of full-time teachers.
+          </div>
+
+
+        
+
+          {/* Calculation Table */}
 
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

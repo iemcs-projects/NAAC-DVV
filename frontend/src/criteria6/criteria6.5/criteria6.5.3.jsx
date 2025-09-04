@@ -19,7 +19,7 @@ const Criteria6_5_3 = () => {
     option3: false,
     option4: false,
   });
-  
+  const[submittedData,setSubmittedData]=useState([]);
   const [rows, setRows] = useState([]);
   const [nextId, setNextId] = useState(1);
   const [yearOfImplementation, setYearOfImplementation] = useState("");
@@ -36,7 +36,8 @@ const Criteria6_5_3 = () => {
     conf_seminar_workshops_on_quality_edu: "",
     collab_quality_initiatives: "",
     participation_in_NIRF: "",
-    from_to_date: "",
+    from_date: "",
+    to_date: "",
     other_quality_audit: ""
   });
 
@@ -65,6 +66,7 @@ const Criteria6_5_3 = () => {
     return 'E. None of the above';
   };
 
+
   const addRow = () => {
     setRows([...rows, { id: nextId, name: "" }]);
     setNextId(nextId + 1);
@@ -75,24 +77,22 @@ const Criteria6_5_3 = () => {
   };
 
   const handleSubmit = async () => {
-    // Get the initiative type based on selected options
+    // Get the count of selected options
     const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
-    const initiative_type = 
-      selectedCount >= 4 ? 'A' :
-      selectedCount === 3 ? 'B' :
-      selectedCount === 2 ? 'C' :
-      selectedCount === 1 ? 'D' : 'E';
+    const options = selectedCount;
 
     // Prepare the request body
     const requestBody = {
       session: currentYear.split('-')[0],
-      initiative_type,
+      options,
       year: formData.year,
       reg_meetings_of_the_IQAC_head: formData.reg_meetings_of_the_IQAC_head,
       conf_seminar_workshops_on_quality_edu: formData.conf_seminar_workshops_on_quality_edu,
       collab_quality_initiatives: formData.collab_quality_initiatives,
       participation_in_NIRF: formData.participation_in_NIRF,
-      from_to_date: formData.from_to_date,
+      orientation_program: formData.orientation_program,
+      from_date: formData.from_date,
+      to_date: formData.to_date,
       other_quality_audit: formData.other_quality_audit
     };
 
@@ -111,7 +111,7 @@ const Criteria6_5_3 = () => {
       console.log("Submission successful:", response.data);
       
       // Add to submitted data
-      const newEntry = { ...formData, initiative_type };
+      const newEntry = { ...formData, options };
       setSubmittedData(prev => [...prev, newEntry]);
       
       // Reset form
@@ -121,7 +121,9 @@ const Criteria6_5_3 = () => {
         conf_seminar_workshops_on_quality_edu: "",
         collab_quality_initiatives: "",
         participation_in_NIRF: "",
-        from_to_date: "",
+        orientation_program: "",
+        from_date: "",
+        to_date: "",
         other_quality_audit: ""
       });
       
@@ -186,11 +188,11 @@ const Criteria6_5_3 = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+    <div className="w-[1520px] min-h-screen bg-gray-50 overflow-x-hidden">
       <Header />
       <Navbar />
 
-      <div className="flex flex-1">
+      <div className="flex w-full">
         <Sidebar />
 
         <div className="flex-1 flex flex-col p-2 mt-[20px]">
@@ -210,11 +212,11 @@ const Criteria6_5_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+            ) : provisionalScore?.data?.score !== undefined || provisionalScore?.score !== undefined ? (
               <p className="text-lg font-semibold text-green-800">
-                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                Provisional Score (6.2.3): {typeof (provisionalScore.data?.score ?? provisionalScore.score) === 'number'
+                  ? (provisionalScore.data?.score ?? provisionalScore.score).toFixed(2)
+                  : (provisionalScore.data?.score ?? provisionalScore.score)} %
                 <span className="ml-2 text-sm font-normal text-gray-500">
                   (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
                 </span>
@@ -304,7 +306,9 @@ const Criteria6_5_3 = () => {
                   <th className="border text-gray-950 px-3 py-2">Conferences, Seminars, Workshops on quality conducted</th>
                   <th className="border text-gray-950 px-3 py-2">Collaborative quality initiatives with other institution(s) (Provide name of the institution and activity</th>
                   <th className="border text-gray-950 px-3 py-2">Participation in NIRF along with Status</th>
-                  <th className="border text-gray-950 px-3 py-2">Orientation programme on quality issues for teachers and students, Date (From-To) (DD-MM-YYYY)</th>
+                  <th className="border text-gray-950 px-3 py-2">Orientation programme on quality issues for teachers and students</th>
+                  <th className="border text-gray-950 px-3 py-2">From Date (DD-MM-YYYY)</th>
+                  <th className="border text-gray-950 px-3 py-2">To Date (DD-MM-YYYY)</th>
                   <th className="border text-gray-950 px-3 py-2">Any other quality audit as recognized by the State, National or International agencies (ISO certification, NBA and such others</th>
                 </tr>
               </thead>
@@ -357,9 +361,27 @@ const Criteria6_5_3 = () => {
                     <input
                       type="text"
                       className="w-full border text-gray-950 rounded px-2 py-1"
-                      value={formData.from_to_date}
-                      onChange={(e) => handleInputChange("from_to_date", e.target.value)}
-                      placeholder="DD-MM-YYYY to DD-MM-YYYY"
+                      value={formData.orientation_program}
+                      onChange={(e) => handleInputChange("orientation_program", e.target.value)}
+                      placeholder="Enter program details"
+                    />
+                  </td>
+                  <td className="border px-3 py-2">
+                    <input
+                      type="text"
+                      className="w-full border text-gray-950 rounded px-2 py-1"
+                      value={formData.from_date}
+                      onChange={(e) => handleInputChange("from_date", e.target.value)}
+                      placeholder="DD-MM-YYYY"
+                    />
+                  </td>
+                  <td className="border px-3 py-2">
+                    <input
+                      type="text"
+                      className="w-full border text-gray-950 rounded px-2 py-1"
+                      value={formData.to_date}
+                      onChange={(e) => handleInputChange("to_date", e.target.value)}
+                      placeholder="DD-MM-YYYY"
                     />
                   </td>
                   <td className="border px-3 py-2">

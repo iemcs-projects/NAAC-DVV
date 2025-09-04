@@ -1,21 +1,64 @@
 import React, { useState , useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip } from 'recharts';
 import { Award, Target, ChevronDown, ChevronUp } from 'lucide-react';
 import { SessionContext } from './contextprovider/sessioncontext';
-import { FaBell } from 'react-icons/fa';
 import Sidebar from './components/iqac-sidebar';
 import UserDropdown from './components/UserDropdown';
 import { useAuth } from './auth/authProvider';
 import { navItems } from './config/navigation';
-import {useGpa} from './contextprovider/GpaContext';
 import {useGpaData} from './contextprovider/gpadata';
 import RadarGraphSection from './Radar';
-import { FaArrowLeft, FaChartLine, FaBullseye, FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+
 
 const Header = () => {
   const { user } = useAuth();
   
+  const {
+    currentGPA,
+    targetGPA,
+    grade,
+    criteria,
+    isLoading,
+    error,
+  } = useGpaData();
+
+  const renderDebugInfo = () => {
+    if (isLoading) return <div className="p-4 text-gray-500">Loading data...</div>;
+    if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+    
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm mb-6 border border-gray-200">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">API Response (Debug)</h3>
+        <div className="bg-gray-50 p-4 rounded overflow-auto max-h-96">
+          <pre className="text-xs text-gray-800">
+            {JSON.stringify({
+              currentGPA,
+              targetGPA,
+              grade,
+              criteria: criteria?.map(c => ({
+                id: c.id,
+                title: c.title,
+                score: c.score,
+                target: c.target,
+                status: c.status,
+                subcriteria: c.subcriteria?.map(s => ({
+                  code: s.code,
+                  title: s.title,
+                  score: s.score,
+                  target: s.target,
+                  grade: s.grade,
+                  targetPercentage: s.targetPercentage
+                }))
+              })),
+              isLoading,
+              error
+            }, null, 2)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-2">
       {/* Header */}
@@ -27,10 +70,6 @@ const Header = () => {
           <p className="text-2xl font-bold text-gray-800">GPA Analysis</p>
         </div>
         <div className="flex items-center space-x-4">
-          {/* <div className="relative cursor-pointer group">
-            <FaBell className="text-gray-600 text-xl transform transition-transform duration-200 group-hover:scale-110"/>
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center animate-pulse">1</span>
-          </div> */}
           <UserDropdown user={user} className="ml-2" />
         </div>
       </div>
@@ -38,135 +77,136 @@ const Header = () => {
   );
 };
 
-const MetricCard = ({ title, value, grade, trend, icon: Icon, color }) => (
-  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-600">{title}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-        <p className={`text-sm ${color} mt-1`}>{grade}</p>
-      </div>
-      <div
-        className={`p-3 rounded-lg ${
-          color === 'text-green-600' ? 'bg-green-100' : color === 'text-red-600' ? 'bg-red-100' : 'bg-blue-100'
-        }`}
-      >
-        <Icon
-          className={`h-6 w-6 ${
-            color === 'text-green-600'
-              ? 'text-green-600'
-              : color === 'text-red-600'
-              ? 'text-red-600'
-              : 'text-blue-600'
-          }`}
-        />
-      </div>
-    </div>
-    {trend && (
-      <div className="mt-4 flex items-center">
-        {trend > 0 ? (
-          <span className="inline-flex items-center text-green-600">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-            </svg>
-            {Math.abs(trend)}% from last assessment
-          </span>
-        ) : (
-          <span className="inline-flex items-center text-red-600">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-            {Math.abs(trend)}% from last assessment
-          </span>
-        )}
-      </div>
-    )}
-  </div>
-);
-
-const CriteriaCard = ({ criteria, expanded, onToggle }) => {
-  const progress = (criteria.score / criteria.target) * 100;
-  const progressColor = progress >= 100 ? 'bg-green-500' : progress >= 80 ? 'bg-yellow-500' : 'bg-red-500';
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className="p-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">{criteria.title}</h3>
-            <p className="text-sm text-gray-600 mt-1">{criteria.description}</p>
-          </div>
-          <div className="flex items-center">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-              criteria.status === 'Above Target' ? 'bg-green-100 text-green-800' :
-              criteria.status === 'Below Target' ? 'bg-red-100 text-red-800' :
-              'bg-yellow-100 text-yellow-800'
-            }`}>
-              {criteria.status}
-            </span>
-            <button
-              onClick={onToggle}
-              className="ml-4 p-1 text-gray-500 hover:text-gray-700 focus:outline-none"
-            >
-              {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </button>
-          </div>
-        </div>
+// const MetricCard = ({ title, value, grade, trend, icon: Icon, color }) => (
+//   <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+//     <div className="flex items-center justify-between">
+//       <div>
+//         <p className="text-sm font-medium text-gray-600">{title}</p>
         
-        <div className="mt-4">
-          <div className="flex justify-between text-sm text-gray-600 mb-1">
-            <span>Progress</span>
-            <span>{criteria.score.toFixed(1)} / {criteria.target}</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className={`h-2 rounded-full ${progressColor}`}
-              style={{ width: `${Math.min(progress, 100)}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
+//         <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+//         <p className={`text-sm ${color} mt-1`}>{grade}</p>
+//       </div>
+//       <div
+//         className={`p-3 rounded-lg ${
+//           color === 'text-green-600' ? 'bg-green-100' : color === 'text-red-600' ? 'bg-red-100' : 'bg-blue-100'
+//         }`}
+//       >
+//         <Icon
+//           className={`h-6 w-6 ${
+//             color === 'text-green-600'
+//               ? 'text-green-600'
+//               : color === 'text-red-600'
+//               ? 'text-red-600'
+//               : 'text-blue-600'
+//           }`}
+//         />
+//       </div>
+//     </div>
+//     {trend && (
+//       <div className="mt-4 flex items-center">
+//         {trend > 0 ? (
+//           <span className="inline-flex items-center text-green-600">
+//             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+//               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+//             </svg>
+//             {Math.abs(trend)}% from last assessment
+//           </span>
+//         ) : (
+//           <span className="inline-flex items-center text-red-600">
+//             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+//               <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+//             </svg>
+//             {Math.abs(trend)}% from last assessment
+//           </span>
+//         )}
+//       </div>
+//     )}
+//   </div>
+// );
+
+// const CriteriaCard = ({ criteria, expanded, onToggle }) => {
+//   const progress = (criteria.score / criteria.target) * 100;
+//   const progressColor = progress >= 100 ? 'bg-green-500' : progress >= 80 ? 'bg-yellow-500' : 'bg-red-500';
+
+//   return (
+//     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+//       <div className="p-6">
+//         <div className="flex justify-between items-start">
+//           <div>
+//             <h3 className="text-lg font-semibold text-gray-900">{criteria.title}</h3>
+//             <p className="text-sm text-gray-600 mt-1">{criteria.description}</p>
+//           </div>
+//           <div className="flex items-center">
+//             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+//               criteria.status === 'Above Target' ? 'bg-green-100 text-green-800' :
+//               criteria.status === 'Below Target' ? 'bg-red-100 text-red-800' :
+//               'bg-yellow-100 text-yellow-800'
+//             }`}>
+//               {criteria.status}
+//             </span>
+//             <button
+//               onClick={onToggle}
+//               className="ml-4 p-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+//             >
+//               {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+//             </button>
+//           </div>
+//         </div>
+        
+//         <div className="mt-4">
+//           <div className="flex justify-between text-sm text-gray-600 mb-1">
+//             <span>Progress</span>
+//             <span>{criteria.score.toFixed(1)} / {criteria.target}</span>
+//           </div>
+//           <div className="w-full bg-gray-200 rounded-full h-2">
+//             <div
+//               className={`h-2 rounded-full ${progressColor}`}
+//               style={{ width: `${Math.min(progress, 100)}%` }}
+//             ></div>
+//           </div>
+//         </div>
+//       </div>
       
-      {expanded && (
-        <div className="border-t border-gray-200 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {criteria.subcriteria.map((sub, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{sub.code} - {sub.title}</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Score: {sub.score} / {sub.target}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    sub.score >= sub.target ? 'bg-green-100 text-green-800' :
-                    sub.score >= 2.5 ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {sub.score >= sub.target ? 'Met' : 'Not Met'}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      className={`h-1.5 rounded-full ${
-                        sub.score >= sub.target ? 'bg-green-500' :
-                        sub.score >= 2.5 ? 'bg-yellow-500' :
-                        'bg-red-500'
-                      }`}
-                      style={{ width: `${(sub.score / sub.target) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+//       {expanded && (
+//         <div className="border-t border-gray-200 p-6">
+//           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+//             {criteria.subcriteria.map((sub, index) => (
+//               <div key={index} className="bg-gray-50 p-4 rounded-lg">
+//                 <div className="flex justify-between items-start">
+//                   <div>
+//                     <h4 className="font-medium text-gray-900">{sub.code} - {sub.title}</h4>
+//                     <p className="text-sm text-gray-600 mt-1">
+//                       Score: {sub.score} / {sub.target}
+//                     </p>
+//                   </div>
+//                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+//                     sub.score >= sub.target ? 'bg-green-100 text-green-800' :
+//                     sub.score >= 2.5 ? 'bg-yellow-100 text-yellow-800' :
+//                     'bg-red-100 text-red-800'
+//                   }`}>
+//                     {sub.score >= sub.target ? 'Met' : 'Not Met'}
+//                   </span>
+//                 </div>
+//                 <div className="mt-2">
+//                   <div className="w-full bg-gray-200 rounded-full h-1.5">
+//                     <div
+//                       className={`h-1.5 rounded-full ${
+//                         sub.score >= sub.target ? 'bg-green-500' :
+//                         sub.score >= 2.5 ? 'bg-yellow-500' :
+//                         'bg-red-500'
+//                       }`}
+//                       style={{ width: `${(sub.score / sub.target) * 100}%` }}
+//                     ></div>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
 
 
 
@@ -176,14 +216,12 @@ const CriteriaCard = ({ criteria, expanded, onToggle }) => {
 
 const GPAAnalysis = () => {
   const {
-    collegeId,
     currentGPA,
     targetGPA,
     grade,
     criteria,
     isLoading,
     error,
-    refetch
   } = useGpaData();
   
 
@@ -200,11 +238,11 @@ const GPAAnalysis = () => {
     }));
   };
 
-  const radarData = criteria?.map((c) => ({
-    criteria: `C${c.id}`,
-    current: c.score,
-    target: c.target
-  })) || [];
+  // const radarData = criteria?.map((c) => ({
+  //   criteria: `C${c.id}`,
+  //   current: c.score,
+  //   target: c.target
+  // })) || [];
 
   if (isLoading) return <div className="p-8">Loading GPA data...</div>;
   if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
@@ -254,12 +292,7 @@ const GPAAnalysis = () => {
                       <p className="text-sm text-gray-500">Your present performance</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                    +5.2%
-                  </div>
+                  
                 </div>
                 <div className="mb-3">
                   <span className="text-4xl font-bold text-gray-900">{currentGPA?.toFixed(2)}</span>

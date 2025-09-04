@@ -11,17 +11,6 @@ function UserManagement() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
-  // const navItems = [
-  //   { icon: FaTachometerAlt, text: 'Dashboard', path: '/iqac-dashboard' },
-  //   { icon: FaUsers, text: 'User Management', path: '/user-management' },
-  //   { icon: FaFileAlt, text: 'Data Entry Forms', path: '/criteria1.1.1' },
-  //   { icon: FaChartLine, text: 'GPA Analysis', path: '/gpa-analysis' },
-  //   { icon: FaPaperPlane, text: 'IIQA Form', path: '/iiqa' },
-  //   { icon: FaDownload, text: 'Extended Profile', path: '/extendedprofile' },
-  //   { icon: FaQuestionCircle, text: 'Help and Support', path: '/helpsupport' },
-  //   { icon: FaCog, text: 'Configuration', path: '/configuration' },
-  //   { icon: FaSignOutAlt, text: 'Logout', path: '/logout' }
-  // ];
     
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');

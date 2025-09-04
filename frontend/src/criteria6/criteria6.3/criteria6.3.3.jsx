@@ -21,11 +21,11 @@ const Criteria6_3_3 = () => {
   }, [availableSessions]);
 
   const [formData, setFormData] = useState({
-    dateFrom: "",
-    dateTo: "",
-    title_prof: "",
-    title_adm: "",
-    num: "",
+    from_date: "",
+    to_date: "",
+    title_of_prof_dev: "",
+    title_of_add_training: "",
+    no_of_participants: "",
   });
   const [submittedData, setSubmittedData] = useState([]);
 
@@ -69,11 +69,11 @@ const Criteria6_3_3 = () => {
   };
 
   const handleSubmit = async () => {
-    const { dateFrom, dateTo, title_prof, title_adm, num } = formData;
+    const { from_date, to_date, title_of_prof_dev, title_of_add_training, no_of_participants } = formData;
     const session = currentSession;
 
     // Basic validation
-    if (!dateFrom || !dateTo || !title_prof || !title_adm || !num) {
+    if (!from_date || !to_date || !title_of_prof_dev || !title_of_add_training || !no_of_participants) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -82,12 +82,12 @@ const Criteria6_3_3 = () => {
     const dateFromRegex = /^\d{2}-\d{2}-\d{4}$/;
     const dateToRegex = /^\d{2}-\d{2}-\d{4}$/;
 
-    if (!dateFromRegex.test(dateFrom)) {
+    if (!dateFromRegex.test(from_date)) {
       alert("Please enter date from in DD-MM-YYYY format");
       return;
     }
 
-    if (!dateToRegex.test(dateTo)) {
+    if (!dateToRegex.test(to_date)) {
       alert("Please enter date to in DD-MM-YYYY format");
       return;
     }
@@ -98,11 +98,11 @@ const Criteria6_3_3 = () => {
         "http://localhost:3000/api/v1/criteria6/createResponse633",
         {
           session: parseInt(session.split("-")[0], 10),
-          dateFrom,
-          dateTo,
-          title_of_prof_dev: title_prof.trim(),
-          title_of_add_training: title_adm.trim(),
-          no_of_participants: parseInt(num) || 0,
+          from_date,
+          to_date,
+          title_of_prof_dev: title_of_prof_dev.trim(),
+          title_of_add_training: title_of_add_training.trim(),
+          no_of_participants: parseInt(no_of_participants) || 0,
         },
         {
           headers: {
@@ -114,22 +114,22 @@ const Criteria6_3_3 = () => {
 
       // Update local state with the new entry
       const newEntry = {
-        dateFrom,
-        dateTo,
-        title_prof: title_prof.trim(),
-        title_adm: title_adm.trim(),
-        num: parseInt(num) || 0,
+        from_date,
+        to_date,
+        title_of_prof_dev: title_of_prof_dev.trim(),
+        title_of_add_training: title_of_add_training.trim(),
+        no_of_participants: parseInt(no_of_participants) || 0,
       };
 
       setSubmittedData(prev => [...prev, newEntry]);
       
       // Reset form
       setFormData({
-        dateFrom: "",
-        dateTo: "",
-        title_prof: "",
-        title_adm: "",
-        num: "",
+        from_date: "",
+        to_date: "",
+        title_of_prof_dev: "",
+        title_of_add_training: "",
+        no_of_participants: "",
       });
 
       alert("Data submitted successfully!");
@@ -261,8 +261,8 @@ const Criteria6_3_3 = () => {
                   <td className="px-2 py-2 border">
                     <input
                       type="text"
-                      value={formData.dateFrom}
-                      onChange={(e) => handleChange('dateFrom', e.target.value)}
+                      value={formData.from_date || ''}
+                      onChange={(e) => handleChange('from_date', e.target.value)}
                       className="w-full px-2 py-1 border rounded text-gray-900 border-black"
                       placeholder="DD-MM-YYYY"
                     />
@@ -270,8 +270,8 @@ const Criteria6_3_3 = () => {
                   <td className="px-2 py-2 border">
                     <input
                       type="text"
-                      value={formData.dateTo}
-                      onChange={(e) => handleChange('dateTo', e.target.value)}
+                      value={formData.to_date || ''}
+                      onChange={(e) => handleChange('to_date', e.target.value)}
                       className="w-full px-2 py-1 border rounded text-gray-900 border-black"
                       placeholder="DD-MM-YYYY"
                     />
@@ -279,8 +279,8 @@ const Criteria6_3_3 = () => {
                   <td className="px-2 py-2 border">
                     <input
                       type="text"
-                      value={formData.title_prof}
-                      onChange={(e) => handleChange('title_prof', e.target.value)}
+                      value={formData.title_of_prof_dev || ''}
+                      onChange={(e) => handleChange('title_of_prof_dev', e.target.value)}
                       className="w-full px-2 py-1 border rounded text-gray-900 border-black"
                       placeholder="Professional Development Title"
                     />
@@ -288,8 +288,8 @@ const Criteria6_3_3 = () => {
                   <td className="px-2 py-2 border">
                     <input
                       type="text"
-                      value={formData.title_adm}
-                      onChange={(e) => handleChange('title_adm', e.target.value)}
+                      value={formData.title_of_add_training || ''}
+                      onChange={(e) => handleChange('title_of_add_training', e.target.value)}
                       className="w-full px-2 py-1 border rounded text-gray-900 border-black"
                       placeholder="Administrative Training Title"
                     />
@@ -297,8 +297,8 @@ const Criteria6_3_3 = () => {
                   <td className="px-2 py-2 border">
                     <input
                       type="text"
-                      value={formData.num}
-                      onChange={(e) => handleChange('num', e.target.value)}
+                      value={formData.no_of_participants || ''}
+                      onChange={(e) => handleChange('no_of_participants', e.target.value)}
                       className="w-full px-2 py-1 border rounded text-gray-900 border-black"
                       placeholder="Number of Participants"
                     />
@@ -336,11 +336,11 @@ const Criteria6_3_3 = () => {
                     {submittedData.map((entry, i) => (
                       <tr key={i} className="even:bg-gray-50 text-gray-950">
                         <td className="px-2 py-2 border border-black">{i + 1}</td>
-                        <td className="px-2 py-2 border border-black">{entry.dateFrom}</td>
-                        <td className="px-2 py-2 border border-black">{entry.dateTo}</td>
-                        <td className="px-2 py-2 border border-black">{entry.title_prof}</td>
-                        <td className="px-2 py-2 border border-black">{entry.title_adm}</td>
-                        <td className="px-2 py-2 border border-black">{entry.num}</td>
+                        <td className="px-2 py-2 border border-black">{entry.from_date}</td>
+                        <td className="px-2 py-2 border border-black">{entry.to_date}</td>
+                        <td className="px-2 py-2 border border-black">{entry.title_of_prof_dev}</td>
+                        <td className="px-2 py-2 border border-black">{entry.title_of_add_training}</td>
+                        <td className="px-2 py-2 border border-black">{entry.no_of_participants}</td>
                       </tr>
                     ))}
                   </tbody>

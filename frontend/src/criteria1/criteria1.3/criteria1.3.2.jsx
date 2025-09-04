@@ -150,46 +150,44 @@ const Criteria1_3_2 = () => {
               Average percentage of courses that include experiential learning through project work/field work/internship
             </p>
           </div>
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              className="border px-3 py-1 rounded text-black"
+              value={selectedSession}
+              onChange={(e) => setSelectedSession(e.target.value)}
+              disabled={sessionLoading}
+            >
+              {sessionLoading ? (
+                <option>Loading sessions...</option>
+              ) : (
+                sessions?.map((session) => (
+                  <option key={session} value={session}>
+                    {session}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                <span className="font-semibold text-gray-700">Provisional Score:&nbsp;</span>
-                {loading ? (
-                  <span className="text-gray-500">Loading...</span>
-                ) : error ? (
-                  <span className="text-red-500">Error: {error}</span>
-                ) : provisionalScore ? (
-                  <div className="text-center">
-                    <div className="text-blue-600 text-lg font-bold">
-                      Score: {provisionalScore.data?.score || 'N/A'}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-gray-500">Score not available</span>
-                )}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (1.1.3): {provisionalScore.data.score}
+                </p>
               </div>
-            </div>
-            </div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
+          </div>
 
           <div className="border rounded mb-8">
-            <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">Courses that include Experiential Learning</h2>
-              <div className="size-7 mb-1">
-                <label className="text-gray-700 font-medium mr-2 -ml-[330px]">Select Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="border border-gray-300 px-3 py-1 rounded text-gray-950 mb-[200px]"
-                >
-                  {pastFiveYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            
+
+            
 
             <table className="w-full border text-sm border-black">
               <thead className="bg-gray-100 text-gray-950">
@@ -226,6 +224,34 @@ const Criteria1_3_2 = () => {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">Links to relevant documents</label>
+            <div className="flex flex-col gap-2">
+              {formData.supportLinks.map((link, index) => (
+                <input
+                  key={index}
+                  type="url"
+                  placeholder={`Enter support link ${index + 1}`}
+                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+                  value={link}
+                  onChange={(e) => handleChange("supportLinks", e.target.value, index)}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    supportLinks: [...formData.supportLinks, ""],
+                  })
+                }
+                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
+              >
+                + Add Another Link
+              </button>
+            </div>
           </div>
 
           {/* Submitted rows */}
@@ -265,67 +291,11 @@ const Criteria1_3_2 = () => {
             </div>
           ))}
 
+          
+          
 
-          <div className="overflow-auto border rounded p-4">
-            <h2 className="text-lg font-semibold mb-2 text-gray-700">
-              Calculation Table (Last 5 Years)
-            </h2>
-            <table className="table-auto border-collapse w-full">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 font-semibold">
-                  <th className="border px-4 py-2">Year</th>
-                  {Object.keys(yearScores).map((year) => (
-                    <th key={year} className="border px-4 py-2">{year}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-4 py-2 font-medium text-gray-600">Calculated Score</td>
-                  {Object.keys(yearScores).map((year) => (
-                    <td key={year} className="border px-4 py-2 text-center border-black text-gray-950">
-                      <input
-                        type="number"
-                        value={yearScores[year]}
-                        onChange={(e) =>
-                          setYearScores({ ...yearScores, [year]: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-20 text-center border px-1 rounded"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2 mt-4">
-              <label className="text-sm font-medium text-gray-700">
-                Enter number of years for average:
-              </label>
-              <input
-                type="number"
-                value={yearCount}
-                min={1}
-                max={5}
-                onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                className="w-20 border px-2 py-1 rounded text-center text-gray-950"
-              />
-              <button
-                className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:bg-green-700"
-                onClick={() => {
-                  const values = Object.values(yearScores).slice(0, yearCount);
-                  const sum = values.reduce((acc, val) => acc + val, 0);
-                  setAverageScore((sum / yearCount).toFixed(2));
-                }}
-              >
-                Calculate Average
-              </button>
-            </div>
-            {averageScore !== null && (
-              <div className="mt-4 text-blue-700 font-semibold">
-                Average Score for last {yearCount} year(s): {averageScore}%
-              </div>
-            )}
-          </div>
+
+          
 
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

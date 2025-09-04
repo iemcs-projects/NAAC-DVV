@@ -187,27 +187,10 @@ const Criteria1_2_2 = () => {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+
+          
             {/* Provisional Score Banner */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex justify-center mb-4">
-              <div className="text-center">
-                <span className="font-semibold text-gray-700">Provisional Score:&nbsp;</span>
-                {loading ? (
-                  <span className="text-gray-500">Loading...</span>
-                ) : error ? (
-                  <span className="text-red-500">Error: {error}</span>
-                ) : provisionalScore ? (
-                  <div className="text-center">
-                    <div className="text-blue-600 text-lg font-bold">
-                      Score: {provisionalScore.data?.score || 'N/A'}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-gray-500">Score not available</span>
-                )}
-              </div>
-            </div>
-            </div>
+            
             <div className="mb-4">
               <h3 className="text-blue-600 font-medium mb-2">1.2.2 Metric Information</h3>
               <p className="text-sm text-gray-700">
@@ -222,35 +205,42 @@ const Criteria1_2_2 = () => {
               </ul>
             </div>
           </div>
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              className="border px-3 py-1 rounded text-black"
+              value={selectedSession}
+              onChange={(e) => setSelectedSession(e.target.value)}
+              disabled={sessionLoading}
+            >
+              {sessionLoading ? (
+                <option>Loading sessions...</option>
+              ) : (
+                sessions?.map((session) => (
+                  <option key={session} value={session}>
+                    {session}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (1.1.3): {provisionalScore.data.score}
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
+          </div>
 
           <div className="border rounded mb-8">
-            <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">Add On Programs</h2>
-              <div className="flex items-center gap-2">
-                <label className="text-gray-700 font-medium">Select Year:</label>
-                {sessionLoading ? (
-                  <span className="text-gray-500">Loading sessions...</span>
-                ) : sessionError ? (
-                  <span className="text-red-500">Error: {sessionError}</span>
-                ) : (
-                  <select
-                    value={selectedSession}
-                    onChange={(e) => setSelectedSession(e.target.value)}
-                    className="border border-gray-300 px-3 py-1 rounded text-gray-950"
-                  >
-                    {sessions.length === 0 ? (
-                      <option value="">No sessions available</option>
-                    ) : (
-                      sessions.map((session) => (
-                        <option key={session} value={session}>
-                          {session}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                )}
-              </div>
-            </div>
+
             <table className="w-full border text-sm border-black">
               <thead className="bg-gray-100 text-gray-950">
                 <tr>
@@ -410,13 +400,7 @@ const Criteria1_2_2 = () => {
             </div>
           ))}
 
-          <div className="flex justify-end mt-4 mb-6">
-            <button
-              className="px-4 py-2 !bg-blue-600 text-white rounded hover:bg-blue-700"
-              onClick={handleCalculateScore}>
-              Calculate Score
-            </button>
-          </div>
+          
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
           </div>

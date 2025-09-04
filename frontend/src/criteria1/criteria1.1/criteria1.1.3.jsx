@@ -28,6 +28,7 @@ const Criteria1_1_3 = () => {
     year: "",
     name: "",
     body: "",
+    supportLinks: []
   });
 
   const [submittedData, setSubmittedData] = useState([]);
@@ -69,8 +70,17 @@ const Criteria1_1_3 = () => {
     fetchScore();
   }, []);
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (field, value, index) => {
+    if (field === 'supportLinks') {
+      setFormData(prev => ({
+        ...prev,
+        supportLinks: prev.supportLinks.map((link, i) => 
+          i === index ? value : link
+        )
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSubmit = async () => {
@@ -119,7 +129,12 @@ const Criteria1_1_3 = () => {
         }],
       }));
 
-      setFormData({ year: "", name: "", body: "" });
+      setFormData(prev => ({
+        year: "",
+        name: "",
+        body: "",
+        supportLinks: prev.supportLinks || []
+      }));
       setSelectedOption("");
       fetchScore();
       alert("Data submitted successfully!");
@@ -154,19 +169,7 @@ const Criteria1_1_3 = () => {
             <div className="text-sm text-gray-600">1.1 - Curricular Planning and Implementation</div>
           </div>
 
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (1.1.3): {provisionalScore.data.score}
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-600">No score data available.</p>
-            )}
-          </div>
+          
 
           <div className="bg-white p-6 rounded shadow mb-6">
             <h3 className="text-blue-600 font-semibold mb-2">1.1.3 Metric Information</h3>
@@ -190,6 +193,20 @@ const Criteria1_1_3 = () => {
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
+          </div>
+
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (1.1.3): {provisionalScore.data.score}
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
           </div>
 
           <div className="flex justify-center overflow-auto border rounded mb-6">
@@ -246,6 +263,31 @@ const Criteria1_1_3 = () => {
               </tbody>
             </table>
           </div>
+
+          <div className="mb-6">
+  <label className="block text-gray-700 font-medium mb-2">
+   Link to relevant documents
+  </label>
+  <div className="flex flex-col gap-2">
+    {formData.supportLinks.map((link, index) => (
+      <input
+        key={index}
+        type="url"
+        placeholder={`Enter support link ${index + 1}`}
+        className="px-3 py-1 border border-gray-300 rounded text-gray-950"
+        value={link}
+        onChange={(e) => handleChange("supportLinks", e.target.value, index)}
+      />
+    ))}
+    <button
+      type="button"
+      onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
+      className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
+    >
+      + Add Another Link
+    </button>
+  </div>
+</div>
 
           {submittedData.length > 0 && (
             <div className="overflow-auto border rounded mb-6">
