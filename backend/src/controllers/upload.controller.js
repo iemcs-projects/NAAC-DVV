@@ -1,5 +1,6 @@
 
 import path from "path";
+import fs from "fs";
 import multer from "multer";
 import asyncHandler from "../utils/asyncHandler.js";
 import apiError from "../utils/apiError.js";
@@ -28,9 +29,12 @@ export const upload = multer({ storage });
 
 // Controller
 export const uploadFile = asyncHandler(async (req, res) => {
+    const uploadPath = path.join(process.cwd(), "uploads");
+  
     try {
-      const { criteriaCode, session } = req.body;
-      const uploadedBy = req.user?.id; // assumes middleware sets user
+      const session = req.body.session;
+      const criteriaCode = req.params.criteriaCode;
+      const uploadedBy = req.user?.id;
   
       if (!req.file) {
         throw new apiError(400, "No file uploaded");
@@ -67,6 +71,15 @@ export const uploadFile = asyncHandler(async (req, res) => {
         .json(new apiResponse(201, record, "File uploaded successfully"));
     } catch (error) {
       console.error("File upload failed:", error);
+  
+      // Cleanup file if DB insert or validation failed
+      if (req.file) {
+        try {
+          fs.unlinkSync(path.join(uploadPath, req.file.filename));
+        } catch (unlinkErr) {
+          console.error("Failed to cleanup uploaded file:", unlinkErr);
+        }
+      }
   
       if (error.name === "SequelizeValidationError") {
         throw new apiError(400, "Database validation failed: " + error.message);

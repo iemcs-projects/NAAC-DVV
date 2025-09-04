@@ -33,8 +33,12 @@ export default class users extends Model {
       allowNull: true
     },
     role: {
-      type: DataTypes.ENUM('faculty','college_admin','mentor','naac_supervisor'),
+      type: DataTypes.ENUM('faculty','college_admin','mentor'),
       allowNull: false
+    },
+    department: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     is_invited: {
       type: DataTypes.BOOLEAN,
