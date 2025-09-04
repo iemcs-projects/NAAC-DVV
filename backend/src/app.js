@@ -14,6 +14,7 @@ import iiqaRoutes from "./routes/iiqa.routes.js";
 import extendedprofileRoutes from "./routes/extendedprofile.routes.js";
 import scoresRoutes from "./routes/scores.routes.js";
 import criteria3Routes from "./routes/criteria3.routes.js";
+import fileRoutes from "./routes/file.routes.js";
 dotenv.config();          // Load .env vars
 
 const app = express();    // Create Express app
@@ -48,6 +49,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/iiqa', iiqaRoutes);
 app.use('/api/v1/extendedprofile', extendedprofileRoutes);
 app.use('/api/v1/scores', scoresRoutes);
+app.use('/api/v1/file', fileRoutes);
 // Health Checks
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Server is running' });

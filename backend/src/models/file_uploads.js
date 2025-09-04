@@ -27,7 +27,7 @@ export default class file_uploads extends Model {
       }
     },
     session: {
-      type: DataTypes.DATE,
+      type: DataTypes.INTEGER,
       allowNull: false
     },
     file_url: {

@@ -427,8 +427,8 @@ export {
     refreshAccessToken,
     getAuthStatus,
     logout,
-    userRegister,
-    getPendingUsers,
+    rejectUser,
     approveUser,
-    rejectUser
+    getPendingUsers,
+    userRegister
 }

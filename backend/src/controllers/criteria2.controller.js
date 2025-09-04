@@ -102,7 +102,7 @@ const getResponsesByCriteriaCode = asyncHandler(async (req, res) => {
     criteria_code: criteriaMaster.criteria_code,
     ...(session && { session })  // Only include session if it's passed
   };
- console.log("DB Name",db[dbName])
+  console.log("DB Name",db[dbName])
   console.log("Database name:", dbName);
   console.log("Where clause:", whereClause);
 
