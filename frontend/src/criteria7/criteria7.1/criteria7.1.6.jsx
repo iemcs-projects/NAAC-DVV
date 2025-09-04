@@ -1,18 +1,159 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria7_1_6 = () => {
-  const [selectedOption, setSelectedOption] = useState("");
-  const [selectedYear, setSelectedYear] = useState("2024-25");
+  const { sessions, isLoading: isSessionLoading } = useContext(SessionContext);
+  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedOptions, setSelectedOptions] = useState({
+    option1: false,
+    option2: false,
+    option3: false,
+    option4: false,
+    option5: false,
+  });
+  const [reportLink, setReportLink] = useState("");
+  const [certification, setCertification] = useState("");
+  const [additionalInfo, setAdditionalInfo] = useState("");
+  const [score, setScore] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const navigate = useNavigate();
 
-  const handleRadioChange = (option) => {
-    setSelectedOption(option);
+  // Set default selected year when sessions are loaded
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedYear) {
+      setSelectedYear(sessions[0]);
+    }
+  }, [sessions, selectedYear]);
+
+  const handleCheckboxChange = (option) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [option]: !prev[option]
+    }));
+  };
+
+  // Function to get grade based on selected options count
+  const getGrade = () => {
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    // Return the count, but cap it at 4
+    return Math.min(selectedCount, 4);
+  };
+
+  // Function to get the display grade text
+  const getGradeText = () => {
+    const count = getGrade();
+    if (count >= 5) return 'A. All of the above';
+    if (count >= 3) return 'B. Any 3 of the above';
+    if (count >= 2) return 'C. Any 2 of the above';
+    if (count >= 1) return 'D. Any 1 of the above';
+    return 'E. None of the above';
+  };
+
+  // Fetch score on mount
+  useEffect(() => {
+    const fetchScore = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(
+          "http://localhost:3000/api/v1/criteria7/score716",
+          {
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true,
+          }
+        );
+
+        if (response.status === 200 && response.data) {
+          setScore(response.data.score || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching score:', err);
+        setError(`Failed to fetch score: ${err.response?.data?.message || err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScore();
+  }, []);
+
+  const handleSubmit = async () => {
+    setError(null);
+    setSuccessMessage("");
+
+    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
+    if (selectedCount === 0) {
+      setError("Please select at least one option.");
+      return;
+    }
+
+    // Calculate the grade (1-4, with 4 being the maximum)
+    const grade = Math.min(selectedCount, 4);
+
+    try {
+      setLoading(true);
+      
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria7/createResponse716",
+        {
+          session: selectedYear,
+          audit_type: grade,
+          report_link: reportLink,
+          certification: certification,
+          additional_info: additionalInfo,
+        },
+        {
+          headers: { "Content-Type": "application/json" },
+          withCredentials: true,
+        }
+      );
+
+      if (response.status === 200 || response.status === 201) {
+        const successMessage = "Data submitted successfully!";
+        setSuccessMessage(successMessage);
+        alert(successMessage);
+        
+        // Clear form after success
+        setSelectedOptions({
+          option1: false,
+          option2: false,
+          option3: false,
+          option4: false,
+          option5: false,
+        });
+        setReportLink("");
+        setCertification("");
+        setAdditionalInfo("");
+        
+        // Fetch updated score
+        const scoreRes = await axios.get(
+          "http://localhost:3000/api/v1/criteria7/score716",
+          {
+            headers: { "Content-Type": "application/json" },
+            withCredentials: true,
+          }
+        );
+        
+        if (scoreRes.status === 200 && scoreRes.data) {
+          setScore(scoreRes.data.score || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to save response. Please try again.';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const goToNextPage = () => {
@@ -22,8 +163,6 @@ const Criteria7_1_6 = () => {
   const goToPreviousPage = () => {
     navigate("/criteria7.1.5");
   };
-
-  const years = ["2024-25", "2023-24", "2022-23", "2021-22", "2020-21"];
 
   return (
     <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
@@ -46,13 +185,15 @@ const Criteria7_1_6 = () => {
 
           {/* Year Dropdown */}
           <div className="mb-6">
-            <label className="font-medium text-gray-700 mr-2">Select Academic Year:</label>
+            <label className="font-medium text-gray-700 mr-2">
+              Select Academic Year:
+            </label>
             <select
               className="border px-3 py-1 rounded text-black"
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
             >
-              {years.map((year) => (
+              {sessions.map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
@@ -62,97 +203,103 @@ const Criteria7_1_6 = () => {
 
           {/* Metric Info */}
           <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-blue-600 font-semibold mb-2">7.1.6 Metric Information</h3>
+            <h3 className="text-blue-600 font-semibold mb-2">
+              7.1.6 Metric Information
+            </h3>
             <p className="text-sm text-gray-700">
-              Quality audits on environment and energy are regularly undertaken by the institution:<br />
-              1. Green audit<br />
-              2. Energy audit<br />
-              3. Environment audit<br />
-              4. Clean and green campus recognitions/awards<br />
+              Quality audits on environment and energy are regularly undertaken
+              by the institution:
+              <br />
+              1. Green audit
+              <br />
+              2. Energy audit
+              <br />
+              3. Environment audit
+              <br />
+              4. Clean and green campus recognitions/awards
+              <br />
               5. Beyond the campus environmental promotional activities
             </p>
           </div>
 
-          {/* Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-gray-700 mb-1">Department</label>
-              <select className="w-full px-4 py-2 border rounded text-gray-950">
-                <option value="">Select department</option>
-                <option>Computer Science</option>
-                <option>Mathematics</option>
-                <option>Physics</option>
-                <option>Chemistry</option>
-                <option>Biology</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-1">Faculty ID</label>
-              <input className="w-full px-4 py-2 border rounded text-gray-950" placeholder="Enter faculty ID" />
-            </div>
-            <div>
-              <label className="block text-gray-700 mb-1">Faculty Name</label>
-              <input className="w-full px-4 py-2 border rounded text-gray-950" placeholder="Enter faculty name" />
-            </div>
-          </div>
-
-          {/* Radio Buttons */}
-          <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-blue-600 font-semibold mb-2">Select the Options</h3>
+          {/* Checkboxes */}
+          <div className="space-y-2">
             {[
-              "All of the above",
-              "Any 3 of the above",
-              "Any 2 of the above",
-              "Any 1 of the above",
-              "None of the above",
-            ].map((label, index) => {
-              const optionKey = `option${index + 1}`;
-              return (
-                <div key={optionKey} className="flex items-center mb-2">
-                  <input
-                    type="radio"
-                    id={optionKey}
-                    name="participation"
-                    className="mr-2"
-                    checked={selectedOption === optionKey}
-                    onChange={() => handleRadioChange(optionKey)}
-                  />
-                  <label htmlFor={optionKey} className="text-sm text-gray-800">
-                    {label}
-                  </label>
-                </div>
-              );
-            })}
+              'Green audit',
+              'Energy audit',
+              'Environment audit',
+              'Clean and green campus recognitions/awards',
+              'Beyond the campus environmental promotional activities'
+            ].map((option, index) => (
+              <div key={index} className="flex items-center">
+                <input
+                  type="checkbox"
+                  id={`option${index + 1}`}
+                  checked={selectedOptions[`option${index + 1}`]}
+                  onChange={() => handleCheckboxChange(`option${index + 1}`)}
+                  className="h-4 w-4 text-blue-600 rounded"
+                />
+                <label htmlFor={`option${index + 1}`} className="ml-2 text-gray-700">
+                  {option}
+                </label>
+              </div>
+            ))}
+            <div className="mt-4 p-3 bg-gray-50 rounded">
+              <p className="font-medium">Selected Grade: {getGradeText()}</p>
+            </div>
           </div>
 
-          {/* File Upload Section */}
+          {/* File/Links Section */}
           <div className="bg-white p-6 rounded shadow mb-6">
-            <ul className="list-disc text-sm text-gray-700 mb-4 pl-5">
-              <li>Upload: Reports on environment and energy audits submitted by the auditing agency</li>
-              <li>Upload: Certification by the auditing agency</li>
-              <li>Upload: Certificates of the awards received</li>
-              <li>Upload: Any other relevant information</li>
-            </ul>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-            <div className="flex items-center mb-4">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
-                <i className="fas fa-upload mr-2"></i>Choose Files
-                <input type="file" className="hidden" multiple />
-              </label>
-              <span className="ml-3 text-gray-600">No file chosen</span>
-            </div>
-
-            <label className="block text-sm font-medium text-gray-700 mb-2">Additional Info (Link)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Report Link
+            </label>
             <input
               type="text"
-              placeholder="Enter URL here"
+              placeholder="Enter report link"
+              value={reportLink}
+              onChange={(e) => setReportLink(e.target.value)}
+              className="w-full px-4 py-2 border rounded text-gray-900 mb-4"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Certification
+            </label>
+            <input
+              type="text"
+              placeholder="Enter certification details or link"
+              value={certification}
+              onChange={(e) => setCertification(e.target.value)}
+              className="w-full px-4 py-2 border rounded text-gray-900 mb-4"
+            />
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Info
+            </label>
+            <input
+              type="text"
+              placeholder="Enter URL or info"
+              value={additionalInfo}
+              onChange={(e) => setAdditionalInfo(e.target.value)}
               className="w-full px-4 py-2 border rounded text-gray-900"
             />
           </div>
 
-          {/* Bottom Buttons */}
+          {/* Score Display */}
+          {score !== null && (
+            <div className="bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
+              <strong>Score:</strong> {score}
+            </div>
+          )}
+
+          {/* Bottom Navigation */}
           <div className="mt-6">
-            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+            <Bottom 
+              onPrevious={goToPreviousPage} 
+              onNext={goToNextPage} 
+              onSubmit={handleSubmit}
+              isSubmitting={loading}
+            />
           </div>
         </div>
       </div>
