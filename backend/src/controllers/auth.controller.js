@@ -119,111 +119,191 @@ const iqacRegister = asyncHandler(async (req, res) => {
   }
 })
 
+const userRegister = asyncHandler(async (req, res) => {
+  const { name, email, password, role, department } = req.body;
+
+  if (!name || !email || !password || !role) {
+    throw new apiError(400, "Missing required fields");
+  }
+
+  const allowedRoles = ["faculty", "college_admin", "mentor"];
+  if (!allowedRoles.includes(role)) {
+    throw new apiError(400, "Invalid role");
+  }
+
+  const userExists = await User.findOne({ where: { email } });
+  if (userExists) {
+    throw new apiError(400, "User already exists");
+  }
+
+  const createdUUID = uuidv4();
+  const hashedPassword = bcrypt.hashSync(password, 10);
+
+  try {
+    const user = await User.create({
+      uuid: createdUUID,
+      name,
+      email,
+      password_hash: hashedPassword,
+      role,
+      department: department || null,
+      is_invited: false, // locked until approved
+      refresh_token: null
+    });
+
+    res
+      .status(201)
+      .json(
+        new apiResponse(
+          201,
+          { 
+            user: {
+              id: user.id,
+              uuid: user.uuid,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              department: user.department,
+              is_invited: user.is_invited
+            }
+          },
+          "User registered successfully. Pending approval"
+        )
+      );
+  } catch (error) {
+    console.error(error);
+    throw new apiError(500, "Failed to create user");
+  }
+});
+
+
+// IQAC: Get all pending users
+const getPendingUsers = asyncHandler(async (req, res) => {
+  const pendingUsers = await User.findAll({ where: { is_invited: false } });
+  res.status(200).json(new apiResponse(200, pendingUsers, "Pending users fetched"));
+});
+
+
+// IQAC: Approve user
+const approveUser = asyncHandler(async (req, res) => {
+  const { uuid } = req.params;
+
+  const user = await User.findOne({ where: { uuid } });
+  if (!user) throw new apiError(404, "User not found");
+
+  user.is_invited = true;
+  await user.save();
+
+  res.status(200).json(new apiResponse(200, user, "User approved successfully"));
+});
+
+
+// IQAC: Reject/Delete user
+const rejectUser = asyncHandler(async (req, res) => {
+  const { uuid } = req.params;
+
+  const user = await Users.findOne({ where: { uuid } });
+  if (!user) throw new apiError(404, "User not found");
+
+  await user.destroy();
+
+  res.status(200).json(new apiResponse(200, {}, "User rejected and removed"));
+});
+
+
 const userLogin = asyncHandler(async (req, res) => {
   const { email, password, role } = req.body;
 
+  if (!email || !password || !role) {
+    throw new apiError(400, "Missing required fields");
+  }
 
   const formattedRole = role.toLowerCase();
-
-  if (!email || !password || !role) {
-      throw new apiError(400, "Missing required fields");
-  }
 
   // Role-based model selection
   let userModel;
   switch (formattedRole) {
-      case "iqac":
-          userModel = IQAC;
-          break;
-      case "faculty":
-      case "hod":
-      case "admin":
-      case "mentor":
-          userModel = User;
-          break;
-      default:
-          throw new apiError(400, "Invalid role");
+    case "iqac":
+      userModel = IQAC;
+      break;
+    case "faculty":
+    case "hod":
+    case "admin":
+    case "mentor":
+      userModel = User;
+      break;
+    default:
+      throw new apiError(400, "Invalid role");
   }
 
   const user = await userModel.findOne({ where: { email } });
-  if (!user) {
-      throw new apiError(404, "User not found");
+  if (!user) throw new apiError(404, "User not found");
+
+  // IQAC approval check (only for non-IQAC roles)
+  if (formattedRole !== "iqac" && user.is_invited === false) {
+    throw new apiError(403, "User not approved by IQAC");
   }
 
   const isPasswordValid = bcrypt.compareSync(password, user.password_hash);
-  if (!isPasswordValid) {
-      throw new apiError(401, "Invalid password");
-  }
+  if (!isPasswordValid) throw new apiError(401, "Invalid credentials");
 
-  console.log('Generating tokens for user:', { uuid: user.uuid, role });
-  
   if (!process.env.JWT_ACCESS_TOKEN || !process.env.JWT_REFRESH_TOKEN) {
-      console.error('JWT secrets are not configured');
-      throw new apiError(500, 'Server configuration error');
+    throw new apiError(500, "Server configuration error");
   }
 
   const accessToken = jwt.sign(
-      { 
-          id: user.uuid, 
-          role,
-          type: 'access'
-      }, 
-      process.env.JWT_ACCESS_TOKEN, 
-      { 
-          expiresIn: '1h',
-          algorithm: 'HS256'
-      }
+    { id: user.uuid, role: formattedRole, type: "access" },
+    process.env.JWT_ACCESS_TOKEN,
+    { expiresIn: "1h", algorithm: "HS256" }
   );
 
   const refreshToken = jwt.sign(
-      { 
-          id: user.uuid, 
-          role,
-          type: 'refresh'
-      }, 
-      process.env.JWT_REFRESH_TOKEN, 
-      { 
-          expiresIn: '7d',
-          algorithm: 'HS256'
-      }
+    { id: user.uuid, role: formattedRole, type: "refresh" },
+    process.env.JWT_REFRESH_TOKEN,
+    { expiresIn: "7d", algorithm: "HS256" }
   );
-  
-  console.log('Tokens generated successfully');
+
+  // Save refresh token in DB if needed
+  user.refresh_token = refreshToken;
+  await user.save();
 
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', 
-    sameSite: 'lax', 
-    maxAge: 60 * 60 * 1000, 
-    path: '/', 
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 1000, // 1h
+    path: "/",
   };
 
   const refreshCookieOptions = {
     ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, 
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
   };
 
-  console.log('Setting cookies with options:', { 
-      accessToken: { ...cookieOptions, value: '***' },
-      refreshToken: { ...refreshCookieOptions, value: '***' } 
-  });
-
   res
-      .cookie('accessToken', accessToken, cookieOptions)
-      .cookie('refreshToken', refreshToken, refreshCookieOptions)
-      .status(200)
-      .json(new apiResponse(200, { 
-          user: { 
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: user.role || role,
-              institution_name: user.institution_name
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, refreshCookieOptions)
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        {
+          user: {
+            id: user.id,
+            uuid: user.uuid,
+            name: user.name,
+            email: user.email,
+            role: user.role || formattedRole,
+            institution_name: user.institution_name,
           },
           accessToken,
-          refreshToken 
-      }, "User logged in successfully"));
+          refreshToken,
+        },
+        "Login successful"
+      )
+    );
 });
+
 
 
 const refreshAccessToken = asyncHandler(async (req, res) => {

@@ -7,7 +7,6 @@ import Sequelize from "sequelize";
 
 const Criteria211 = db.response_2_1_1;
 const Criteria212 = db.response_2_1_2;
-// const Criteria241243222233 = db.response_2_4_1_2_4_3_2_2_2_2_3_3;
 const Criteria241 = db.response_2_4_1;
 const Criteria243 = db.response_2_4_3;
 const Criteria222 = db.response_2_2_2;
