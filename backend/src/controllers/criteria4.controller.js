@@ -139,13 +139,13 @@ const score413 = asyncHandler(async (req, res) => {
   const score = (noOfRooms / totalRooms) * 100;
 
   let grade;
-  if (score >= 25) {
+  if (score >= 75) {
     grade = 4;
-  } else if (score >= 20) {
+  } else if (score >= 60) {
     grade = 3;
-  } else if (score >= 10) {
+  } else if (score >= 40) {
     grade = 2;
-  } else if (score >= 1) {
+  } else if (score >= 10) {
     grade = 1;
   } else {
     grade = 0;
@@ -506,8 +506,8 @@ const score414 = asyncHandler(async (req, res) => {
   // Step 6: Grade mapping
   let grade;
   if (score >= 25) grade = 4;
-  else if (score >= 20) grade = 3;
-  else if (score >= 10) grade = 2;
+  else if (score >= 10) grade = 3;
+  else if (score >= 5) grade = 2;
   else if (score >= 1) grade = 1;
   else grade = 0;
 
@@ -721,13 +721,15 @@ const createResponse433 = asyncHandler(async (req, res) => {
   const endYear = latestIIQA.session_end_year;
   const startYear = endYear - 5;
 
+  const optionSelected = String(options);
+
   if (sessionYear < startYear || sessionYear > endYear) {
     throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
   const duplicate = await Criteria433.findOne({
-    where: { session, options }
-  }); 
+    where: { session, options: optionSelected }
+  });
 
   if (duplicate) {
     throw new apiError(409, "Entry already exists for this session and options");
@@ -738,20 +740,20 @@ const createResponse433 = asyncHandler(async (req, res) => {
     where: {
       session: session,
       criteria_code: criteria.criteria_code,
-      options: options,
+      options: optionSelected,
     },
     defaults: {
       id: criteria.id,
       criteria_code: criteria.criteria_code,
       session: session,
-      options: options,
+      options: optionSelected,
     }
   });
 
   // If already exists, update values
   if (!created) {
     await Criteria433.update({
-      options: options
+      options: optionSelected
     }, {
       where: {
         session: session,
@@ -763,7 +765,7 @@ const createResponse433 = asyncHandler(async (req, res) => {
       where: {
         session: session,
         criteria_code: criteria.criteria_code,
-        options: options
+        options: optionSelected
       }
     });
   }
@@ -1145,7 +1147,7 @@ const score422 = asyncHandler(async (req, res) => {
     throw new apiError(404, "No response found for criteria 4.2.2");
   }
 
-  const optionSelected = Number(response.options);
+  const optionSelected = String(response.options);
 
   let score, grade;
   switch (optionSelected) {
@@ -1285,10 +1287,10 @@ const score423 = asyncHandler(async (req, res) => {
   else if (avgExpenditure >=6 && avgExpenditure < 8) {
     grade = 2;
   }
-  else if (avgExpenditure >=4 && avgExpenditure < 6) {
+  else if (avgExpenditure >=2 && avgExpenditure < 6) {
     grade = 1;
   }
-  else if (avgExpenditure >=2 && avgExpenditure < 4) {
+  else if (avgExpenditure < 2) {
     grade = 0;
   }
 
@@ -1531,16 +1533,16 @@ const score424 = asyncHandler(async (req, res) => {
   const score = (numerator / denominator).toFixed(3)*100;
   let grade = 0; // No grading logic provided
 
-  if(score < 2){
-    grade = 0;
-  }else if(score >= 2 && score <= 6){
-    grade = 1;
-  }else if(score >= 6 && score <= 8){
-    grade = 2;
-  }else if(score >= 8 && score <= 10){
-    grade = 3;
-  }else if(score >= 10){
+  if(score >=75){
     grade = 4;
+  }else if(score >= 60 && score <= 75){
+    grade = 3;
+  }else if(score >= 40 && score <= 60){
+    grade = 2;
+  }else if(score >= 10 && score <= 40){
+    grade = 1;
+  }else if(score < 10){
+    grade = 0;
   }
 
   // Step 6: Store or update score in the scores table

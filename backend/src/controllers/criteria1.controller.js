@@ -819,7 +819,7 @@ const score122 = asyncHandler(async (req, res) => {
 
   const iiqa_form_id = latestIIQA.id;
   const endYear = latestIIQA.session_end_year;
-  const startYear = endYear - 4; // Last 5 years (inclusive)
+  const startYear = endYear - 5; // Last 5 years (inclusive)
 
   const yearlyPercentages = [];
 
@@ -864,10 +864,11 @@ const score122 = asyncHandler(async (req, res) => {
 
   // Scoring
   let grade = 0;
-  if (avgPercentage >= 50) grade = 4;
-  else if (avgPercentage >= 35) grade = 3;
-  else if (avgPercentage >= 20) grade = 2;
-  else if (avgPercentage >= 10) grade = 1;
+  if (avgPercentage >= 25) grade = 4;
+  else if (avgPercentage >= 15) grade = 3;
+  else if (avgPercentage >= 5) grade = 2;
+  else if (avgPercentage >= 1) grade = 1;
+  else grade = 0;
 
   // Save to score table
   let [entry, created] = await Score.findOrCreate({
@@ -943,7 +944,7 @@ const score123 = asyncHandler(async (req, res) => {
 
   const iiqa_form_id = latestIIQA.id;
   const endYear = latestIIQA.session_end_year;
-  const startYear = endYear - 4; // 5 years
+  const startYear = endYear - 5; // 5 years
 
   // Step 3: Get total students from iiqa_programme_count (latest IIQA)
   const programmeCount = await IIQAProgrammeCount.findOne({
@@ -996,6 +997,7 @@ const score123 = asyncHandler(async (req, res) => {
   else if (avgPercentage >= 35) grade = 3;
   else if (avgPercentage >= 20) grade = 2;
   else if (avgPercentage >= 10) grade = 1;
+  else grade = 0;
 
   // Step 6: Insert or update score
   let [entry, created] = await Score.findOrCreate({
@@ -1426,10 +1428,10 @@ const score133 = asyncHandler(async (req, res) => {
   const percentage = totalStudents > 0 ? (totalHigherStudies / totalStudents) * 100 : 0;
 
   let grade;
-  if (percentage >= 80) grade = 4;
-  else if (percentage >= 60) grade = 3;
-  else if (percentage >= 40) grade = 2;
-  else if (percentage >= 20) grade = 1;
+  if (percentage >= 35) grade = 4;
+  else if (percentage >= 20) grade = 3;
+  else if (percentage >= 10) grade = 2;
+  else if (percentage >= 5) grade = 1;
   else grade = 0;
   // Insert or update score
   let [entry, created] = await Score.findOrCreate({

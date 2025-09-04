@@ -50,6 +50,10 @@ export default class response_6_3_3 extends Model {
       type: DataTypes.DATE,
       allowNull: true,
       defaultValue: Sequelize.Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    no_of_participants: {
+      type: DataTypes.INTEGER,
+      allowNull: true
     }
   }, {
     sequelize,
