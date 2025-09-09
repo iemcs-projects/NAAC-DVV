@@ -64,13 +64,8 @@ const Criteria5_3_1 = () => {
   // Ensure values are sent exactly as specified in the enum
   const formatValueForBackend = (value, field) => {
     if (!value) return '';
-<<<<<<< Updated upstream
-    // Return value as-is since enum values are exact matches
-    return value;
-=======
     // Convert to proper case for consistency with enum
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
->>>>>>> Stashed changes
   };
 
   const navigate = useNavigate();
@@ -136,13 +131,8 @@ const Criteria5_3_1 = () => {
     e?.preventDefault();
     
     // Format values to match enum exactly
-<<<<<<< Updated upstream
-    const award_name = formData.name.trim();
-    const student_name = formData.studentname.trim();
-=======
     const award_name = formData.name;
     const student_name = formData.studentname;
->>>>>>> Stashed changes
     const team_or_individual = formatValueForBackend(formData.team_or_individual, 'team_or_individual');
     const level = formatValueForBackend(formData.level, 'level');
     const activity_type = formatValueForBackend(formData.activity_type, 'activity_type');
@@ -164,8 +154,7 @@ const Criteria5_3_1 = () => {
         (!activity_type ? "- Activity Type\n" : ""));
       return;
     }
-    const year = currentYear.split("-")[0];
-    const session = year;
+  
 
     // Parse year correctly
     const yearStr = currentYear.split("-")[0];

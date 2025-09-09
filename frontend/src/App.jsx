@@ -118,12 +118,14 @@ import Criteria7_1_11 from "./criteria7/criteria7.1/criteria7.1.11.jsx";
 import Criteria7_2_1 from "./criteria7/criteria7.2/criteria7.2.1.jsx";
 import Criteria7_3_1 from "./criteria7/criteria7.3/criteria7.3.1.jsx";
 import { GpaDataProvider } from "./contextprovider/gpadata.jsx";
+import { UploadProvider } from "./contextprovider/uploadsContext";
 
 
 
 
 function App() {
   return (
+    <UploadProvider>
     <AuthProvider>
       <GpaDataProvider>
       <GpaProvider>
@@ -245,7 +247,7 @@ function App() {
           <Route
             path='/criteria1.1.3'
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <PrivateRoute allowedRoles={['admin','iqac']}>
                 <Criteria1_1_3 />
               </PrivateRoute>
             }
@@ -983,6 +985,7 @@ function App() {
     </GpaProvider>
     </GpaDataProvider>
     </AuthProvider>
+    </UploadProvider>
     
   );
 }

@@ -203,29 +203,14 @@ const Criteria6_2_3 = () => {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score623");
       console.log('API Response:', response);
       
-<<<<<<< Updated upstream
-      // Extract score data from the response
-      const responseData = response.data?.data;
-      
-      if (responseData) {
-        console.log('Score data:', responseData);
-        // The backend now returns an object with score, grade, and distinctAreas
-        // Map it to the expected format for the frontend
-        const scoreData = {
-          data: {
-            score_sub_sub_criteria: responseData.score,
-            sub_sub_cr_grade: responseData.grade,
-            distinctAreas: responseData.distinctAreas
-          }
-        };
-=======
+
       // Handle different possible response structures
       const scoreData = response.data?.data?.entry || response.data?.data || response.data;
       
       if (scoreData) {
         console.log('Score data:', scoreData);
         // Set the entire response data and let the display logic handle it
->>>>>>> Stashed changes
+
         setProvisionalScore(scoreData);
       } else {
         console.log('No score data found in response');
@@ -317,27 +302,7 @@ const Criteria6_2_3 = () => {
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-<<<<<<< Updated upstream
-            ) : provisionalScore?.data ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (6.2.3): {provisionalScore.data.score_sub_sub_criteria} / 4
-                  <span className="ml-2 text-sm font-normal text-gray-600">
-                    (Grade: {provisionalScore.data.sub_sub_cr_grade})
-                  </span>
-                </p>
-                {provisionalScore.data.distinctAreas?.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-sm font-medium text-gray-700">Selected Areas:</p>
-                    <ul className="list-disc list-inside text-sm text-gray-600 mt-1">
-                      {provisionalScore.data.distinctAreas.map((area, index) => (
-                        <li key={index}>{area}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-=======
+
             ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
               <p className="text-lg font-semibold text-green-800">
                 Provisional Score (6.2.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
@@ -347,17 +312,12 @@ const Criteria6_2_3 = () => {
                   (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
                 </span>
               </p>
->>>>>>> Stashed changes
             ) : (
               <p className="text-gray-600">No score data available. Submit data to see your score.</p>
             )}
           </div>
 
-<<<<<<< Updated upstream
-          {/* Data Entry Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-700 mb-4">E-Governance Implementation</h2>
-=======
+
 
           {/* Multiple Selection Checkboxes */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -383,7 +343,6 @@ const Criteria6_2_3 = () => {
                 </div>
               ))}
             </div>
->>>>>>> Stashed changes
             
             <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
               <h3 className="text-lg font-semibold mb-4 text-gray-800">Areas of E-Governance Implementation</h3>

@@ -8,7 +8,11 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
 import Criteria2_1_1 from "../../criteria2/criteria2.1/criteria2.1.1";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+
 const Criteria1_4_2 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
   const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const [selectedOption, setSelectedOption] = useState("");
   const [currentYear, setCurrentYear] = useState("");
@@ -17,6 +21,9 @@ const Criteria1_4_2 = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState(null);
+  const [formData, setFormData] = useState({
+      supportLinks: []
+    });
 
   useEffect(() => {
     if (availableSessions && availableSessions.length > 0) {
@@ -313,35 +320,74 @@ Board of Management </li>
                   
 
           {/* File Upload */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="bg-blue-50 p-4 rounded-md mb-6">
-            <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-              <li>URL for the feedback report 
-</li>
-              <li>Upload Stakeholders feedback report, Action taken report of the institute 
-on it as stated in the minutes of the Governing Council, Syndicate, 
-Board of Management </li>
-<li>Any additional information (Upload) </li>
-            </ul>
-          </div>
-
-              <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-            <div className="flex items-center mb-4">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
-                <i className="fas fa-upload mr-2"></i>Choose Files
-                <input type="file" className="hidden" multiple />
-              </label>
-              <span className="ml-3 text-gray-600">No file chosen</span>
-            </div>
-
-            <label className="block text-sm font-medium text-gray-700 mb-2">Paste Link for Additional Information</label>
-            <input
-              type="text"
-              placeholder="Enter URL here"
-              className="w-full px-4 py-2 border rounded text-gray-900"
-            />
-            
-          </div>
+          <div className="mb-6">
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+      <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+  <i className="fas fa-upload mr-2"></i> Choose Files
+  <input
+    type="file"
+    className="hidden"
+    multiple
+    onChange={async (e) => {
+      const filesArray = Array.from(e.target.files);
+      for (const file of filesArray) {
+        try {
+          const uploaded = await uploadFile(
+            "criteria1_2_2",
+            file,
+            "1.2.2",
+            currentYear
+          );
+          setFormData((prev) => ({
+            ...prev,
+            supportLinks: [...prev.supportLinks, uploaded.file_url],
+          }));
+        } catch (err) {
+          alert(err.message || "Upload failed");
+        }
+      }
+    }}
+  />
+</label>
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+{error && <span className="text-red-600">{error}</span>}
+      </div>
+      </div>
+      {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
 
           <div className="mt-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

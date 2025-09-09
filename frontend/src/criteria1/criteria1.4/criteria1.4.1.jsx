@@ -7,8 +7,11 @@ import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria1_4_1 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
   const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const [selectedOption, setSelectedOption] = useState("");
   const [rows, setRows] = useState([]);
@@ -21,6 +24,9 @@ const Criteria1_4_1 = () => {
   const [facultyId, setFacultyId] = useState("");
   const [facultyName, setFacultyName] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
+  const [formData, setFormData] = useState({
+    supportLinks: []
+  });
   
   const navigate = useNavigate();
   
@@ -338,53 +344,75 @@ minutes of the Governing Council, Syndicate, Board of Management
             </ul>
           </div>
 
-             <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-            <div className="flex items-center mb-4">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded cursor-pointer">
-                <i className="fas fa-upload mr-2"></i>Choose Files
-                <input type="file" className="hidden" multiple />
-              </label>
-              <span className="ml-3 text-gray-600">No file chosen</span>
-            </div>
-
-            <label className="block text-sm font-medium text-gray-700 mb-2">Paste Link for Additional Information</label>
-              <input
-                type="url"
-                placeholder="Enter URL here"
-                className="w-full px-4 py-2 border rounded text-gray-900"
-                value={additionalInfo}
-                onChange={(e) => setAdditionalInfo(e.target.value)}
-              />
-            
-          </div>
-
-          {/* Save Button */}
-          {/* <div className="flex justify-end mb-6">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center"
-              disabled={loading || !selectedOption}
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                  </svg>
-                  Save Response
-                </>
-              )}
-            </button>
-          </div> */}
-
+          <div className="mb-6">
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+      <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+  <i className="fas fa-upload mr-2"></i> Choose Files
+  <input
+    type="file"
+    className="hidden"
+    multiple
+    onChange={async (e) => {
+      const filesArray = Array.from(e.target.files);
+      for (const file of filesArray) {
+        try {
+          const uploaded = await uploadFile(
+            "criteria1_2_2",
+            file,
+            "1.2.2",
+            currentYear
+          );
+          setFormData((prev) => ({
+            ...prev,
+            supportLinks: [...prev.supportLinks, uploaded.file_url],
+          }));
+        } catch (err) {
+          alert(err.message || "Upload failed");
+        }
+      }
+    }}
+  />
+</label>
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+{error && <span className="text-red-600">{error}</span>}
+      </div>
+      </div>
+      {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
+          
           {/* Bottom Navigation */}
           <div className="mt-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
@@ -393,6 +421,7 @@ minutes of the Governing Council, Syndicate, Board of Management
           
         </div>
       </div>
+    </div>
     </div>
   );
 };

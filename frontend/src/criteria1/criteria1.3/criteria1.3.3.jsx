@@ -6,9 +6,11 @@ import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
 import LandingNavbar from "../../components/landing-navbar";
 import axios from "axios";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 import { SessionContext } from "../../contextprovider/sessioncontext";
 const Criteria1_3_3 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
  const { sessions, availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
   const pastFiveYears=Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`)
@@ -221,33 +223,73 @@ const Criteria1_3_3 = () => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Support Document Links (Add as many as required):
-            </label>
-            <div className="space-y-2">
-              {(formData.supportLinks || []).map((link, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    placeholder={`Enter support link ${index + 1}`}
-                    className="flex-1 px-3 py-1 border border-gray-300 rounded text-gray-900"
-                    value={link}
-                    onChange={(e) => handleChange("supportLinks", e.target.value, index)}
-                  />
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormData({ 
-                  ...formData, 
-                  supportLinks: formData.supportLinks ? [...formData.supportLinks, ""] : [""] 
-                })}
-                className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-              >
-                + Add Another Link
-              </button>
-            </div>
-          </div>
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+      <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+  <i className="fas fa-upload mr-2"></i> Choose Files
+  <input
+    type="file"
+    className="hidden"
+    multiple
+    onChange={async (e) => {
+      const filesArray = Array.from(e.target.files);
+      for (const file of filesArray) {
+        try {
+          const uploaded = await uploadFile(
+            "criteria1_2_2",
+            file,
+            "1.2.2",
+            currentYear
+          );
+          setFormData((prev) => ({
+            ...prev,
+            supportLinks: [...prev.supportLinks, uploaded.file_url],
+          }));
+        } catch (err) {
+          alert(err.message || "Upload failed");
+        }
+      }
+    }}
+  />
+</label>
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+{error && <span className="text-red-600">{error}</span>}
+      </div>
+      </div>
+      {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
 
 
           {submittedData.length > 0 && (

@@ -121,6 +121,7 @@ const iqacRegister = asyncHandler(async (req, res) => {
 
 const userRegister = asyncHandler(async (req, res) => {
   const { name, email, password, role, department } = req.body;
+  console.log(req.body);
 
   if (!name || !email || !password || !role) {
     throw new apiError(400, "Missing required fields");

@@ -6,23 +6,14 @@ import Sidebar from './components/iqac-sidebar';
 import UserDropdown from './components/UserDropdown';
 import { useAuth } from './auth/authProvider';
 import { navItems } from './config/navigation';
+import axiosInstance from './contextprovider/axios';
+
 
 function UserManagement() {
   const navigate = useNavigate();
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
-  // const navItems = [
-  //   { icon: FaTachometerAlt, text: 'Dashboard', path: '/iqac-dashboard' },
-  //   { icon: FaUsers, text: 'User Management', path: '/user-management' },
-  //   { icon: FaFileAlt, text: 'Data Entry Forms', path: '/criteria1.1.1' },
-  //   { icon: FaChartLine, text: 'GPA Analysis', path: '/gpa-analysis' },
-  //   { icon: FaPaperPlane, text: 'IIQA Form', path: '/iiqa' },
-  //   { icon: FaDownload, text: 'Extended Profile', path: '/extendedprofile' },
-  //   { icon: FaQuestionCircle, text: 'Help and Support', path: '/helpsupport' },
-  //   { icon: FaCog, text: 'Configuration', path: '/configuration' },
-  //   { icon: FaSignOutAlt, text: 'Logout', path: '/logout' }
-  // ];
-    
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All Departments');
   const [roleFilter, setRoleFilter] = useState('All Roles');
@@ -33,84 +24,10 @@ function UserManagement() {
   const [activeTab, setActiveTab] = useState('pending');
 
   // Pending user requests
-  const [pendingUsers, setPendingUsers] = useState([
-    {
-      id: 'PEN001',
-      name: 'Dr. Anita Verma',
-      email: 'anita.verma@college.edu',
-      department: 'Computer Science Engineering',
-      role: 'Faculty',
-      requestDate: '2024-01-15',
-      status: 'pending'
-    },
-    {
-      id: 'PEN002',
-      name: 'Prof. Vikash Kumar',
-      email: 'vikash.kumar@college.edu',
-      department: 'Electronics & Communication',
-      role: 'HoD',
-      requestDate: '2024-01-16',
-      status: 'pending'
-    },
-    {
-      id: 'PEN003',
-      name: 'Rahul Sharma',
-      email: 'rahul.sharma@student.college.edu',
-      department: 'Computer Science Engineering',
-      role: 'Student Admin',
-      requestDate: '2024-01-17',
-      status: 'pending'
-    },
-    {
-      id: 'PEN004',
-      name: 'Dr. Meera Patel',
-      email: 'meera.patel@college.edu',
-      department: 'Administration',
-      role: 'College Admin',
-      requestDate: '2024-01-18',
-      status: 'pending'
-    }
-  ]);
+ 
 
   // Approved users
-  const [approvedUsers, setApprovedUsers] = useState([
-    {
-      id: 'APP001',
-      name: 'Dr. Priya Singh',
-      email: 'priya.singh@college.edu',
-      department: 'Computer Science Engineering',
-      role: 'Faculty',
-      approvedDate: '2024-01-10',
-      status: 'approved'
-    },
-    {
-      id: 'APP002',
-      name: 'Prof. Ravi Gupta',
-      email: 'ravi.gupta@college.edu',
-      department: 'Computer Science Engineering',
-      role: 'Faculty',
-      approvedDate: '2024-01-12',
-      status: 'approved'
-    },
-    {
-      id: 'APP003',
-      name: 'Dr. Amit Patel',
-      email: 'amit.patel@college.edu',
-      department: 'Computer Science Engineering',
-      role: 'HoD',
-      approvedDate: '2024-01-08',
-      status: 'approved'
-    },
-    {
-      id: 'APP004',
-      name: 'Suresh Kumar',
-      email: 'suresh.kumar@student.college.edu',
-      department: 'Electronics & Communication',
-      role: 'Student Admin',
-      approvedDate: '2024-01-14',
-      status: 'approved'
-    }
-  ]);
+  const [approvedUsers, setApprovedUsers] = useState([]);
 
   const getRoleColor = (role) => {
     switch (role) {
@@ -127,23 +44,51 @@ function UserManagement() {
     }
   };
 
-  const handleApproveUser = (userId) => {
-    const userToApprove = pendingUsers.find(u => u.id === userId);
-    if (userToApprove) {
-      const approvedUser = {
-        ...userToApprove,
-        id: `APP${String(approvedUsers.length + 1).padStart(3, '0')}`,
-        status: 'approved',
-        approvedDate: new Date().toISOString().split('T')[0]
-      };
-      
-      setApprovedUsers([...approvedUsers, approvedUser]);
-      setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+  // Fetch pending users from backend
+useEffect(() => {
+  const fetchPendingUsers = async () => {
+    try {
+      const response = await axiosInstance.get('/auth/getPendingUsers', { withCredentials: true });
+      if (response.data && response.data.data && Array.isArray(response.data.data.users)) {
+        setPendingUsers(response.data.data.users);
+      }
+    } catch (err) {
+      console.error('Error fetching pending users:', err);
     }
   };
 
-  const handleRejectUser = (userId) => {
-    setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+  fetchPendingUsers();
+}, []);
+
+
+  const handleApproveUser = async (userId) => {
+    try {
+      axiosInstance.post(`/auth/approveUser/${userId}`, {}, { withCredentials: true });
+      if (response.data.success) {
+        // Move user to approved list
+        const userToApprove = pendingUsers.find(u => u.id === userId);
+        if (userToApprove) {
+          const approvedUser = {
+            ...userToApprove,
+            status: 'approved',
+            approvedDate: new Date().toISOString()
+          };
+          setApprovedUsers([...approvedUsers, approvedUser]);
+          setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+        }
+      }
+    } catch (err) {
+      console.error('Error approving user:', err);
+    }
+  };
+  
+  const handleRejectUser = async (userId) => {
+    try {
+      axiosInstance.post(`/auth/rejectUser/${userId}`, {}, { withCredentials: true });
+      setPendingUsers(pendingUsers.filter(u => u.id !== userId));
+    } catch (err) {
+      console.error('Error rejecting user:', err);
+    }
   };
 
   const handleRemoveUser = (userId) => {
@@ -319,27 +264,27 @@ function UserManagement() {
           <div>
             {/* Tabs */}
             <div className="flex mb-6 border-b border-gray-200">
-              <button
-                onClick={() => setActiveTab('pending')}
-                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                  activeTab === 'pending'
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Pending Requests ({pendingUsers.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('approved')}
-                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
-                  activeTab === 'approved'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Approved Users ({approvedUsers.length})
-              </button>
-            </div>
+    <button
+      onClick={() => setActiveTab('pending')}
+      className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+        activeTab === 'pending'
+          ? 'border-orange-500 text-orange-600'
+          : 'border-transparent text-gray-500 hover:text-gray-700'
+      }`}
+    >
+      Pending Requests ({pendingUsers.length})
+    </button>
+    <button
+      onClick={() => setActiveTab('approved')}
+      className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${
+        activeTab === 'approved'
+          ? 'border-blue-500 text-blue-600'
+          : 'border-transparent text-gray-500 hover:text-gray-700'
+      }`}
+    >
+      Approved Users ({approvedUsers.length})
+    </button>
+  </div>
 
             {/* Filters */}
             <div className="flex gap-4 mb-6">

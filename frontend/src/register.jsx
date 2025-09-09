@@ -27,6 +27,7 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     role: 'faculty',
+    department: '',
     institutionName: '',
     institutionType: '',
     aisheId: '',
@@ -114,6 +115,9 @@ const Register = () => {
       email: formData.email,
       password: formData.password,
       role: formData.role,
+      ...(formData.role === "faculty" || formData.role === "mentor"
+        ? { department: formData.department || null }
+        : {}),
       ...(showIQACForm && {
         institutionName: formData.institutionName,
         institutionType: formData.institutionType,
@@ -125,48 +129,73 @@ const Register = () => {
 
     setIsSubmitting(true);
     try {
-      const endpoint = showIQACForm ? 'auth/iqacRegister' : 'auth/register';
+      const endpoint = showIQACForm ? 'auth/iqacRegister' : 'auth/userRegister';
       const response = await axiosInstance.post(endpoint, submissionData, { withCredentials: true });
 
-      if (response.data.success) {
-        if (showIQACForm) {
-          // Set user data and wait for authentication to be properly set
-          const success = await setUserAfterRegistration(response.data.data.iqac);
-          if (success) {
-            // Show success message before navigation
-            setSuccessMessage('Registration successful! Redirecting to dashboard...');
-            // Wait a moment to ensure authentication is properly set
-            setTimeout(() => {
-              navigate('/iqac-dashboard');
-            }, 1000);
+      try {
+        if (response.data.success) {
+          if (showIQACForm) {
+            // ========================
+            // IQAC Registration Flow
+            // ========================
+            const success = await setUserAfterRegistration(response.data.data.iqac);
+      
+            if (success) {
+              // Successfully set IQAC user session
+              setSuccessMessage('Registration successful! Redirecting to dashboard...');
+              setTimeout(() => {
+                navigate('/iqac-dashboard');
+              }, 1000);
+            } else {
+              // If session setup failed, try login with submitted credentials
+              const loginSuccess = await login(
+                submissionData.email,
+                submissionData.password,
+                'iqac' // IQAC role
+              );
+      
+              if (loginSuccess) {
+                // Login worked → go to dashboard
+                setSuccessMessage('Registration successful! Redirecting to dashboard...');
+                navigate('/iqac-dashboard');
+              } else {
+                // Login failed → still show registration success, then error
+                setSuccessMessage('Registration successful!');
+                setTimeout(() => {
+                  setErrors(prev => ({
+                    ...prev,
+                    global: 'Login failed. Please log in manually.'
+                  }));
+                }, 1000);
+              }
+            }
           } else {
-            setErrors(prev => ({ ...prev, global: 'Failed to set user session' }));
+            // ========================
+            // Normal User Registration
+            // ========================
+            setSuccessMessage('Registration successful! Pending admin approval.');
+            setTimeout(() => {
+              navigate('/login');
+            }, 2000);
           }
         } else {
-          const loginSuccess = await login(
-            submissionData.email, 
-            submissionData.password,
-            submissionData.role
-          );
-          
-          if (loginSuccess) {
-            setSuccessMessage('Registration successful! Redirecting to dashboard...');
-            // Show success message for 1.5 seconds before redirecting
-              navigate('/iqac-dashboard');
-            } else {
-            // For login failure case, show success message first then error
-            setSuccessMessage('Registration successful!');
-            setTimeout(() => {
-              setErrors(prev => ({ ...prev, global: 'Login failed. Please log in manually.' }));
-            }, 1000);
-          }
+          // ========================
+          // Registration Failed
+          // ========================
+          setErrors(prev => ({
+            ...prev,
+            global: response.data.message || 'Registration failed'
+          }));
         }
-      } else {
-        setErrors(prev => ({ ...prev, global: response.data.message || 'Registration failed' }));
+      } catch (error) {
+        console.error('Registration error:', error);
+        setErrors(prev => ({
+          ...prev,
+          global: error.response?.data?.message || 'An error occurred during registration.'
+        }));
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (err) {
-      const message = err.response?.data?.message || 'An error occurred during registration.';
-      setErrors(prev => ({ ...prev, global: message }));
     } finally {
       setIsSubmitting(false);
     }
@@ -300,9 +329,8 @@ const Register = () => {
                     required
                   >
                     <option value="">Select role</option>
-                    <option value="faculty">Faculty</option>
-                    <option value="hod">HOD</option>
-                    <option value="college_authority">College Authority</option>
+                    <option value="college_admin">College Admin</option>
+                    <option value="mentor">Mentor</option>
                   </select>
                   <FaChevronDown className="text-gray-400 mr-3" size={16} />
                 </div>
@@ -311,6 +339,30 @@ const Register = () => {
                 )}
               </div>
             )}
+            {(formData.role === "faculty" || formData.role === "mentor") && !showIQACForm && (
+  <div>
+    <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
+      Department
+    </label>
+    <div className="flex items-center gap-3 border rounded-md bg-white">
+      <FaBuilding className="text-gray-400 ml-3" size={18} />
+      <input
+        id="department"
+        name="department"
+        type="text"
+        className="w-full bg-white text-black placeholder-gray-400 outline-none text-sm py-2.5"
+        placeholder="Enter your department"
+        value={formData.department || ""}
+        onChange={handleChange}
+        onBlur={handleBlur}
+      />
+    </div>
+    {touched.department && errors.department && (
+      <p className="mt-1 text-sm text-red-600">{errors.department}</p>
+    )}
+  </div>
+)}
+
 
             {showIQACForm && (
               <>

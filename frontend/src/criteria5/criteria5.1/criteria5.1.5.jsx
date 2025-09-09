@@ -36,7 +36,6 @@ const Criteria5_1_5 = () => {
   useEffect(() => {
     if (sessions && sessions.length > 0) {
       setAvailableSessions(sessions);
-<<<<<<< Updated upstream
       // Only set initial year if not already set
       if (!currentYear) {
         setCurrentYear(sessions[0]);
@@ -51,27 +50,6 @@ const Criteria5_1_5 = () => {
       }
     }
   }, [sessions, pastFiveYears, currentYear]);
-=======
-      setCurrentYear(sessions[0]);
-      setSelectedYear(sessions[0]);
-    }
-  }, [sessions]);
-
-  useEffect(() => {
-    const yearToUse = availableSessions?.length > 0 ? availableSessions[0] : pastFiveYears[0];
-    if (yearToUse && currentYear !== yearToUse) {
-      setCurrentYear(yearToUse);
-      setSelectedYear(yearToUse);
-    }
-  }, [availableSessions, pastFiveYears, currentYear]);
-
-  useEffect(() => {
-    if (!availableSessions?.length && pastFiveYears.length > 0) {
-      setCurrentYear(pastFiveYears[0]);
-      setSelectedYear(pastFiveYears[0]);
-    }
-  }, [availableSessions, pastFiveYears]);
->>>>>>> Stashed changes
 
   // Fetch provisional score
   const fetchScore = async () => {
@@ -101,7 +79,6 @@ const Criteria5_1_5 = () => {
     } finally {
       setLoading(false);
     }
-<<<<<<< Updated upstream
   };
 
   useEffect(() => {
@@ -130,22 +107,6 @@ const Criteria5_1_5 = () => {
     });
   };
 
-=======
-  };
-
-  useEffect(() => {
-    fetchScore();
-  }, []);
-
-  // Updated to handle checkbox changes
-  const handleCheckboxChange = (option) => {
-    setSelectedOptions(prev => ({
-      ...prev,
-      [option]: !prev[option]
-    }));
-  };
-
->>>>>>> Stashed changes
   
   
   const navigate = useNavigate();
@@ -169,7 +130,6 @@ const Criteria5_1_5 = () => {
   };
 
   // Submit selected options
-<<<<<<< Updated upstream
   // Updated handleSubmit function with clearer logic
 const handleSubmit = async () => {
   const sessionFull = currentYear;
@@ -204,35 +164,10 @@ const handleSubmit = async () => {
       "http://localhost:3000/api/v1/criteria5/createResponse515",
       requestPayload,
       {
-=======
-  const handleSubmit = async () => {
-    const sessionFull = currentYear;
-    const session = sessionFull.split("-")[0];
-    const year = sessionFull;
-    
-    const selectedCount = Object.values(selectedOptions).filter(Boolean).length;
-    const grade = getGrade();
-
-    // Validate at least one option is selected
-    if (selectedCount === 0) {
-      alert("Please select at least one option before submitting.");
-      return;
-    }
-
-    try {
-      const response = await axios.post("http://localhost:3000/api/v1/criteria5/createResponse515", {
-        session: parseInt(session),
-        year: year,
-        selectedCount: selectedCount,
-        grade: grade,
-        selectedOptions: selectedOptions
-      }, {
->>>>>>> Stashed changes
         headers: {
           'Content-Type': 'application/json',
         },
         withCredentials: true
-<<<<<<< Updated upstream
       }
     );
 
@@ -255,27 +190,6 @@ const handleSubmit = async () => {
     alert(error.response?.data?.message || error.message || "Failed to submit data");
   }
 };
-=======
-      });
-
-      const resp = response?.data?.data || {};
-      const newEntry = {
-        year: year,
-        selectedCount: resp.selectedCount || selectedCount,
-        grade: resp.grade || grade
-      };
-
-      setSubmittedData((prev) => [...prev, newEntry]);
-      
-      // Fetch updated score
-      await fetchScore();
-      alert("Grievance redressal data submitted successfully!");
-    } catch (error) {
-      console.error("Error submitting data:", error);
-      alert(error.response?.data?.message || error.message || "Failed to submit data");
-    }
-  };
->>>>>>> Stashed changes
 
   return (
     <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
@@ -359,7 +273,6 @@ const handleSubmit = async () => {
               }}
               className="px-3 py-1 border border-gray-300 rounded text-gray-950"
             >
-<<<<<<< Updated upstream
               {availableSessions && availableSessions.length > 0 ? (
                 availableSessions.map((session) => (
                   <option key={session} value={session}>
@@ -369,13 +282,6 @@ const handleSubmit = async () => {
               ) : (
                 <option value="">No sessions available</option>
               )}
-=======
-              {availableSessions.map((session) => (
-                <option key={session} value={session}>
-                  {session}
-                </option>
-              ))}
->>>>>>> Stashed changes
             </select>
           </div>
 
