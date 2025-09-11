@@ -189,9 +189,9 @@ const updateResponse211 = asyncHandler(async (req, res) => {
 //new delete response 211
 const deleteResponse211 = asyncHandler(async (req, res) => {
   const { sl_no } = req.params;
-  const { session, year } = req.body;
+  const { session } = req.body;
 
-  if (!session || !year) {
+  if (!session ) {
     throw new apiError(400, "Missing required fields: session and year are required");
   }
 
@@ -200,7 +200,7 @@ const deleteResponse211 = asyncHandler(async (req, res) => {
     throw new apiError(404, "Row not found");
   }
 
-  if (row.session !== session || row.year !== year) {
+  if (row.session != session ) {
     throw new apiError(400, "Session/year mismatch — cannot delete this row");
   }
 
