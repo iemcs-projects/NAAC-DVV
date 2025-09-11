@@ -207,6 +207,7 @@ def main():
         print("❌ Config errors found:")
         for e in config_errors:
             print("  -", e)
+            
         return
 
     # Initialize system (text-only mode by default)

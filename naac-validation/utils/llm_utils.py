@@ -288,5 +288,6 @@ Provide response in JSON format:
             "confidence_thresholds": {
                 "accept": settings.CONFIDENCE_ACCEPT_THRESHOLD,
                 "flag": settings.CONFIDENCE_FLAG_THRESHOLD
+         
             }
         }

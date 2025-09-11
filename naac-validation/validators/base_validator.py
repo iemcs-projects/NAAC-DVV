@@ -136,4 +136,5 @@ class BaseValidator(ABC):
         overlap = len(words1.intersection(words2))
         total_unique = len(words1.union(words2))
         
+        
         return overlap / total_unique if total_unique > 0 else 0.0

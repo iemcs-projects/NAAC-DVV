@@ -9,6 +9,7 @@ load_dotenv()
 class Settings:
     """Configuration settings for NAAC validation system"""
     
+    
     # API Keys
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     

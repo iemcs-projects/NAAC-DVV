@@ -342,4 +342,5 @@ class OCRProcessor:
                 "ocr_processing": self.ocr_available and self.ocr_method != "text_only",
                 "cloud_ocr": self.ocr_method == "cloud"
             }
+            
         }

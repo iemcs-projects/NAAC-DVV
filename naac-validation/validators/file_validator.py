@@ -15,6 +15,7 @@ class FileValidator(BaseValidator):
         super().__init__()
         self.file_rules = self.validation_rules.get("file_validation", {})
         
+        
         # MIME type mapping for better validation
         self.mime_type_mapping = {
             'application/pdf': ['pdf'],

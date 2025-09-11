@@ -286,5 +286,6 @@ class FileProcessor:
             
             return metadata
             
+            
         except Exception as e:
             return {"excel_error": f"Could not read Excel metadata: {str(e)}"}
