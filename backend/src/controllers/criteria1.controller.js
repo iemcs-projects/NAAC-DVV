@@ -6,8 +6,7 @@ import Sequelize from "sequelize";
 
 const Criteria113 = db.response_1_1_3;
 const Criteria121 = db.response_1_2_1;
-const Criteria122 = db.response_1_2_2;
-const Criteria123 = db.response_1_2_3;
+const Criteria122_123 = db.response_1_2_2_1_2_3;
 const Criteria132 = db.response_1_3_2;
 const Criteria133 = db.response_1_3_3;
 const Criteria141 = db.response_1_4_1;
@@ -256,6 +255,113 @@ const createResponse113 = asyncHandler(async (req, res) => {
       created ? "Response created successfully" : "Response updated successfully"
     )
   );
+});
+
+const updateResponse113 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    year,
+    teacher_name,
+    body_name,
+    option_selected
+  } = req.body;
+
+if(!session || !year || !teacher_name || !body_name || !option_selected){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria113.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session != session || row.year != year){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria113.update({
+    teacher_name,
+    body_name,
+    option_selected
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria113.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse113 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    year,
+    teacher_name,
+    body_name,
+    option_selected
+  } = req.body;
+
+    if(!session || !year || !teacher_name || !body_name || !option_selected){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria113.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session != session || row.year != year){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria113.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria113.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
 });
 
 
@@ -518,6 +624,120 @@ const createResponse121 = asyncHandler(async (req, res) => {
   return res.status(201).json(
     new apiResponse(201, entry, created ? "Response created successfully" : "Response updated successfully")
   );
+});
+
+const updateResponse121 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    programme_code,
+    programme_name,
+    year_of_introduction,
+    status_of_implementation_of_CBCS,
+    year_of_implementation_of_CBCS,
+    year_of_revision,
+    prc_content_added
+  } = req.body;
+if(!session || !programme_code || !programme_name || !year_of_introduction || !status_of_implementation_of_CBCS || !year_of_implementation_of_CBCS || !year_of_revision || !prc_content_added){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria121.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session != session ){
+  throw new apiError(400, "Session mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria121.update({
+  year_of_introduction,
+  status_of_implementation_of_CBCS,
+  year_of_implementation_of_CBCS,
+  year_of_revision,
+  prc_content_added
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria121.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse121 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    programme_code,
+    programme_name,
+    year_of_introduction,
+    status_of_implementation_of_CBCS,
+    year_of_implementation_of_CBCS,
+    year_of_revision,
+    prc_content_added
+  } = req.body;
+
+    if(!session || !programme_code || !programme_name || !year_of_introduction || !status_of_implementation_of_CBCS || !year_of_implementation_of_CBCS || !year_of_revision || !prc_content_added){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria121.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session != session){
+      throw new apiError(400, "Session mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria121.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria121.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
 });
 
 const score121 = asyncHandler(async (req, res) => {
@@ -793,7 +1013,122 @@ const createResponse122_123 = asyncHandler(async (req, res) => {
   }
 });
 
+const updateResponse122_123 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    course_code,
+    year_of_offering,
+    no_of_times_offered,
+    duration,
+    no_of_students_enrolled,
+    no_of_students_completed
+  } = req.body;
 
+
+if(!session || !program_name || !course_code || !year_of_offering || !no_of_times_offered || !duration || !no_of_students_enrolled || !no_of_students_completed){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria122.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session !== session || row.year_of_offering !== year_of_offering || row.program_name !== program_name || row.course_code !== course_code){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria122_123.update({
+  program_name,
+  course_code,
+  year_of_offering,
+  no_of_times_offered,
+  duration,
+  no_of_students_enrolled,
+  no_of_students_completed
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria122_123.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse122_123 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    course_code,
+    year_of_offering,
+    no_of_times_offered,
+    duration,
+    no_of_students_enrolled,
+    no_of_students_completed}=req.body;
+
+    if(!session || !program_name || !course_code || !year_of_offering || !no_of_times_offered || !duration || !no_of_students_enrolled || !no_of_students_completed){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria122_123.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session !== session || row.year_of_offering !== year_of_offering || row.program_name !== program_name || row.course_code !== course_code){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria122_123.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria122_123.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
+});
 const score122 = asyncHandler(async (req, res) => {
   const currentYear = new Date().getFullYear();
   const criteria_code = convertToPaddedFormat("1.2.2");
@@ -1146,6 +1481,122 @@ const createResponse132 = asyncHandler(async (req, res) => {
   );
 });
 
+const updateResponse132 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    program_code,
+    course_name,
+    course_code,
+    year_of_offering,
+    student_name
+  } = req.body;
+
+if(!session || !program_name || !program_code || !course_name || !course_code || !year_of_offering || !student_name){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria132.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session !== session || row.year !== year){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria132.update({
+  program_name,
+  program_code,
+  course_name,
+  course_code,
+  year_of_offering,
+  student_name
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria132.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse132 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    program_code,
+    course_name,
+    course_code,
+    year_of_offering,
+    student_name
+  } = req.body;
+
+
+    if(!session || !program_name || !program_code || !course_name || !course_code || !year_of_offering || !student_name){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria132.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session !== session || row.year_of_offering !== year_of_offering){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria132.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria132.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
+});
+
+
 const score132 = asyncHandler(async (req, res) => {
   /*
   1. Get current session (year)
@@ -1353,6 +1804,111 @@ const createResponse133 = asyncHandler(async (req, res) => {
   return res.status(201).json(
     new apiResponse(201, entry, "Response created successfully")
   );
+});
+
+const updateResponse133 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    program_code,
+    student_name
+  } = req.body;
+
+if(!session || !program_name || !program_code || !student_name){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria133.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session !== session || row.program_name !== program_name){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria133.update({
+  program_name,
+  program_code,
+  student_name
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria133.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse133 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    program_name,
+    program_code,
+    student_name
+  } = req.body;
+
+    if(!session || !program_name || !program_code || !student_name){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria133.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session !== session || row.program_name !== program_name){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria133.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria133.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
 });
 
 const score133 = asyncHandler(async (req, res) => {
@@ -1572,6 +2128,106 @@ const createResponse141 = asyncHandler(async (req, res) => {
   );
 });
 
+const updateResponse141 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    option_selected,
+  } = req.body;
+
+if(!session || !option_selected){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria141.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session !== session || row.year !== year){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria141.update({
+  option_selected
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria141.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse141 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    option_selected,
+  } = req.body;
+
+
+    if(!session || !year || !number_of_seats_earmarked_for_reserved_category_as_per_GOI || !number_of_students_admitted_from_the_reserved_category){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria141.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session !== session || row.year !== year){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria141.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria141.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
+});
+
 const score141 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("1.4.1");
   const currentYear = new Date().getFullYear();
@@ -1744,6 +2400,106 @@ const createResponse142 = asyncHandler(async (req, res) => {
   }
 });
 
+const updateResponse142 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    option_selected,
+  } = req.body;
+
+if(!session || !option_selected){
+  throw new apiError(400, "Missing required fields");
+}
+
+const row = await Criteria142.findOne({where:{sl_no}});
+
+if(!row){
+  throw new apiError(404, "Row not found");
+}
+
+if(row.session !== session || row.year !== year){
+  throw new apiError(400, "Session/year mismatch — cannot update this row");
+}
+
+const latestIIQA = await IIQA.findOne({
+  attributes: ['session_end_year'],
+  order: [['created_at', 'DESC']]
+});
+
+if(!latestIIQA){
+  throw new apiError(404, "No IIQA form found");
+}
+
+const endYear = latestIIQA.session_end_year;
+const startYear = endYear - 5;
+
+if(session < startYear || session > endYear){
+  throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+}
+
+await Criteria142.update({
+  option_selected
+}, {
+  where: { sl_no }
+});
+
+const updated = await Criteria142.findOne({ where: { sl_no } });
+
+return res.status(200).json(
+  new apiResponse(200, updated, "Row updated successfully")
+);
+});
+
+
+const deleteResponse142 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  const {
+    session,
+    option_selected,
+  } = req.body;
+
+
+    if(!session || !year || !number_of_seats_earmarked_for_reserved_category_as_per_GOI || !number_of_students_admitted_from_the_reserved_category){
+      throw new apiError(400, "Missing required fields");
+    }
+
+    const row = await Criteria142.findOne({where:{sl_no}}); 
+
+    if(!row){
+      throw new apiError(404, "Row not found");
+    }
+    
+    if(row.session !== session || row.year !== year){
+      throw new apiError(400, "Session/year mismatch — cannot delete this row");
+    }
+    
+    const latestIIQA = await IIQA.findOne({
+      attributes: ['session_end_year'],
+      order: [['created_at', 'DESC']]
+    });
+    
+    if(!latestIIQA){
+      throw new apiError(404, "No IIQA form found");
+    }
+    
+    const endYear = latestIIQA.session_end_year;
+    const startYear = endYear - 5;
+    
+    if(session < startYear || session > endYear){
+      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
+    }
+    
+    await Criteria142.destroy({
+      where: { sl_no }
+    });
+    
+    const deleted = await Criteria142.findOne({ where: { sl_no } });
+    
+    return res.status(200).json(
+      new apiResponse(200, deleted, "Row deleted successfully")
+    );
+});
+
 const score142 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("1.4.2");
   const currentYear = new Date().getFullYear();
@@ -1832,12 +2588,26 @@ const score142 = asyncHandler(async (req, res) => {
 
 
 export { createResponse133,
+  updateResponse133,
+  deleteResponse133,
   createResponse132,
+  updateResponse132,
+  deleteResponse132,
   createResponse122_123,
+  updateResponse122_123,
+  deleteResponse122_123,
   createResponse121,
+  updateResponse121,
+  deleteResponse121,
   createResponse113,
+  updateResponse113,
+  deleteResponse113,
   createResponse141,
+  updateResponse141,
+  deleteResponse141,
   createResponse142,
+  updateResponse142,
+  deleteResponse142,
   getResponsesByCriteriaCode,
    score113,
    score122,
