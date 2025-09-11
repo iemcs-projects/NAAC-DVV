@@ -6,7 +6,8 @@ import Sequelize from "sequelize";
 
 const Criteria113 = db.response_1_1_3;
 const Criteria121 = db.response_1_2_1;
-const Criteria122_123 = db.response_1_2_2_1_2_3;
+const Criteria122 = db.response_1_2_2;
+const Criteria123 = db.response_1_2_3;
 const Criteria132 = db.response_1_3_2;
 const Criteria133 = db.response_1_3_3;
 const Criteria141 = db.response_1_4_1;
@@ -1037,8 +1038,8 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session || row.year_of_offering !== year_of_offering || row.program_name !== program_name || row.course_code !== course_code){
-  throw new apiError(400, "Session/year mismatch — cannot update this row");
+if(row.session != session ){
+  throw new apiError(400, "Session mismatch — cannot update this row");
 }
 
 const latestIIQA = await IIQA.findOne({
@@ -1057,7 +1058,7 @@ if(session < startYear || session > endYear){
   throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
 }
 
-await Criteria122_123.update({
+await Criteria122.update({
   program_name,
   course_code,
   year_of_offering,
@@ -1069,10 +1070,24 @@ await Criteria122_123.update({
   where: { sl_no }
 });
 
-const updated = await Criteria122_123.findOne({ where: { sl_no } });
+await Criteria123.update({
+  program_name,
+  course_code,
+  year_of_offering,
+  no_of_times_offered,
+  duration,
+  no_of_students_enrolled,
+  no_of_students_completed
+}, {
+  where: { sl_no }
+});
+
+const updated122 = await Criteria122.findOne({ where: { sl_no } });
+const updated123 = await Criteria123.findOne({ where: { sl_no } });
 
 return res.status(200).json(
-  new apiResponse(200, updated, "Row updated successfully")
+  new apiResponse(200, updated122, "Row updated successfully"),
+  new apiResponse(200, updated123, "Row updated successfully")
 );
 });
 
@@ -1503,7 +1518,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session || row.year !== year){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -1825,7 +1840,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session || row.program_name !== program_name){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -2145,7 +2160,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session || row.year !== year){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -2417,7 +2432,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session || row.year !== year){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
