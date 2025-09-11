@@ -1,0 +1,43 @@
+# Core dependencies
+python-dotenv==1.0.0
+pydantic==2.5.0
+typing-extensions==4.8.0
+
+# LangChain and Groq
+langchain==0.1.0
+langchain-groq==0.0.1
+groq==0.4.1
+
+# File processing
+PyPDF2==3.0.1
+pdfplumber==0.10.0
+openpyxl==3.1.2
+pandas==2.1.4
+
+# OCR capabilities
+pytesseract==0.3.10
+Pillow==10.1.0
+pdf2image==1.16.3
+easyocr==1.5.1
+
+# Utilities
+requests==2.31.0
+validators==0.22.0
+python-magic==0.4.27
+
+# Optional: For better PDF handling
+pymupdf==1.23.14
+
+
+# File processing (No system dependencies)
+PyPDF2==3.0.1
+pdfplumber==0.10.0
+openpyxl==3.1.2
+pandas==2.1.4
+
+# Better PDF handling
+pymupdf==1.23.14
+
+# Utilities
+requests==2.31.0
+validators==0.22.0

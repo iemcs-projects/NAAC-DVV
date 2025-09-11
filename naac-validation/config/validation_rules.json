@@ -1,0 +1,63 @@
+{
+    "file_validation": {
+      "max_size_mb": 5,
+      "min_size_bytes": 1024,
+      "allowed_formats": ["pdf", "xlsx", "xls", "doc", "docx"],
+      "forbidden_extensions": [".exe", ".bat", ".sh", ".zip", ".rar"],
+      "required_file_types": {
+        "sanction_letter": ["pdf"],
+        "data_template": ["xlsx", "xls"],
+        "supporting_document": ["pdf", "xlsx", "xls", "doc", "docx"]
+      }
+    },
+    "criteria_validation": {
+      "3.1.1": {
+        "name": "Total Grants received from Government and non-governmental agencies",
+        "required_fields": ["project_name", "pi_name", "amount", "year", "funding_agency"],
+        "validation_rules": {
+          "year_range": 5,
+          "min_amount": 1000,
+          "max_amount": 10000000,
+          "required_documents": ["sanction_letter", "data_template"]
+        }
+      },
+      "3.1.2": {
+        "name": "Number of departments having Research projects funded by government and non-government agencies",
+        "required_fields": ["department_name", "project_count", "year"],
+        "validation_rules": {
+          "year_range": 5,
+          "min_projects": 1,
+          "unique_departments": true
+        }
+      }
+    },
+    "document_types": {
+      "sanction_letter": {
+        "required_content": ["project name", "amount", "sanctioned", "principal investigator"],
+        "optional_content": ["duration", "objectives", "deliverables"]
+      },
+      "mou": {
+        "required_content": ["parties", "date", "purpose", "duration"],
+        "optional_content": ["terms", "conditions"]
+      },
+      "invoice": {
+        "required_content": ["amount", "date", "vendor", "description"],
+        "optional_content": ["tax details", "payment terms"]
+      }
+    },
+    "confidence_factors": {
+      "exact_match": {
+        "project_name": 0.3,
+        "pi_name": 0.3,
+        "amount": 0.2,
+        "year": 0.1,
+        "agency": 0.1
+      },
+      "penalties": {
+        "missing_critical_info": -0.3,
+        "contradictory_info": -0.5,
+        "poor_document_quality": -0.2,
+        "partial_match": -0.1
+      }
+    }
+  }
