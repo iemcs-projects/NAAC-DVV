@@ -5,7 +5,8 @@ import apiError from "../utils/apiError.js";
 import Sequelize from "sequelize";
 
 const Criteria413 = db.response_4_1_3;
-const Criteria414_441 = db.response_4_1_4_4_1;
+const Criteria414 = db.response_4_1_4;
+const Criteria441 = db.response_4_4_1;
 const CriteriaMaster = db.criteria_master;
 const IIQA = db.iiqa_form;
 const ExtendedProfile = db.extended_profile;
@@ -360,7 +361,7 @@ if(session < startYear || session > endYear){
   throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
 }
 
-await Criteria414_441.update({
+await Criteria414.update({
   budget_allocated_infra,
   expenditure_infra_lakhs,
   total_exp_infra_lakhs,
@@ -370,7 +371,7 @@ await Criteria414_441.update({
   where: { sl_no }
 });
 
-const updated = await Criteria414_441.findOne({ where: { sl_no } });
+const updated = await Criteria414.findOne({ where: { sl_no } });
 
 return res.status(200).json(
   new apiResponse(200, updated, "Row updated successfully")
@@ -378,7 +379,7 @@ return res.status(200).json(
 });
 
 
-const deleteResponse414_441 = asyncHandler(async (req, res) => {
+const deleteResponse414 = asyncHandler(async (req, res) => {
   const { sl_no } = req.params;
   const {
     session,
@@ -394,7 +395,7 @@ const deleteResponse414_441 = asyncHandler(async (req, res) => {
       throw new apiError(400, "Missing required fields");
     }
 
-    const row = await Criteria414_441.findOne({where:{sl_no}}); 
+    const row = await Criteria414.findOne({where:{sl_no}}); 
 
     if(!row){
       throw new apiError(404, "Row not found");
@@ -420,11 +421,11 @@ const deleteResponse414_441 = asyncHandler(async (req, res) => {
       throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
     }
     
-    await Criteria414_441.destroy({
+    await Criteria414.destroy({
       where: { sl_no }
     });
     
-    const deleted = await Criteria414_441.findOne({ where: { sl_no } });
+    const deleted = await Criteria414.findOne({ where: { sl_no } });
     
     return res.status(200).json(
       new apiResponse(200, deleted, "Row deleted successfully")
