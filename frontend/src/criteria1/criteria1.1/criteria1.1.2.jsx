@@ -5,7 +5,15 @@ import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 const Criteria1_1_2 = () => {
+  const { uploads, uploading, uploadFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
+  const [currentYear, setCurrentYear] = useState("");
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    supportLinks: [],
+  })
   const [metrics, setMetrics] = useState([
     {
       id: '1.1.2',
@@ -119,7 +127,14 @@ const navigate = useNavigate();
     };
   }, [metrics]);
 
-   const goToNextPage = () => {
+  useEffect(() => {
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    const academicYear = `${currentYear}-${nextYear}`;
+    setCurrentYear(academicYear);
+  }, []);
+
+  const goToNextPage = () => {
     navigate('/criteria1.1.3'); 
   };
 
@@ -216,51 +231,102 @@ const navigate = useNavigate();
                 )}
               </div>
             ))}
-          </div>
-          
-           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="bg-blue-50 p-4 rounded-md mb-6">
-            <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-              <li>Upload  Additional information
-</li>
-              
-<li>Link for Additional information   </li>
-            </ul>
-          </div>
+    
+            <div className="mb-6">
+              <label className="block text-gray-700 font-medium mb-2">
+                Upload Documents
+              </label>
+              <div className="flex items-center gap-4 mb-2">
+                <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                  <i className="fas fa-upload mr-2"></i> Choose Files
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={async (e) => {
+                      const filesArray = Array.from(e.target.files);
+                      for (const file of filesArray) {
+                        try {
+                          console.log('Uploading file:', file.name);
+                          if (!currentYear) {
+                            throw new Error('Academic year is not set');
+                          }
+                          
+                          const uploaded = await uploadFile(
+                            "1.1.2",  // Metric ID
+                            file,
+                            "1.1.2",  // Criteria code
+                            currentYear
+                          );
+                          
+                          console.log('Upload response:', uploaded);
+                          
+                          const fileUrl = uploaded.path || uploaded.file_url || (uploaded.data && uploaded.data.path);
+                          if (!fileUrl) {
+                            throw new Error('No file URL returned from server');
+                          }
+                          
+                          setFormData(prev => ({
+                            ...prev,
+                            supportLinks: [...prev.supportLinks, fileUrl],
+                          }));
+                        } catch (err) {
+                          console.error('Upload error:', err);
+                          console.error('Error details:', {
+                            message: err.message,
+                            response: err.response?.data,
+                            status: err.response?.status
+                          });
+                          setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                        }
+                      }
+                    }}
+                  />
+                </label>
 
-             <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-<div className="flex items-center mb-4">
-  <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-    <i className="fas fa-upload mr-2"></i> Choose Files
-    <input type="file" className="hidden" multiple />
-  </label>
-  <span className="ml-3 text-gray-600">No file chosen</span>
-</div>
+                {/* Status Messages */}
+                {uploading && <span className="text-gray-600">Uploading...</span>}
+                {error && <span className="text-red-600">{error}</span>}
+              </div>
+        
 
-<label className="block text-sm font-medium text-gray-700 mb-2 mt-4">Paste Link for Additional Information</label>
-<input
-  type="text"
-  placeholder="Enter URL here"
-  className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
-/>
-            
-          </div>
-
-          {/* Footer Buttons */}
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {autoSaveTimestamp ? (
-                <span><i className="fas fa-save mr-1"></i> Auto-saved at {autoSaveTimestamp}</span>
-              ) : (
-                <span>Changes will be auto-saved</span>
+              {formData.supportLinks.length > 0 && (
+                <ul className="list-disc pl-5 text-gray-700">
+                  {formData.supportLinks.map((link, index) => (
+                    <li key={index} className="flex justify-between items-center mb-1">
+                      <a
+                        href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline"
+                      >
+                        {link.split("/").pop()}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Remove from local formData
+                          setFormData(prev => ({
+                            ...prev,
+                            supportLinks: prev.supportLinks.filter(l => l !== link)
+                          }));
+                          // Also remove from context
+                          removeFile("1.1.2", link);
+                        }}
+                        className="text-red-600 ml-2"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-            
-             
           </div>
+          
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-  <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
-</div>
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+          </div>
         </div>
       </div>
     </div>

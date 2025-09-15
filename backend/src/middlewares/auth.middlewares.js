@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import db from "../models/index.js";
 
 const IQAC = db.iqac_supervision;
+const User = db.users;
 const verifyToken = async (req, res, next) => {
     try {
         // Get token from cookies or Authorization header
@@ -41,8 +42,19 @@ const verifyToken = async (req, res, next) => {
                 });
             }
 
-            const user = await IQAC.findOne({ where: { uuid: decoded.id } });
-            console.log('User found in database:', user ? 'Yes' : 'No');
+            // First check IQAC table
+            let user = await IQAC.findOne({ where: { uuid: decoded.id } });
+            
+            // If not found in IQAC, check Users table
+            if (!user) {
+                user = await User.findOne({ 
+                    where: { uuid: decoded.id },
+                    attributes: { exclude: ['password_hash', 'refresh_token'] }
+                });
+                console.log('User found in Users table:', user ? 'Yes' : 'No');
+            } else {
+                console.log('User found in IQAC table');
+            }
             
             if (!user) {
                 return res.status(404).json({ 

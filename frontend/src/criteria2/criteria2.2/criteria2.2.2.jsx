@@ -6,10 +6,15 @@ import { useNavigate } from "react-router-dom";
 import Bottom from "../../components/bottom";
 import axios from "axios";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_2_2 = () => {
   const navigate = useNavigate();
-
+  const formData = {
+    supportLinks: []
+  }
+    const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+    const [useupload, setUseupload] = useState(false);
     const [file, setFile] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState({
     score: {
@@ -144,26 +149,78 @@ const Criteria2_2_2 = () => {
           </div>
 
           {/* File Upload */}
-          <div>
-            <h3 className="text-lg font-semibold text-blue-700 mb-2">
-              File Description (Upload)
-            </h3>
-            <label className="block font-medium mb-1">
-              Any Additional Information:
-            </label>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.jpg,.png"
-              onChange={handleFileChange}
-              className="border border-blue-500 rounded px-3 py-2 w-full"
-            />
-            {file && (
-              <p className="text-sm text-gray-700 mt-1">
-                Selected file:{" "}
-                <span className="font-medium">{file.name}</span>
-              </p>
-            )}
-          </div>
+          <div className="mb-6">
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+          <i className="fas fa-upload mr-2"></i> Choose Files
+          <input
+            type="file"
+            className="hidden"
+            multiple
+            onChange={async (e) => {
+              const filesArray = Array.from(e.target.files);
+              for (const file of filesArray) {
+                try {
+                  const uploaded = await uploadFile(
+                    "criteria1_1_3",
+                    file,
+                    "1.1.3",
+                    currentYear
+                  );
+                  setFormData((prev) => ({
+                    ...prev,
+                    supportLinks: [...prev.supportLinks, uploaded.file_url],
+                  }));
+                } catch (err) {
+                  alert(err.message || "Upload failed");
+                }
+              }
+            }}
+          />
+        </label>
+
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+        {error && <span className="text-red-600">{error}</span>}
+      </div>
+    
+
+
+  {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
 
           {/* Footer Note */}
           <p className="text-xs italic mt-6 text-gray-600">

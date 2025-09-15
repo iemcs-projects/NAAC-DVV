@@ -1,146 +1,211 @@
 // src/auth/authProvider.js
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api';
-import { useNavigate } from 'react-router-dom';
-import { AppContext } from '../contextprovider/appContext';
 
+// Simplified and more reliable role checking
 const hasRole = (user, requiredRole) => {
-  if (!user || (!user.role && !user.roles)) return false;
-
-  const userRoles = Array.isArray(user.roles || user.role)
-    ? (user.roles || user.role).map(r => String(r).toLowerCase())
-    : [String(user.role).toLowerCase()];
-
+  if (!user?.role) return false;
+  
+  const userRoles = Array.isArray(user.role) 
+    ? user.role.map(r => r.toLowerCase()) 
+    : [user.role.toLowerCase()];
+    
   const requiredRoles = Array.isArray(requiredRole)
-    ? requiredRole.map(r => String(r).toLowerCase())
-    : [String(requiredRole).toLowerCase()];
-
-  return userRoles.some(userRole =>
-    requiredRoles.some(reqRole =>
-      userRole === reqRole || userRole.includes(reqRole) || reqRole.includes(userRole)
-    )
-  );
+    ? requiredRole.map(r => r.toLowerCase())
+    : [requiredRole.toLowerCase()];
+    
+  return requiredRoles.some(reqRole => userRoles.includes(reqRole));
 };
 
 export const AuthContext = createContext({
   isAuthenticated: false,
   user: null,
-  hasRole,
+  loading: false,
+  error: null,
+  hasRole: () => false,
   checkAuth: () => Promise.resolve(false),
   login: () => Promise.resolve({ success: false }),
   logout: () => Promise.resolve(),
+  clearError: () => {},
   initialized: false
 });
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [initialized, setInitialized] = useState(false);
-  const { setIsLoggedIn } = useContext(AppContext);
 
-  const setUserAndLogin = useCallback((userData) => {
+  const clearError = useCallback(() => setError(null), []);
+
+  const setUserData = useCallback((userData) => {
     setUser(userData);
-    setIsLoggedIn(true);
-  }, [setIsLoggedIn]);
+    setError(null);
+  }, []);
 
   const checkAuth = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await api.get('/auth/me');
+      
       if (response.data?.success && response.data.data?.user) {
-        setUserAndLogin(response.data.data.user);
+        setUserData(response.data.data.user);
         return true;
       }
+      
+      setUser(null);
       return false;
-    } catch {
+    } catch (err) {
+      console.error('Auth check failed:', err);
+      setUser(null);
+      setError('Authentication check failed');
       return false;
+    } finally {
+      setLoading(false);
     }
-  }, [setUserAndLogin]);
+  }, [setUserData]);
 
   const refreshTokens = useCallback(async () => {
     try {
-      const res = await api.post('/auth/refresh');
-      if (res.data?.success) {
-        return await checkAuth(); // re-fetch user
+      const response = await api.post('/auth/refresh');
+      
+      if (response.data?.success) {
+        // Re-check auth after successful refresh
+        return await checkAuth();
       }
       return false;
-    } catch {
+    } catch (err) {
+      console.error('Token refresh failed:', err);
       return false;
     }
   }, [checkAuth]);
 
+  // Initialize auth state
   useEffect(() => {
-    const init = async () => {
-      const authed = await checkAuth();
-      if (!authed) await refreshTokens();
+    const initAuth = async () => {
+      setLoading(true);
+      
+      // Try to authenticate with existing tokens
+      const authenticated = await checkAuth();
+      
+      // If auth failed, try to refresh tokens
+      if (!authenticated) {
+        await refreshTokens();
+      }
+      
       setInitialized(true);
+      setLoading(false);
     };
-    init();
+
+    initAuth();
   }, [checkAuth, refreshTokens]);
 
   const login = useCallback(async (email, password, role) => {
     try {
-      const res = await api.post('/auth/userLogin', { email, password, role: role.toLowerCase() });
-      if (res.data?.data?.user) {
-        setUserAndLogin(res.data.data.user);
-        return { success: true, user: res.data.data.user };
+      setLoading(true);
+      setError(null);
+      
+      const response = await api.post('/auth/userLogin', { 
+        email, 
+        password, 
+        role: role.toLowerCase() 
+      });
+      
+      if (response.data?.data?.user) {
+        setUserData(response.data.data.user);
+        return { 
+          success: true, 
+          user: response.data.data.user,
+          message: response.data.message 
+        };
       }
-      return { success: false, error: res.data?.message || 'Login failed' };
+      
+      const errorMsg = response.data?.message || 'Login failed';
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+      
     } catch (err) {
-      return { success: false, error: err?.response?.data?.message || 'Login error' };
-    }
-  }, [setUserAndLogin]);
-
-  const setUserAfterRegistration = useCallback((iqacData) => {
-    setUserAndLogin({
-      id: iqacData.id,
-      name: iqacData.name,
-      email: iqacData.email,
-      role: 'iqac',
-      institution_name: iqacData.institution_name
-    });
-    return true;
-  }, [setUserAndLogin]);
-
-  const logout = useCallback(async () => {
-    try {
-      console.log("Calling /auth/logout API");
-  
-      const response = await api.post('/auth/logout');
-      console.log("Logout API response:", response.data);
-  
-    } catch (error) {
-      console.error('Logout error:', error?.response?.data || error.message);
+      const errorMsg = err?.response?.data?.message || 'Login error occurred';
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
     } finally {
-      // Clear frontend state
-      setUser(null);
-      setIsLoggedIn(false);
-  
-      // Clear frontend storage
-      localStorage.clear();
-      sessionStorage.clear();
-  
-      // Optional: Clear non-HttpOnly cookies (won’t affect accessToken if HttpOnly)
-      document.cookie = 'accessToken=; Max-Age=0; path=/;';
-      document.cookie = 'refreshToken=; Max-Age=0; path=/;';
-  
-      // Redirect to login
-      window.location.href = '/login';
+      setLoading(false);
     }
-  }, [setIsLoggedIn]);
-  
+  }, [setUserData]);
+
+  const setUserAfterRegistration = useCallback((userData) => {
+    // Normalize the user data structure
+    const normalizedUser = {
+      id: userData.id || userData.uuid,
+      uuid: userData.uuid,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role || 'iqac',
+      institution_name: userData.institution_name,
+      ...userData
+    };
+    
+    setUserData(normalizedUser);
+    return true;
+  }, [setUserData]);
+
+  const logout = useCallback(async (redirectCallback) => {
+    try {
+      setLoading(true);
+      
+      // Call logout API
+      await api.post('/auth/logout');
+      console.log('Logout API call successful');
+      
+    } catch (error) {
+      console.error('Logout API error:', error?.response?.data || error.message);
+      // Continue with logout even if API fails
+    } finally {
+      // Always clear state regardless of API success/failure
+      setUser(null);
+      setError(null);
+      setLoading(false);
+      
+      // Clear any client-side storage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (storageError) {
+        console.warn('Storage clearing failed:', storageError);
+      }
+      
+      // Call redirect callback if provided
+      if (typeof redirectCallback === 'function') {
+        redirectCallback();
+      }
+    }
+  }, []);
+
+  const contextValue = {
+    isAuthenticated: !!user,
+    user,
+    loading,
+    error,
+    hasRole: (role) => hasRole(user, role),
+    checkAuth,
+    login,
+    logout,
+    setUserAfterRegistration,
+    clearError,
+    initialized
+  };
+
   return (
-    <AuthContext.Provider value={{
-      isAuthenticated: !!user,
-      user,
-      hasRole: (role) => hasRole(user, role),
-      checkAuth,
-      login,
-      logout,
-      setUserAfterRegistration,
-      initialized
-    }}>
-      {initialized ? children : null}
+    <AuthContext.Provider value={contextValue}>
+      {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

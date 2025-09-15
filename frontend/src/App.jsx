@@ -175,7 +175,7 @@ function App() {
           <Route
             path='/admin-dashboard'
             element={
-              <PrivateRoute allowedRoles={['admin']}>
+              <PrivateRoute allowedRoles={['admin', 'college_admin', 'mentor','Faculty']}>
                 <Dashboard_admin />
               </PrivateRoute>
             }

@@ -5,8 +5,16 @@ import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_2_1 = () => {
+  const { uploads, uploading, uploadFile, error: uploadError } = useUpload(); 
+  const [useupload, setUseupload] = useState(false);
+  const [currentYear, setCurrentYear] = useState("");
+  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    supportLinks: [],
+  })
 
    const navigate = useNavigate();
     const goToNextPage = () => {
@@ -30,6 +38,16 @@ const Criteria2_2_1 = () => {
     }
   ]);
   
+  useEffect(() => {
+    // Set current year in YYYY-YYYY format (e.g., 2023-2024)
+    const currentYear = new Date().getFullYear();
+    const nextYear = currentYear + 1;
+    const academicYear = `${currentYear}-${nextYear}`;
+    setCurrentYear(academicYear);
+    
+    // If you need to fetch existing uploads, you can do it here
+    // Example: fetchExistingUploads("1.1.1", academicYear);
+  }, []);
 
 
   const [saving, setSaving] = useState(false);
@@ -223,35 +241,96 @@ const Criteria2_2_1 = () => {
             ))}
           </div>
 
-           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="bg-blue-50 p-4 rounded-md mb-6">
-            <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-              <li>File Description:Past link for additional Information
-</li>
-              
-<li>File Description:Upload any additional information</li>
-            </ul>
-          </div>
+          <div className="mb-6">
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+          <i className="fas fa-upload mr-2"></i> Choose Files
+          <input
+            type="file"
+            className="hidden"
+            multiple
+            onChange={async (e) => {
+              const filesArray = Array.from(e.target.files);
+              for (const file of filesArray) {
+                try {
+                  console.log('Uploading file:', file.name);
+                  const yearToUse = currentYear || new Date().getFullYear().toString();
+                  console.log('Using year:', yearToUse);
+                  
+                  const uploaded = await uploadFile(
+                    "2.2.1",  // Metric ID
+                    file,
+                    "2.2.1",  // Criteria code
+                    yearToUse
+                  );
+                  
+                  console.log('Upload successful:', uploaded);
+                  
+                  const fileUrl = uploaded.path || uploaded.file_url || (uploaded.data && uploaded.data.path);
+                  if (!fileUrl) {
+                    throw new Error('No file URL returned from server');
+                  }
+                  
+                  setFormData((prev) => ({
+                    ...prev,
+                    supportLinks: [...prev.supportLinks, fileUrl],
+                  }));
+                } catch (err) {
+                  console.error('Upload error:', err);
+                  console.error('Error details:', {
+                    message: err.message,
+                    response: err.response?.data,
+                    status: err.response?.status
+                  });
+                  setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                }
+              }
+            }}
+          />
+        </label>
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Documents</label>
-<div className="flex items-center mb-4">
-  <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-    <i className="fas fa-upload mr-2"></i> Choose Files
-    <input type="file" className="hidden" multiple />
-  </label>
-  <span className="ml-3 text-gray-600">No file chosen</span>
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+        {error && <span className="text-red-600">{error}</span>}
+      </div>
+    
+
+
+  {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+removeFile("2.2.1", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
 </div>
-
-<label className="block text-sm font-medium text-gray-700 mb-2 mt-4">Paste Link for Additional Information</label>
-<input
-  type="text"
-  placeholder="Enter URL here"
-  className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900"
-/>
-
-            
-          </div>
-
           {/* Footer Buttons */}
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
             <div className="text-sm text-gray-500">
@@ -261,6 +340,7 @@ const Criteria2_2_1 = () => {
                 <span>Changes will be auto-saved</span>
               )}
             </div>
+           
            
 
            

@@ -171,6 +171,7 @@ const createResponse113 = asyncHandler(async (req, res) => {
     body_name,
     option_selected
   } = req.body;
+  console.log(req.body);
 
   // Step 1: Field validation
   if (

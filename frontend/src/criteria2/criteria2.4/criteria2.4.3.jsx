@@ -7,12 +7,16 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import LandingNavbar from "../../components/landing-navbar";
 import { SessionContext } from "../../contextprovider/sessioncontext";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_4_3 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
+  const [file, setFile] = useState(null);
+  const error = uploadError;
   const { sessions, isLoading: sessionsLoading, error: sessionsError } = useContext(SessionContext);
   const [currentYear, setCurrentYear] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState({
     score: {
       score_sub_sub_criteria: 0,

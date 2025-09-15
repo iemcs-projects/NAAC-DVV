@@ -379,7 +379,7 @@ return res.status(200).json(
 });
 
 
-const deleteResponse414 = asyncHandler(async (req, res) => {
+const deleteResponse414_441 = asyncHandler(async (req, res) => {
   const { sl_no } = req.params;
   const {
     session,

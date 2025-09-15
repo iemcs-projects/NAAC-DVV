@@ -7,8 +7,11 @@ import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_1_1 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
   const { sessions: availableSessions, isLoading: isLoadingSessions } = useContext(SessionContext);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(null);
@@ -531,33 +534,78 @@ const Criteria2_1_1 = () => {
             </table>
           </div>
 
-          {/* Support Links */}
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Link to relevant documents
-            </label>
-            <div className="flex flex-col gap-2">
-              {(formData.supportLinks || []).map((link, index) => (
-                <input
-                  key={index}
-                  type="url"
-                  placeholder={`Enter support link ${index + 1}`}
-                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                  value={link}
-                  onChange={(e) => handleChange('supportLinks', e.target.value, index)}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({ ...formData, supportLinks: [...formData.supportLinks, ''] })
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+          <i className="fas fa-upload mr-2"></i> Choose Files
+          <input
+            type="file"
+            className="hidden"
+            multiple
+            onChange={async (e) => {
+              const filesArray = Array.from(e.target.files);
+              for (const file of filesArray) {
+                try {
+                  const uploaded = await uploadFile(
+                    "criteria1_1_3",
+                    file,
+                    "1.1.3",
+                    currentYear
+                  );
+                  setFormData((prev) => ({
+                    ...prev,
+                    supportLinks: [...prev.supportLinks, uploaded.file_url],
+                  }));
+                } catch (err) {
+                  alert(err.message || "Upload failed");
                 }
-                className="mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
-              >
-                + Add Another Link
-              </button>
-            </div>
-          </div>
+              }
+            }}
+          />
+        </label>
+
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+        {error && <span className="text-red-600">{error}</span>}
+      </div>
+    
+
+
+  {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
 
           {/* Display Data for All Years */}
           {availableSessions.map((year) => (

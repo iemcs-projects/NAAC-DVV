@@ -44,17 +44,30 @@ const Login = () => {
       console.log('Login result:', result);
       
       if (result && result.success) {
-        console.log('Login successful, user data:', result.user);
+        console.log('Login successful, full response:', JSON.stringify(result, null, 2));
+        console.log('User data:', result.user);
+        console.log('User role:', result.user?.role);
         setIsLoggedIn(true);
         
-        // Check if user has the required role for the dashboard
-        if (result.user && result.user.role === 'iqac') {
-          console.log('User has iqac role, navigating to /iqac-dashboard');
-          navigate('/iqac-dashboard', { replace: true });
-        } else {
-          console.log('User does not have iqac role, checking other roles');
-          // Handle other roles here if needed
-          setError('You do not have permission to access the dashboard');
+        // Handle role which might be an array or string
+        const userRoles = Array.isArray(result.user?.role) 
+          ? result.user.role.map(r => r?.toLowerCase())
+          : [result.user?.role?.toLowerCase()];
+          
+        console.log('User roles:', userRoles);
+        
+        // Redirect based on user role
+        if (result.user) {
+          if (userRoles.includes('iqac')) {
+            console.log('User has iqac role, navigating to /iqac-dashboard');
+            navigate('/iqac-dashboard', { replace: true });
+          } else if (userRoles.some(r => ['college_authority', 'college_admin', 'college admin', 'admin', 'mentor', 'faculty'].includes(r))) {
+            console.log(`User has admin role, navigating to /admin-dashboard`);
+            navigate('/admin-dashboard', { replace: true });
+          } else {
+            console.log('User roles not recognized or missing:', userRoles);
+            setError('You do not have permission to access the dashboard');
+          }
         }
       } else {
         const errorMsg = result?.error || 'Invalid credentials';
@@ -155,8 +168,8 @@ const Login = () => {
                 >
                   <option value="">Select role</option>
                   <option value="faculty">Faculty</option>
-                  <option value="hod">HOD</option>
-                  <option value="college_authority">College Authority</option>
+                  <option value="college_admin">College Admin</option>
+                  <option value="mentor">Mentor</option>
                   <option value="iqac">IQAC</option>
                 </select>
               </div>

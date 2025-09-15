@@ -329,6 +329,7 @@ const Register = () => {
                     required
                   >
                     <option value="">Select role</option>
+                    <option value="faculty">Faculty</option>
                     <option value="college_admin">College Admin</option>
                     <option value="mentor">Mentor</option>
                   </select>

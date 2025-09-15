@@ -44,41 +44,84 @@ function UserManagement() {
     }
   };
 
+  // Fetch approved users from backend
+  const fetchApprovedUsers = async () => {
+    try {
+      const response = await axiosInstance.get('/auth/getApprovedUsers', { withCredentials: true });
+      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        setApprovedUsers(response.data.data.map(user => ({
+          ...user,
+          status: 'approved'
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching approved users:', err);
+    }
+  };
+
   // Fetch pending users from backend
-useEffect(() => {
   const fetchPendingUsers = async () => {
     try {
       const response = await axiosInstance.get('/auth/getPendingUsers', { withCredentials: true });
-      if (response.data && response.data.data && Array.isArray(response.data.data.users)) {
-        setPendingUsers(response.data.data.users);
+      if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        setPendingUsers(response.data.data);
       }
     } catch (err) {
       console.error('Error fetching pending users:', err);
     }
   };
 
-  fetchPendingUsers();
-}, []);
+  // Fetch both pending and approved users when component mounts
+  useEffect(() => {
+    fetchPendingUsers();
+    fetchApprovedUsers();
+  }, []);
 
 
   const handleApproveUser = async (userId) => {
     try {
-      axiosInstance.post(`/auth/approveUser/${userId}`, {}, { withCredentials: true });
-      if (response.data.success) {
-        // Move user to approved list
-        const userToApprove = pendingUsers.find(u => u.id === userId);
-        if (userToApprove) {
-          const approvedUser = {
-            ...userToApprove,
-            status: 'approved',
-            approvedDate: new Date().toISOString()
-          };
-          setApprovedUsers([...approvedUsers, approvedUser]);
-          setPendingUsers(pendingUsers.filter(u => u.id !== userId));
-        }
+      console.log('Approving user with ID:', userId);
+      // Find the user to get their UUID
+      const userToApprove = pendingUsers.find(u => u.id === userId);
+      console.log('Found user to approve:', userToApprove);
+      
+      if (!userToApprove) {
+        console.error('User not found in pending list');
+        alert('Error: User not found in pending list');
+        return;
       }
-    } catch (err) {
-      console.error('Error approving user:', err);
+      
+      console.log(`Making API call to: /auth/approveUser/${userToApprove.uuid}`);
+      const response = await axiosInstance.post(
+        `/auth/approveUser/${userToApprove.uuid}`, 
+        {}, 
+        { 
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      console.log('API Response:', response);
+      
+      if (response.data && response.data.success) {
+        // Show success message
+        alert('User approved successfully!');
+        
+        // Refresh both user lists
+        await Promise.all([
+          fetchPendingUsers(),
+          fetchApprovedUsers()
+        ]);
+        
+        console.log('UI refreshed with updated data');
+      } else {
+        throw new Error(response.data?.message || 'Failed to approve user');
+      }
+    } catch (error) {
+      console.error('Error approving user:', error);
+      alert(`Error: ${error.message || 'Failed to approve user'}`);
     }
   };
   

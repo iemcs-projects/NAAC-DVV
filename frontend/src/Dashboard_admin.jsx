@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
+import { useAuth } from "./auth/authProvider";
 import * as echarts from "echarts";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,6 +14,16 @@ import {
 const Dashboard_admin = () => {
   const [activeNavItem, setActiveNavItem] = useState("Dashboard");
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    // Add a small delay for the animation
+    const timer = setTimeout(() => {
+      setIsLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const chartDom = document.getElementById("progressChart");
@@ -125,11 +136,9 @@ const Dashboard_admin = () => {
         {/* Scrollable main section */}
         <main className="p-6 overflow-auto flex-1">
           {/* Welcome */}
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-gray-700">Welcome, John Smith</h2>
-            <p className="text-sm text-gray-500">
-              Your NAAC accreditation progress is on track. Keep up the good work!
-            </p>
+          <div className={`mb-6 transform transition-all duration-700 delay-100 ${isLoaded ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'}`}>
+            <h2 className="text-2xl font-bold text-gray-800">Welcome, {user?.name || 'User'}</h2>
+            <p className="text-sm text-gray-600">Your NAAC accreditation progress is on track, keep up the good work!</p>
           </div>
 
           {/* Key Metrics */}
