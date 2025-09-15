@@ -233,7 +233,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session ){
+if(row.session != session ){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -273,35 +273,10 @@ return res.status(200).json(
 
 const deleteResponse313 = asyncHandler(async (req, res) => {
   const { sl_no } = req.params;
-  const { session } = req.body;
-
-  if (!session ) {
-    throw new apiError(400, "Missing required fields: session and year are required");
-  }
-
+  
   const row = await Criteria313.findOne({ where: { sl_no } });
   if (!row) {
     throw new apiError(404, "Row not found");
-  }
-
-  if (row.session != session ) {
-    throw new apiError(400, "Session/year mismatch — cannot delete this row");
-  }
-
-  const latestIIQA = await IIQA.findOne({
-    attributes: ["session_end_year"],
-    order: [["created_at", "DESC"]],
-  });
-  if (!latestIIQA) {
-    throw new apiError(404, "No IIQA form found");
-  }
-
-  const endYear = parseInt(latestIIQA.session_end_year, 10);
-  const startYear = endYear - 5;
-  const sessionInt = parseInt(session, 10);
-
-  if (sessionInt < startYear || sessionInt > endYear) {
-    throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
   }
 
   // keep a copy before delete
@@ -503,7 +478,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session ){
+if(row.session != session ){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -766,7 +741,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -1388,7 +1363,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -1740,7 +1715,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -2084,7 +2059,7 @@ const updateResponse341 = asyncHandler(async (req, res) => {
     year_of_collaboration,
     duration
     }= req.body;
-if(!session || !year || !title_of_activity || !collaborating_agency || !participant_name || !year_of_collaboration || !duration){
+if(!session || !title_of_activity || !collaborating_agency || !participant_name || !year_of_collaboration || !duration){
   throw new apiError(400, "Missing required fields");
 }
 
@@ -2094,7 +2069,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
@@ -2346,7 +2321,7 @@ if(!row){
   throw new apiError(404, "Row not found");
 }
 
-if(row.session !== session){
+if(row.session != session){
   throw new apiError(400, "Session/year mismatch — cannot update this row");
 }
 
