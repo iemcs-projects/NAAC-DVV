@@ -1,38 +1,82 @@
 import express from 'express';
 const router = express.Router();
-import {  createResponse511_512, createResponse513, createResponse514,createResponse515,createResponse521, createResponse522,createResponse523, createResponse531, createResponse533, createResponse542, score511, score512, score513, score514,score515, score521, score522, score523, score531, score533, score542, getResponsesByCriteriaCode } from '../controllers/criteria5.controller.js';
+import {  createResponse511_512,updateResponse511_512, createResponse513, updateResponse513, createResponse514, updateResponse514,createResponse515,updateResponse515,createResponse521, updateResponse521,createResponse522,updateResponse522,createResponse523, updateResponse523, createResponse531, updateResponse531, createResponse533, updateResponse533, createResponse542, updateResponse542, score511, score512, score513, score514,score515, score521, score522, score523, score531, score533, score542, getResponsesByCriteriaCode } from '../controllers/criteria5.controller.js';
 
 
 
 router.route('/createResponse511_512')
     .post(createResponse511_512);
 
+router.route('/updateResponse511_512/:sl_no')
+    .put(updateResponse511_512);
+
+
 router.route('/createResponse513')
     .post(createResponse513);
+
+router.route('/updateResponse513/:sl_no')
+    .put(updateResponse513);
+
+
 
 router.route('/createResponse514')
     .post(createResponse514);
 
+router.route('/updateResponse514/:sl_no')
+    .put(updateResponse514);
+
+
 router.route('/createResponse515')
     .post(createResponse515);
+
+router.route('/updateResponse515/:sl_no')
+    .put(updateResponse515);
+
 
 router.route('/createResponse521')
     .post(createResponse521);
 
+router.route('/updateResponse521/:sl_no')
+    .put(updateResponse521);
+
+
 router.route('/createResponse522')
     .post(createResponse522);
+
+router.route('/updateResponse522/:sl_no')
+    .put(updateResponse522);
+
+
 
 router.route('/createResponse523')
     .post(createResponse523);
 
+router.route('/updateResponse523/:sl_no')
+    .put(updateResponse523);
+
+
+
 router.route('/createResponse531')
     .post(createResponse531);
+
+router.route('/updateResponse531/:sl_no')
+    .put(updateResponse531);
+
 
 router.route('/createResponse533')
     .post(createResponse533);
 
+router.route('/updateResponse533/:sl_no')
+    .put(updateResponse533);
+
+
+
 router.route('/createResponse542')
     .post(createResponse542);
+
+router.route('/updateResponse542/:sl_no')
+    .put(updateResponse542);
+
     
 router.route('/getResponsesByCriteriaCode/:criteriaCode')
     .get(getResponsesByCriteriaCode);

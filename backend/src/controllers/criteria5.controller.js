@@ -290,13 +290,13 @@ const createResponse511_512 = asyncHandler(async (req, res) => {
     throw new apiError(400, "Missing required fields");
   }
   
-  const row = await Criteria512.findOne({where:{sl_no}});
+  const row = await Criteria511.findOne({where:{sl_no}});
   
   if(!row){
     throw new apiError(404, "Row not found");
   }
   
-  if(row.session !== session){
+  if(row.session != session){
     throw new apiError(400, "Session mismatch — cannot update this row");
   }
   
@@ -800,7 +800,7 @@ const createResponse513 = asyncHandler(async (req, res) => {
     throw new apiError(404, "Row not found");
   }
   
-  if(row.session !== session){
+  if(row.session != session){
     throw new apiError(400, "Session mismatch — cannot update this row");
   }
   
@@ -1106,7 +1106,7 @@ const createResponse514 = asyncHandler(async (req, res) => {
     throw new apiError(404, "Row not found");
   }
   
-  if(row.session !== session ){
+  if(row.session != session ){
     throw new apiError(400, "Session mismatch — cannot update this row");
   }
   
