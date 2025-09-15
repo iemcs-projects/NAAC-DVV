@@ -102,6 +102,7 @@ class FileValidator(BaseValidator):
             result.extracted_data['file_size_bytes'] = file_size
             result.extracted_data['file_size_mb'] = round(file_size / (1024*1024), 2)
             
+            
         except Exception as e:
             result.add_error(f"Could not determine file size: {str(e)}")
     

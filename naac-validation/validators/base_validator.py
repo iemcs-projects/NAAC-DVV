@@ -104,6 +104,7 @@ class BaseValidator(ABC):
         """Validate if amount is within acceptable range"""
         return min_amount <= amount <= max_amount
     
+    
     def _normalize_text(self, text: str) -> str:
         """Normalize text for comparison"""
         if not text:
