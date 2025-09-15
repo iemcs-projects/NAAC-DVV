@@ -13,8 +13,8 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-class OCRProcessor:
-    """OCR processing utilities using cloud services or python-only libraries"""
+class FlexibleOCRProcessor:
+    """OCR processing utilities using cloud services or python-only libraries (No Tesseract dependency)"""
     
     def __init__(self, ocr_method: str = "text_only"):
         """

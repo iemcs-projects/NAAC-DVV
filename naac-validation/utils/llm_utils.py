@@ -1,9 +1,16 @@
 import json
 from typing import Dict, Any, List, Optional, Union
 import logging
-from langchain_groq import ChatGroq
-from langchain.schema import HumanMessage, SystemMessage
-from langchain.prompts import PromptTemplate
+import os
+
+try:
+    from langchain_groq import ChatGroq
+    from langchain.schema import HumanMessage, SystemMessage
+    from langchain.prompts import PromptTemplate
+    LANGCHAIN_AVAILABLE = True
+except ImportError as e:
+    LANGCHAIN_AVAILABLE = False
+    _import_error = str(e)
 
 from config.settings import settings
 
@@ -13,19 +20,31 @@ class LLMValidator:
     """LLM-based document validation using Groq"""
     
     def __init__(self):
+        # Check if LangChain dependencies are available
+        if not LANGCHAIN_AVAILABLE:
+            raise ValueError(f"LangChain dependencies not available: {_import_error}")
+        
         if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY not found in environment variables")
         
-        self.llm = ChatGroq(
-            groq_api_key=settings.GROQ_API_KEY,
-            model_name="mixtral-8x7b-32768",  # Good balance of speed and accuracy
-            temperature=0.1,  # Low temperature for consistent results
-            max_tokens=4096
-        )
+        try:
+            self.llm = ChatGroq(
+                groq_api_key=settings.GROQ_API_KEY,
+                model_name="mixtral-8x7b-32768",  # Good balance of speed and accuracy
+                temperature=0.1,  # Low temperature for consistent results
+                max_tokens=4096
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to initialize ChatGroq: {str(e)}")
         
         # Load confidence factors from validation rules
-        self.validation_rules = settings.load_validation_rules()
-        self.confidence_factors = self.validation_rules.get("confidence_factors", {})
+        try:
+            self.validation_rules = settings.load_validation_rules()
+            self.confidence_factors = self.validation_rules.get("confidence_factors", {})
+        except Exception as e:
+            logger.warning(f"Could not load validation rules: {str(e)}")
+            self.validation_rules = {}
+            self.confidence_factors = {}
     
     def validate_document_content(self, data_row: Dict[str, Any], 
                                  extracted_text: str, 
