@@ -7,8 +7,13 @@ import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_4_1 = () => {
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
+  const [file, setFile] = useState(null);
+  const error = uploadError;
   const { sessions, isLoading: sessionsLoading, error: sessionsError } = useContext(SessionContext);
 
   const [currentYear, setCurrentYear] = useState("");
@@ -21,12 +26,9 @@ const Criteria2_4_1 = () => {
     name_of_department: "",
     total_number_of_years_of_experience_in_the_same_institution: "",
     isServing: false,
+    supportLinks: [],
   });
-  const [uploads, setUploads] = useState({
-    template: null,
-    additionalInfo: null,
-    facultyList: null,
-  });
+ 
   const [provisionalScore, setProvisionalScore] = useState({
     score: {
       score_sub_sub_criteria: 0,
@@ -404,32 +406,78 @@ const Criteria2_4_1 = () => {
           ))}
 
           {/* File Upload Section */}
-          <div className="mt-10 border-t pt-6">
-            <h3 className="text-xl font-semibold text-blue-900 mb-4">File Description (Upload)</h3>
+          <div className="mb-6">
+      <label className="block text-gray-700 font-medium mb-2">
+        Upload Documents
+      </label>
+      <div className="flex items-center gap-4 mb-2">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+          <i className="fas fa-upload mr-2"></i> Choose Files
+          <input
+            type="file"
+            className="hidden"
+            multiple
+            onChange={async (e) => {
+              const filesArray = Array.from(e.target.files);
+              for (const file of filesArray) {
+                try {
+                  const uploaded = await uploadFile(
+                    "criteria1_1_3",
+                    file,
+                    "1.1.3",
+                    currentYear
+                  );
+                  setFormData((prev) => ({
+                    ...prev,
+                    supportLinks: [...prev.supportLinks, uploaded.file_url],
+                  }));
+                } catch (err) {
+                  alert(err.message || "Upload failed");
+                }
+              }
+            }}
+          />
+        </label>
 
-            {["template", "additionalInfo", "facultyList"].map((field, idx) => {
-              const labelText =
-                field === "template"
-                  ? "Year wise full time teachers and sanctioned posts for 5 years (Data Template):"
-                  : field === "additionalInfo"
-                  ? "Any additional information:"
-                  : "List of the faculty members authenticated by the Head of HEI:";
-              return (
-                <div key={idx} className="mb-4">
-                  <label className="block font-medium mb-1 capitalize">{labelText}</label>
-                  <input
-                    type="file"
-                    onChange={(e) => handleFileChange(field, e.target.files[0])}
-                    className="w-full border rounded px-3 py-2"
-                  />
-                  {uploads[field] && (
-                    <p className="text-sm text-gray-600 mt-1">Selected: {uploads[field].name}</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {/* Status Messages */}
+        {uploading && <span className="text-gray-600">Uploading...</span>}
+        {error && <span className="text-red-600">{error}</span>}
+      </div>
+    
 
+
+  {formData.supportLinks.length > 0 && (
+    <ul className="list-disc pl-5 text-gray-700">
+      {formData.supportLinks.map((link, index) => (
+        <li key={index} className="flex justify-between items-center mb-1">
+          <a
+            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline"
+          >
+            {link.split("/").pop()}
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              // Remove from local formData
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: prev.supportLinks.filter(l => l !== link)
+              }));
+              // Also remove from context
+              removeFile("criteria1_1_3", link);
+            }}
+            className="text-red-600 ml-2"
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  )}
+</div>
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
           </div>
