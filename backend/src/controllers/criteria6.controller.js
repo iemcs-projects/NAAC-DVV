@@ -208,6 +208,24 @@ return res.status(200).json(
 );
 });
 
+const deleteResponse623 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria623.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria623.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 
 const score623 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("6.2.3");
@@ -441,6 +459,24 @@ const updated = await Criteria632.findOne({ where: { sl_no } });
 return res.status(200).json(
   new apiResponse(200, updated, "Row updated successfully")
 );
+});
+
+const deleteResponse632 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria632.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria632.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
 });
 
 const score632 = asyncHandler(async (req, res) => {
@@ -749,6 +785,24 @@ return res.status(200).json(
 );
 });
 
+const deleteResponse633 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria633.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria633.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 const score633 = asyncHandler(async (req, res) => {
   const session = new Date().getFullYear();
   const criteria_code = convertToPaddedFormat("6.3.3");
@@ -996,6 +1050,24 @@ const updated = await Criteria634.findOne({ where: { sl_no } });
 return res.status(200).json(
   new apiResponse(200, updated, "Row updated successfully")
 );
+});
+
+const deleteResponse634 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria634.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria634.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
 });
 
 
@@ -1267,6 +1339,24 @@ const updated = await Criteria642.findOne({ where: { sl_no } });
 return res.status(200).json(
   new apiResponse(200, updated, "Row updated successfully")
 );
+});
+
+const deleteResponse642 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria642.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria642.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
 });
 
 const score642 = asyncHandler(async (req, res) => {
@@ -1564,6 +1654,24 @@ return res.status(200).json(
 );
 });
 
+const deleteResponse653 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria653.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria653.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 const score653 = asyncHandler(async (req, res) => {
   const criteria_code = convertToPaddedFormat("6.5.3");
   const currentYear = new Date().getFullYear();
@@ -1709,4 +1817,11 @@ const getAllCriteria6 = asyncHandler(async (req, res) => {
   );
 });
 
-export { getResponsesByCriteriaCode,getAllCriteria6, createResponse623,updateResponse623, createResponse632, updateResponse632, createResponse633, updateResponse633, createResponse634,updateResponse634, createResponse642, updateResponse642, createResponse653, updateResponse653, score623, score632, score633,score634,score642,score653 };
+export { getResponsesByCriteriaCode,getAllCriteria6,
+   createResponse623,updateResponse623, deleteResponse623,
+    createResponse632, updateResponse632, deleteResponse632,
+     createResponse633, updateResponse633, deleteResponse633,
+      createResponse634,updateResponse634, deleteResponse634,
+       createResponse642, updateResponse642, deleteResponse642,
+        createResponse653, updateResponse653, deleteResponse653,
+         score623, score632, score633,score634,score642,score653 };

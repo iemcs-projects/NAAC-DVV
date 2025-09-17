@@ -356,57 +356,22 @@ const createResponse511_512 = asyncHandler(async (req, res) => {
   
   const deleteResponse511_512 = asyncHandler(async (req, res) => {
     const { sl_no } = req.params;
-    const {
-      session,
-      year,
-      scheme_name,
-      gov_students_count,
-      gov_amount,
-      non_gov_students_count,
-      non_gov_amount,
-      total_students_count,
-      inst_students_count,
-      inst_amount}=req.body;
+    
+    const row = await Criteria511.findOne({ where: { sl_no } });
+    const row2 = await Criteria512.findOne({ where: { sl_no } });
+    if (!row || !row2) {
+      throw new apiError(404, "Row not found");
+    }
   
-      if(!session || !year || !scheme_name || !gov_students_count || !gov_amount || !non_gov_students_count || !non_gov_amount || !total_students_count || !inst_students_count || !inst_amount){
-        throw new apiError(400, "Missing required fields");
-      }
+    // keep a copy before delete
+    const deletedRow = { ...row.get(), ...row2.get() };
   
-      const row = await Criteria511_512.findOne({where:{sl_no}}); 
+    await Criteria511.destroy({ where: { sl_no } });
+    await Criteria512.destroy({ where: { sl_no } });
   
-      if(!row){
-        throw new apiError(404, "Row not found");
-      }
-      
-      if(row.session !== session || row.year !== year){
-        throw new apiError(400, "Session/year mismatch — cannot delete this row");
-      }
-      
-      const latestIIQA = await IIQA.findOne({
-        attributes: ['session_end_year'],
-        order: [['created_at', 'DESC']]
-      });
-      
-      if(!latestIIQA){
-        throw new apiError(404, "No IIQA form found");
-      }
-      
-      const endYear = latestIIQA.session_end_year;
-      const startYear = endYear - 5;
-      
-      if(session < startYear || session > endYear){
-        throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-      }
-      
-      await Criteria511_512.destroy({
-        where: { sl_no }
-      });
-      
-      const deleted = await Criteria511_512.findOne({ where: { sl_no } });
-      
-      return res.status(200).json(
-        new apiResponse(200, deleted, "Row deleted successfully")
-      );
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
   });
   
 //score 5.1.1
@@ -839,53 +804,20 @@ const createResponse513 = asyncHandler(async (req, res) => {
   
   const deleteResponse513 = asyncHandler(async (req, res) => {
     const { sl_no } = req.params;
-    const {
-      session,
-      program_name,
-      implementation_date,
-      students_enrolled,
-      agency_name,
-    } = req.body;
+    
+    const row = await Criteria513.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
   
-      if(!session || !program_name || !implementation_date || !students_enrolled || !agency_name){
-        throw new apiError(400, "Missing required fields");
-      }
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
   
-      const row = await Criteria513.findOne({where:{sl_no}}); 
+    await Criteria513.destroy({ where: { sl_no } });
   
-      if(!row){
-        throw new apiError(404, "Row not found");
-      }
-      
-      if(row.session != session ){
-        throw new apiError(400, "Session mismatch — cannot delete this row");
-      }
-      
-      const latestIIQA = await IIQA.findOne({
-        attributes: ['session_end_year'],
-        order: [['created_at', 'DESC']]
-      });
-      
-      if(!latestIIQA){
-        throw new apiError(404, "No IIQA form found");
-      }
-      
-      const endYear = latestIIQA.session_end_year;
-      const startYear = endYear - 5;
-      
-      if(session < startYear || session > endYear){
-        throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-      }
-      
-      await Criteria513.destroy({
-        where: { sl_no }
-      });
-      
-      const deleted = await Criteria513.findOne({ where: { sl_no } });
-      
-      return res.status(200).json(
-        new apiResponse(200, deleted, "Row deleted successfully")
-      );
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
   });
   // score 5.1.3
   const score513 = asyncHandler(async (req, res) => {
@@ -1144,52 +1076,20 @@ const createResponse514 = asyncHandler(async (req, res) => {
   
   const deleteResponse514 = asyncHandler(async (req, res) => {
     const { sl_no } = req.params;
-    const {
-      session,
-      year,
-      activity_name,
-      students_participated,
-    } = req.body
+    
+    const row = await Criteria514.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
   
-      if(!session || !year || !activity_name || !students_participated){
-        throw new apiError(400, "Missing required fields");
-      }
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
   
-      const row = await Criteria514.findOne({where:{sl_no}}); 
+    await Criteria514.destroy({ where: { sl_no } });
   
-      if(!row){
-        throw new apiError(404, "Row not found");
-      }
-      
-      if(row.session != session ){
-        throw new apiError(400, "Session/year mismatch — cannot delete this row");
-      }
-      
-      const latestIIQA = await IIQA.findOne({
-        attributes: ['session_end_year'],
-        order: [['created_at', 'DESC']]
-      });
-      
-      if(!latestIIQA){
-        throw new apiError(404, "No IIQA form found");
-      }
-      
-      const endYear = latestIIQA.session_end_year;
-      const startYear = endYear - 5;
-      
-      if(session < startYear || session > endYear){
-        throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-      }
-      
-      await Criteria514.destroy({
-        where: { sl_no }
-      });
-      
-      const deleted = await Criteria514.findOne({ where: { sl_no } });
-      
-      return res.status(200).json(
-        new apiResponse(200, deleted, "Row deleted successfully")
-      );
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
   });
 
 // score 5.1.4
@@ -1461,50 +1361,20 @@ return res.status(200).json(
 
 const deleteResponse515 = asyncHandler(async (req, res) => {
   const { sl_no } = req.params;
-  const {
-    session,
-    options,
-  } = req.body;
+  
+  const row = await Criteria515.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
 
-    if(!session || !options){
-      throw new apiError(400, "Missing required fields");
-    }
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
 
-    const row = await Criteria515.findOne({where:{sl_no}}); 
+  await Criteria515.destroy({ where: { sl_no } });
 
-    if(!row){
-      throw new apiError(404, "Row not found");
-    }
-    
-    if(row.session != session ){
-      throw new apiError(400, "Session mismatch — cannot delete this row");
-    }
-    
-    const latestIIQA = await IIQA.findOne({
-      attributes: ['session_end_year'],
-      order: [['created_at', 'DESC']]
-    });
-    
-    if(!latestIIQA){
-      throw new apiError(404, "No IIQA form found");
-    }
-    
-    const endYear = latestIIQA.session_end_year;
-    const startYear = endYear - 5;
-    
-    if(session < startYear || session > endYear){
-      throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
-    }
-    
-    await Criteria515.destroy({
-      where: { sl_no }
-    });
-    
-    const deleted = await Criteria515.findOne({ where: { sl_no } });
-    
-    return res.status(200).json(
-      new apiResponse(200, deleted, "Row deleted successfully")
-    );
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
 });
 
 
@@ -1767,6 +1637,24 @@ const createResponse521 = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new apiResponse(200, updated, "Row updated successfully")
   );
+  });
+
+  const deleteResponse521 = asyncHandler(async (req, res) => {
+    const { sl_no } = req.params;
+    
+    const row = await Criteria521.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
+  
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
+  
+    await Criteria521.destroy({ where: { sl_no } });
+  
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
   });
 
 // score 5.2.1
@@ -2076,6 +1964,24 @@ const createResponse522 = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new apiResponse(200, updated, "Row updated successfully")
   );
+  });
+
+  const deleteResponse522 = asyncHandler(async (req, res) => {
+    const { sl_no } = req.params;
+    
+    const row = await Criteria522.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
+  
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
+  
+    await Criteria522.destroy({ where: { sl_no } });
+  
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
   });
 
   // score 5.2.2
@@ -2437,6 +2343,24 @@ return res.status(200).json(
 );
 });
 
+const deleteResponse523 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria523.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria523.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 
 
 //score 5.2.3
@@ -2762,6 +2686,24 @@ const score523 = asyncHandler(async (req, res) => {
   );
   });
 
+  const deleteResponse531 = asyncHandler(async (req, res) => {
+    const { sl_no } = req.params;
+    
+    const row = await Criteria531.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
+  
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
+  
+    await Criteria531.destroy({ where: { sl_no } });
+  
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+  });
+
   // score 5.3.1
   const score531 = asyncHandler(async (req, res) => {
     /*
@@ -3035,6 +2977,24 @@ const createResponse533 = asyncHandler(async (req, res) => {
   );
   });
 
+  const deleteResponse533 = asyncHandler(async (req, res) => {
+    const { sl_no } = req.params;
+    
+    const row = await Criteria533.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
+  
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
+  
+    await Criteria533.destroy({ where: { sl_no } });
+  
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+  });
+
 //score 5.3.3
   const score533 = asyncHandler(async (req, res) => {
     /*
@@ -3294,6 +3254,24 @@ const createResponse533 = asyncHandler(async (req, res) => {
     new apiResponse(200, updated, "Row updated successfully")
   );
   });
+
+  const deleteResponse542 = asyncHandler(async (req, res) => {
+    const { sl_no } = req.params;
+    
+    const row = await Criteria542.findOne({ where: { sl_no } });
+    if (!row) {
+      throw new apiError(404, "Row not found");
+    }
+  
+    // keep a copy before delete
+    const deletedRow = { ...row.get() };
+  
+    await Criteria542.destroy({ where: { sl_no } });
+  
+    return res
+      .status(200)
+      .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+  });
   
 // score 5.4.2
   const score542 = asyncHandler(async (req, res) => {
@@ -3397,24 +3375,34 @@ const createResponse533 = asyncHandler(async (req, res) => {
   export {
     createResponse511_512,
     updateResponse511_512,
+    deleteResponse511_512,
     createResponse513,
     updateResponse513,
+    deleteResponse513,
     createResponse514,
     updateResponse514,
+    deleteResponse514,
     createResponse515,
     updateResponse515,
+    deleteResponse515,
     createResponse521,
     updateResponse521,
+    deleteResponse521,
     createResponse522,
     updateResponse522,
+    deleteResponse522,
     createResponse523,
     updateResponse523,
+    deleteResponse523,
     createResponse531,
     updateResponse531,
+    deleteResponse531,
     createResponse533,
     updateResponse533,
+    deleteResponse533,
     createResponse542,
     updateResponse542,
+    deleteResponse542,
     getResponsesByCriteriaCode,
     score511,
     score512,
