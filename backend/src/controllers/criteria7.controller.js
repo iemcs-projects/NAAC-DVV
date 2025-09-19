@@ -261,6 +261,23 @@ const score712 = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteResponse712 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria712.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria712.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
 
 
 // 7.1.4
@@ -453,6 +470,26 @@ const score714 = asyncHandler(async (req, res) => {
     )
   );
 });
+
+const deleteResponse714 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria714.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria714.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
+
 // 7.1.5
 
 const createResponse715 = asyncHandler(async (req, res) => {
@@ -642,6 +679,23 @@ const score715 = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteResponse715 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria715.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria715.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
 
 
 // 7.1.6
@@ -835,6 +889,25 @@ const score716 = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteResponse716 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria716.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria716.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
+
 // 7.1.7
 
 const createResponse717 = asyncHandler(async (req, res) => {
@@ -1025,6 +1098,25 @@ const score717 = asyncHandler(async (req, res) => {
     )
   );
 });
+
+const deleteResponse717 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria717.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria717.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 
 // 7.1.10
 
@@ -1225,21 +1317,45 @@ const score7110 = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteResponse7110 = asyncHandler(async (req, res) => {
+  const { sl_no } = req.params;
+  
+  const row = await Criteria7110.findOne({ where: { sl_no } });
+  if (!row) {
+    throw new apiError(404, "Row not found");
+  }
+
+  // keep a copy before delete
+  const deletedRow = { ...row.get() };
+
+  await Criteria7110.destroy({ where: { sl_no } });
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, deletedRow, "Row deleted successfully"));
+});
+
 
 export {
 
   createResponse712,
   score712,
+  deleteResponse712,
   createResponse714,
   score714,
+  deleteResponse714,
   createResponse715,
   score715,
+  deleteResponse715,
   createResponse716,
   score716,
+  deleteResponse716,
   createResponse717,
   score717,
+  deleteResponse717,
   createResponse7110,
   score7110,
+  deleteResponse7110,
   getResponsesByCriteriaCode,
 };
 
