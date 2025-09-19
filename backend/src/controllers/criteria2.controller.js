@@ -20,6 +20,9 @@ const IIQAStaffDetails = db.iiqa_staff_details;
 const extended_profile = db.extended_profile;
 const CriteriaMaster = db.criteria_master;
 
+
+
+
 // Helper function to convert criteria code to padded format
 const convertToPaddedFormat = (code) => {
   // First remove any dots, then split into individual characters
@@ -438,6 +441,7 @@ const score212 = asyncHandler(async (req, res) => {
   }
 
   const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
   console.log(groupedByYear)
   console.log(scores)
   console.log(average)
@@ -2408,10 +2412,11 @@ const createResponse271 = asyncHandler(async (req, res) => {
 })
 
 const score271 = asyncHandler(async (req, res) => {
-  const session = new Date().getFullYear();
   const criteria_code = convertToPaddedFormat("2.7.1");
+  const currentYear = new Date().getFullYear();
+  const sessionDate = currentYear;
 
-  // Get criteria from master table
+  // Get criteria details
   const criteria = await CriteriaMaster.findOne({
     where: { 
       sub_sub_criterion_id: criteria_code
@@ -2422,117 +2427,117 @@ const score271 = asyncHandler(async (req, res) => {
     throw new apiError(404, "Criteria 2.7.1 not found in criteria_master");
   }
 
-  if (session < 1990 || session > new Date().getFullYear()) {
-    throw new apiError(400, "Session must be between 1990 and current year");
-  }
-
-  const latestIIQA = await IIQA.findOne({
-    attributes: ['session_end_year'],
-    order: [['created_at', 'DESC']]
-  });
-
-  if (!latestIIQA) {
-    throw new apiError(404, "No IIQA form found");
-  }
-
-  const endYear = latestIIQA.session_end_year;
-  const startYear = endYear - 5;
-
-  if (session < startYear || session > endYear) {
-    throw new apiError(400, "Session must be between the last 5 years");
-  }
-
-  const responses = await Criteria271.findAll({
+  // Get the latest response for this criteria
+  const response = await Criteria271.findOne({
     where: {
-      session: session
-    }
+      criteria_code: criteria.criteria_code
+    },
+    order: [['session', 'DESC']], // Use session instead of created_at
+    raw: true
   });
 
-  if (!Array.isArray(responses)) {
-    console.error('Responses is not an array:', responses);
-    throw new apiError(500, "Internal server error: Responses is not an array");
+  if (!response) {
+    throw new apiError(404, "No response found for criteria 2.7.1");
   }
 
-  if (responses.length === 0) {
-    throw new apiError(404, "No responses found for this session");
+  const q1 = parseInt(response.q1_syllabus_coverage);
+  console.log("q1"+q1)
+  const q2 = parseInt(response.q2_teacher_preparedness);
+  console.log("q2"+q2)
+  const q3 = parseInt(response.q3_teacher_communication);
+  console.log("q3"+q3)
+  const q4 = parseInt(response.q4_teaching_approach);
+  console.log("q4"+q4)
+  const q5 = parseInt(response.q5_internal_evaluation_fairness);
+  console.log("q5"+q5)
+  const q6 = parseInt(response.q6_assignment_discussion);
+  console.log("q6"+q6)
+  const q7 = parseInt(response.q7_internship_support);
+  console.log("q7"+q7)
+  const q8 = parseInt(response.q8_mentoring_growth);
+  console.log("q8"+q8)
+  const q9 = parseInt(response.q9_learning_opportunities);
+  console.log("q9"+q9)
+  const q10 = parseInt(response.q10_competency_info);
+  console.log("q10"+q10)
+  const q11 = parseInt(response.q11_mentor_followup);
+  console.log("q11"+q11)
+  const q12 = parseInt(response.q12_examples_usage);
+  console.log("q12"+q12)
+  const q13 = parseInt(response.q13_strengths_identification);
+  console.log("q13"+q13)
+  const q14 = parseInt(response.q14_weakness_support);
+  console.log("q14"+q14)
+  const q15 = parseInt(response.q15_student_engagement);
+  console.log("q15"+q15)
+  const q16 = parseInt(response.q16_student_centric_methods);
+  console.log("q16"+q16)
+  const q17 = parseInt(response.q17_extracurricular_encouragement);
+  console.log("q17"+q17)
+  const q18 = parseInt(response.q18_softskills_training);
+  console.log("q18"+q18)
+  const q19 = parseInt(response.q19_ict_usage);
+  console.log("q19"+q19)
+  const q20 = parseInt(response.q20_teaching_learning_quality);
+  console.log("q20"+q20)
+  const q = Math.round((q1+q2+q3+q4+q5+q6+q7+q8+q9+q10+q11+q12+q13+q14+q15+q16+q17+q18+q19+q20)/20);
+  let score, grade, optionSelected;
+  console.log("average"+q);
+  // Map option to score and grade
+  switch(q) {
+    case 4:
+      score = 4;
+      grade = 4;
+      optionSelected = "Strongly Agree";
+      break;
+    case 3:
+      score = 3;
+      grade = 3;
+      optionSelected = "Agree";
+      break;
+    case 2:
+      score = 2;
+      grade = 2;
+      optionSelected = "Disagree";
+      break;
+    case 1:
+      score = 1;
+      grade = 1;
+      optionSelected = "Strongly Disagree";
+      break;
+    case 0:
+    default:
+      score = 0;
+      grade = 0;
+      optionSelected = "No Response";
   }
 
-  // Get the latest response based on session year
-  const latestResponse = responses.sort((a, b) => b.session - a.session)[0];
+  // Create or update score entry
+  const [entry, created] = await Score.upsert({
+    criteria_code: criteria.criteria_code,
+    criteria_id: criteria.criterion_id,
+    sub_criteria_id: criteria.sub_criterion_id,
+    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+    score_criteria: 0,
+    score_sub_criteria: 0,
+    score_sub_sub_criteria: score,
+    sub_sub_cr_grade: grade,
+    session: sessionDate,
+    year: currentYear,
+    cycle_year: 1
+  }, {
+    conflictFields: ['criteria_code', 'session', 'year']
+  });
 
-  if (!latestResponse) {
-    throw new apiError(404, "No valid response found for this session");
-  }
-  console.log(latestResponse)
-  console.log(latestResponse.No_of_mentee, latestResponse.No_of_mentors)
-  const noOfMentees = latestResponse.No_of_mentee;
-  const noOfMentors = latestResponse.No_of_mentors;
-  // Calculate ratio using the latest response
-  const ratio = noOfMentees > 0 ? Math.round(noOfMentees / noOfMentors) : 0;
-  const score = parseFloat(`${ratio}.1`);
-  console.log(ratio)
-  
-  let grade;
-  if (score <= 20) grade = 4;
-  else if (score <= 30) grade = 3;
-  else if (score <= 40) grade = 2;
-  else if (score <= 50) grade = 1;
-  else grade = 0;
+  return res.status(200).json(
+    new apiResponse(200, {
+      score,
+      grade,
+      message: `Grade is ${grade} (Selected option: ${optionSelected}, Average Score: ${q.toFixed(2)})`
+    }, created ? "Score created successfully" : "Score updated successfully")
+  );
+});
 
-  console.log("Score", score)
-  console.log("Grade", grade)
-  try {
-    // First try to find existing score
-    let entry = await Score.findOne({
-      where: {
-        criteria_code: criteria.criteria_code,
-        session: session
-      }
-    });
-
-    if (entry) {
-      // Update existing entry
-      await Score.update(
-        { score_sub_sub_criteria: score, sub_sub_cr_grade: grade },
-        {
-          where: {
-            criteria_code: criteria.criteria_code,
-            session: session
-          }
-        }
-      );
-    } else {
-      // Create new entry
-      entry = await Score.create({
-        criteria_code: criteria.criteria_code,
-        criteria_id: criteria.criterion_id,
-        sub_criteria_id: criteria.sub_criterion_id,
-        sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-        score_criteria: 0,
-        score_sub_criteria: 0,
-        score_sub_sub_criteria: score,
-        sub_sub_cr_grade: grade,
-        session: session,
-        cycle_year: 1
-      });
-    }
-
-    // Fetch the updated/created entry
-    const result = await Score.findOne({
-      where: {
-        criteria_code: criteria.criteria_code,
-        session: session
-      }
-    });
-
-    return res.status(200).json(
-      new apiResponse(200, result, "Score processed successfully")
-    );
-  } catch (error) {
-    console.error('Error in score271:', error);
-    throw new apiError(500, "Internal server error while processing score");
-  }
-})
 
 
 export { 
@@ -2566,6 +2571,7 @@ export {
   score263,
   score241,
   score233,
+  score271,
   getResponsesByCriteriaCode,
   // getAllCriteria241243222233 ,
   // createResponse241243222233,
