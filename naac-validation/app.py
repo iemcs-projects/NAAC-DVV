@@ -22,9 +22,10 @@ from pydantic import BaseModel
 sys.path.append(str(Path(__file__).parent))
 
 from config.settings import settings
-from validators.file_validator import FileValidator
-from utils.file_utils import FileProcessor
-from utils.ocr_utils_no_tesseract import FlexibleOCRProcessor
+from processors.ocr_processor import UnifiedOCRProcessor
+from validation.criteria.criteria_validator import CriteriaValidator
+from validation.content_validator import NAACContentValidator
+from config.database import db
 
 # Setup logging
 logging.basicConfig(
@@ -43,22 +44,121 @@ app = FastAPI(
     description="File validation and text extraction API for NAAC DVV submissions",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize validators and processors
-file_validator = FileValidator()
-file_processor = FileProcessor()
-ocr_processor = FlexibleOCRProcessor(ocr_method="text_only")
+# Initialize processors
+ocr_processor = UnifiedOCRProcessor()
+criteria_validator = CriteriaValidator()
+
+@app.post("/extract-text-mistral")
+async def extract_text_with_mistral(
+    file: UploadFile = File(...),
+    force_ocr: bool = Form(default=True),
+    language: str = Form(default="eng")
+):
+    """
+    Extract text using Mistral AI Vision OCR specifically.
+    Designed for scanned documents and images.
+    
+    Args:
+        file: Upload file (PDF, images)
+        force_ocr: Force OCR even if text is available (default: True)
+        language: OCR language (default: "eng")
+        
+    Returns:
+        Detailed OCR results with confidence scores and metadata
+    """
+    temp_file_path = None
+    
+    logger.info(f"[MISTRAL-OCR] Processing: {file.filename}")
+    print(f"[AI] [MISTRAL-OCR] File: {file.filename} | Force OCR: {force_ocr} | Language: {language}")
+    
+    try:
+        # Validate file type
+        if not file.filename.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.bmp')):
+            raise HTTPException(
+                status_code=400,
+                detail="Mistral OCR supports PDF and image files only (.pdf, .png, .jpg, .jpeg, .tiff, .bmp)"
+            )
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+        
+        # Use unified OCR processor with Mistral focus
+        extraction_result = ocr_processor.extract_text(temp_file_path, use_ocr=force_ocr)
+        
+        extracted_text = extraction_result.get("text", "")
+        ocr_method = extraction_result.get("ocr_method", "none")
+        
+        # Enhanced response with OCR-specific details
+        response_data = {
+            "success": bool(extracted_text),
+            "message": f"Mistral OCR completed using {ocr_method}",
+            "data": {
+                "extracted_text": extracted_text,
+                "text_length": len(extracted_text),
+                "ocr_method": ocr_method,
+                "ocr_used": extraction_result.get("ocr_used", False),
+                "pages_processed": extraction_result.get("pages_processed", 0),
+                "confidence_scores": extraction_result.get("confidence_scores", []),
+                "errors": extraction_result.get("errors", []),
+                "processing_stats": {
+                    "language": language,
+                    "force_ocr": force_ocr,
+                    "file_size": Path(temp_file_path).stat().st_size,
+                    "file_type": Path(file.filename).suffix.lower()
+                },
+                "file_info": {
+                    "original_name": file.filename,
+                    "content_type": file.content_type,
+                    "processed_with": "Mistral AI Vision OCR"
+                }
+            }
+        }
+        
+        # Console summary
+        if extracted_text:
+            avg_confidence = sum(extraction_result.get("confidence_scores", [0])) / max(len(extraction_result.get("confidence_scores", [1])), 1)
+            logger.info(f"[MISTRAL-SUCCESS] Text: {len(extracted_text)} chars | Method: {ocr_method} | Confidence: {avg_confidence:.2f}")
+            print(f"[SUCCESS] [MISTRAL-OCR] Success! Method: {ocr_method} | Text Length: {len(extracted_text)} | Pages: {extraction_result.get('pages_processed', 0)}")
+        else:
+            logger.warning(f"[MISTRAL-WARNING] No text extracted from {file.filename}")
+            print(f"[WARNING] [MISTRAL-OCR] Warning: No text extracted")
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"[MISTRAL-ERROR] OCR failed: {str(e)}")
+        print(f"[ERROR] [MISTRAL-OCR] Error: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Mistral OCR processing failed: {str(e)}"
+        )
+    
+    finally:
+        # Clean up temporary file
+        if temp_file_path and Path(temp_file_path).exists():
+            os.unlink(temp_file_path)
+
+
+def _save_uploaded_file(file: UploadFile) -> str:
+    """Save uploaded file to temporary location"""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+        temp_file_path = temp_file.name
+        shutil.copyfileobj(file.file, temp_file)
+    return temp_file_path
 
 
 class SubmissionData(BaseModel):
@@ -97,16 +197,31 @@ async def health_check():
     try:
         # Test system components
         system_status = {
-            "file_validator": "available",
-            "file_processor": "available", 
-            "ocr_processor": ocr_processor.ocr_method,
+            "ocr_processor": "unified_processor_available",
+            "criteria_validator": "available", 
+            "content_validator": "available",
             "settings": "loaded"
         }
+        
+        # Test OCR processor
+        try:
+            ocr_status = ocr_processor.get_status()
+            system_status["ocr_details"] = ocr_status
+        except Exception as e:
+            system_status["ocr_processor"] = f"error: {str(e)}"
+        
+        # Test criteria validator
+        try:
+            supported_criteria = criteria_validator.list_supported_criteria()
+            system_status["supported_criteria_count"] = len(supported_criteria)
+        except Exception as e:
+            system_status["criteria_validator"] = f"error: {str(e)}"
         
         return {
             "status": "healthy",
             "components": system_status,
-            "timestamp": str(Path(__file__).stat().st_mtime)
+            "timestamp": str(Path(__file__).stat().st_mtime),
+            "validation_workflow": "database_integration_ready"
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -479,7 +594,267 @@ def _validate_complete_submission(data_row: Dict[str, Any], file_path: str, crit
     return result
 
 
-# Criteria validation moved to ValidationUtils
+@app.post("/validate-with-database", response_model=ValidationResponse)
+async def validate_with_database(
+    file: UploadFile = File(...),
+    database_record: str = Form(...),
+    criteria_code: str = Form(...)
+):
+    """
+    Validate document against database record using AI instructions
+    
+    Args:
+        file: Document file to validate
+        database_record: JSON string with database record
+        criteria_code: NAAC criteria code (e.g., "3.1.1")
+    """
+    temp_file_path = None
+    
+    logger.info(f"🎯 Database validation request: {file.filename} | Criteria: {criteria_code}")
+    
+    try:
+        # Parse database record
+        try:
+            db_record = json.loads(database_record)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in database_record: {str(e)}")
+        
+        # Save uploaded file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+        
+        logger.info(f"📁 File saved: {temp_file_path}")
+        
+        # Extract text using unified OCR processor
+        extraction_result = ocr_processor.extract_text(temp_file_path)
+        
+        if not extraction_result["success"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Text extraction failed: {extraction_result.get('error', 'Unknown error')}"
+            )
+        
+        extracted_text = extraction_result["extracted_text"]
+        logger.info(f"📝 Text extracted: {len(extracted_text)} characters")
+        
+        # Validate using criteria validator with database record
+        validation_result = criteria_validator.validate_criteria_document(
+            criteria_code, db_record, extracted_text
+        )
+        
+        # Prepare response
+        response_data = {
+            "validation_result": validation_result,
+            "extraction_info": extraction_result.get("metadata", {}),
+            "criteria_info": criteria_validator.get_criteria_info(criteria_code),
+            "processing_stats": {
+                "file_size": Path(temp_file_path).stat().st_size,
+                "text_length": len(extracted_text),
+                "confidence_score": validation_result.get("confidence_score", 0.0)
+            }
+        }
+        
+        # Console summary
+        decision = validation_result.get("decision", "UNKNOWN")
+        confidence = validation_result.get("confidence_score", 0.0)
+        status_emoji = "✅" if decision == "ACCEPT" else "⚠️" if decision == "FLAG_FOR_REVIEW" else "❌"
+        
+        print(f"🎯 [DATABASE-VALIDATION] {status_emoji} {decision} | Confidence: {confidence:.3f} | Criteria: {criteria_code}")
+        
+        return ValidationResponse(
+            success=validation_result.get("is_valid", False),
+            message=f"Database validation completed for {criteria_code}",
+            data=response_data,
+            errors=[]
+        )
+        
+    except Exception as e:
+        logger.error(f"Database validation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+    
+    finally:
+        # Clean up temporary file
+        if temp_file_path and Path(temp_file_path).exists():
+            os.unlink(temp_file_path)
+
+
+@app.get("/criteria/{criteria_code}")
+async def get_criteria_info(criteria_code: str):
+    """Get information about a specific NAAC criteria"""
+    try:
+        criteria_info = criteria_validator.get_criteria_info(criteria_code)
+        if "error" in criteria_info:
+            raise HTTPException(status_code=404, detail=f"Criteria {criteria_code} not found")
+        
+        return {
+            "criteria_code": criteria_code,
+            "info": criteria_info,
+            "supported_criteria": criteria_validator.list_supported_criteria()
+        }
+    except Exception as e:
+        logger.error(f"Error getting criteria info: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get criteria info: {str(e)}")
+
+
+@app.get("/criteria")
+async def list_supported_criteria():
+    """List all supported NAAC criteria"""
+    try:
+        return {
+            "supported_criteria": criteria_validator.list_supported_criteria(),
+            "total_count": len(criteria_validator.list_supported_criteria())
+        }
+    except Exception as e:
+        logger.error(f"Error listing criteria: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list criteria: {str(e)}")
+
+
+@app.post("/validate-record", response_model=ValidationResponse)
+async def validate_record_from_database(
+    file: UploadFile = File(...),
+    criteria_code: str = Form(...),
+    record_id: int = Form(...)
+):
+    """
+    Validate document against database record (fetched automatically)
+    
+    Args:
+        file: Document file to validate
+        criteria_code: NAAC criteria code (e.g., "3.1.1")
+        record_id: Database record ID (sl_no)
+    """
+    temp_file_path = None
+    
+    logger.info(f"[TARGET] Database record validation: {file.filename} | Criteria: {criteria_code} | Record ID: {record_id}")
+    
+    try:
+        # Fetch record from database
+        database_record = db.get_criteria_record(criteria_code, record_id)
+        
+        if not database_record:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Record with ID {record_id} not found for criteria {criteria_code}"
+            )
+        
+        logger.info(f"[DATA] Retrieved database record: {database_record.get('name_of_project', 'Unknown')}")
+        
+        # Save uploaded file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            temp_file_path = temp_file.name
+            shutil.copyfileobj(file.file, temp_file)
+        
+        # Extract text using unified OCR processor
+        extraction_result = ocr_processor.extract_text(temp_file_path)
+        
+        # Check if extraction was successful
+        extracted_text = extraction_result.get("text", "")
+        if not extracted_text and extraction_result.get("errors"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Text extraction failed: {'; '.join(extraction_result['errors'])}"
+            )
+        
+        if not extracted_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="No text could be extracted from the document"
+            )
+        
+        logger.info(f"[FILE] Text extracted: {len(extracted_text)} characters")
+        
+        # Validate using criteria validator with database record
+        validation_result = criteria_validator.validate_criteria_document(
+            criteria_code, database_record, extracted_text
+        )
+        
+        # Prepare response
+        response_data = {
+            "validation_result": validation_result,
+            "database_record": database_record,
+            "extraction_info": extraction_result.get("metadata", {}),
+            "criteria_info": criteria_validator.get_criteria_info(criteria_code),
+            "processing_stats": {
+                "file_size": Path(temp_file_path).stat().st_size,
+                "text_length": len(extracted_text),
+                "confidence_score": validation_result.get("confidence_score", 0.0),
+                "record_id": record_id
+            }
+        }
+        
+        # Console summary
+        decision = validation_result.get("decision", "UNKNOWN")
+        confidence = validation_result.get("confidence_score", 0.0)
+        status_emoji = "✅" if decision == "ACCEPT" else "⚠️" if decision == "FLAG_FOR_REVIEW" else "❌"
+        
+        print(f"🎯 [DB-RECORD-VALIDATION] {status_emoji} {decision} | Confidence: {confidence:.3f} | Record: {record_id}")
+        
+        return ValidationResponse(
+            success=validation_result.get("is_valid", False),
+            message=f"Database record validation completed for {criteria_code}",
+            data=response_data,
+            errors=[]
+        )
+        
+    except Exception as e:
+        logger.error(f"Database record validation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+    
+    finally:
+        # Clean up temporary file
+        if temp_file_path and Path(temp_file_path).exists():
+            os.unlink(temp_file_path)
+
+
+@app.get("/records/{criteria_code}")
+async def get_records_by_criteria(criteria_code: str, limit: int = 10):
+    """Get recent records for a specific criteria"""
+    try:
+        records = db.get_records_by_criteria(criteria_code, limit)
+        return {
+            "criteria_code": criteria_code,
+            "records": records,
+            "count": len(records)
+        }
+    except Exception as e:
+        logger.error(f"Error getting records: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get records: {str(e)}")
+
+
+@app.get("/search/{criteria_code}")
+async def search_records(criteria_code: str, pi_name: str = None, project_name: str = None, year: int = None):
+    """Search records by parameters"""
+    try:
+        search_params = {}
+        if pi_name:
+            search_params["name_of_principal_investigator"] = pi_name
+        if project_name:
+            search_params["name_of_project"] = project_name
+        if year:
+            search_params["year_of_award"] = str(year)
+        
+        records = db.search_records(criteria_code, search_params)
+        return {
+            "criteria_code": criteria_code,
+            "search_params": search_params,
+            "records": records,
+            "count": len(records)
+        }
+    except Exception as e:
+        logger.error(f"Error searching records: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to search records: {str(e)}")
+
+
+@app.get("/database/status")
+async def get_database_status():
+    """Get database connection status and statistics"""
+    try:
+        status = db.get_database_status()
+        return status
+    except Exception as e:
+        logger.error(f"Database status check failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database status check failed: {str(e)}")
 
 
 if __name__ == "__main__":

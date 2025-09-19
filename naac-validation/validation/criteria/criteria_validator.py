@@ -1,24 +1,45 @@
 """
-NAAC Criteria-specific validation rules and logic
+NAAC Criteria-specific validation rules and logic with database model integration
 """
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from validation.content_validator import NAACContentValidator
 
 class CriteriaValidator:
-    """Validates documents against specific NAAC criteria requirements"""
+    """Validates documents against specific NAAC criteria requirements and database models"""
     
     def __init__(self):
         self.content_validator = NAACContentValidator()
         
-        # Define criteria-specific requirements
+        # Define criteria-specific requirements with database model mappings and AI instructions
         self.criteria_requirements = {
             "2.1.1": {
                 "name": "Number of teaching staff joined the institution during the last five years",
-                "required_fields": ["faculty_name", "joining_date", "designation", "department"],
-                "document_types": ["joining_letter", "appointment_order"],
+                "database_model": "response_2_1_1",
+                "model_fields": ["programme_name", "programme_code", "no_of_seats", "no_of_students", "year", "session"],
+                "required_fields": ["programme_name", "year", "no_of_students"],
+                "document_types": ["enrollment_data", "programme_details"],
+                "ai_validation_instructions": """
+                You are validating a document against NAAC criteria 2.1.1 (Student enrollment data).
+                Compare the extracted text with the database entry and assign a confidence score (0.0-1.0).
+                
+                KEY VALIDATION POINTS:
+                1. Programme Name Matching: Check if programme names in document match database entries
+                2. Year Validation: Ensure year mentioned is within the assessment period
+                3. Student Numbers: Verify student enrollment numbers are consistent
+                4. Data Completeness: Check if all required fields have corresponding information
+                
+                CONFIDENCE SCORING GUIDE:
+                - 0.9-1.0: Perfect match, all data points align with high accuracy
+                - 0.7-0.8: Good match, minor discrepancies or formatting differences
+                - 0.5-0.6: Partial match, some data points match but concerns exist
+                - 0.3-0.4: Poor match, significant discrepancies found
+                - 0.0-0.2: No meaningful match, document doesn't support the data
+                
+                Focus on: Programme identification, enrollment numbers accuracy, year consistency
+                """,
                 "validation_rules": {
-                    "joining_date": "must be within last 5 years",
-                    "designation": "must be teaching position"
+                    "year": "must be within assessment period (last 5 years)",
+                    "no_of_students": "must be > 0 and realistic for programme capacity"
                 }
             },
             "2.2.1": {
@@ -31,21 +52,69 @@ class CriteriaValidator:
             },
             "3.1.1": {
                 "name": "Grants received from Government and non-governmental agencies for research projects",
-                "required_fields": ["project_title", "pi_name", "co_pi_names", "funding_agency", "sanctioned_amount", "duration", "sanction_year"],
-                "document_types": ["sanction_letter", "grant_certificate"],
+                "database_model": "response_3_1_1", 
+                "model_fields": ["name_of_principal_investigator", "department_of_principal_investigator", "duration_of_project", "type", "name_of_project", "year_of_award", "amount_sanctioned", "name_of_funding_agency"],
+                "required_fields": ["name_of_project", "name_of_principal_investigator", "name_of_funding_agency", "amount_sanctioned", "year_of_award"],
+                "document_types": ["sanction_letter", "grant_certificate", "approval_letter"],
+                "ai_validation_instructions": """
+                You are validating a document for NAAC criteria 3.1.1 (Research grants).
+                Compare the extracted document text with the database entry for research grant details.
+                
+                KEY VALIDATION POINTS:
+                1. Principal Investigator: Verify PI name and department match between document and database
+                2. Project Details: Check project title/name consistency 
+                3. Funding Agency: Confirm funding agency name matches
+                4. Amount Verification: Cross-check sanctioned amount (consider formatting variations)
+                5. Timeline: Verify project duration and award year
+                6. Grant Type: Confirm if Government/Non-Government classification is correct
+                
+                CONFIDENCE SCORING GUIDE:
+                - 0.9-1.0: All critical details match perfectly (PI, project, amount, agency)
+                - 0.7-0.8: Core details match with minor variations in formatting/spelling
+                - 0.5-0.6: Key information matches but some fields have discrepancies
+                - 0.3-0.4: Partial match, significant issues with amount/PI/agency details
+                - 0.0-0.2: Document doesn't support the claimed grant details
+                
+                Focus on: PI verification, funding agency confirmation, amount accuracy, project identification
+                """,
                 "validation_rules": {
-                    "sanctioned_amount": "must be > 0",
-                    "sanction_year": "must be within assessment period",
-                    "pi_name": "must be faculty of institution"
+                    "amount_sanctioned": "must be > 0 and match document amount",
+                    "year_of_award": "must be within assessment period",
+                    "name_of_principal_investigator": "must be faculty of institution",
+                    "type": "must be 'Government' or 'Non Government'"
                 }
             },
             "3.2.1": {
                 "name": "Institution has created an ecosystem for innovations and has initiatives for creation and transfer of knowledge",
-                "required_fields": ["innovation_title", "participants", "outcome", "year"],
-                "document_types": ["innovation_report", "patent_document", "publication"],
+                "database_model": "response_3_2_1",
+                "model_fields": ["paper_title", "author_names", "department", "journal_name", "year_of_publication", "issn_number"],
+                "required_fields": ["paper_title", "author_names", "journal_name", "year_of_publication"],
+                "document_types": ["research_paper", "publication_certificate", "journal_publication"],
+                "ai_validation_instructions": """
+                You are validating a document for NAAC criteria 3.2.1 (Innovation and knowledge transfer).
+                Compare the extracted document text with database entry for research publications/innovations.
+                
+                KEY VALIDATION POINTS:
+                1. Publication Title: Verify paper/innovation title matches database entry
+                2. Author Verification: Check if author names match (consider name variations)
+                3. Journal Validation: Confirm journal name and authenticity
+                4. Publication Year: Verify year of publication is within assessment period
+                5. ISSN Verification: Cross-check ISSN number if available in document
+                6. Institutional Affiliation: Ensure authors are affiliated with the institution
+                
+                CONFIDENCE SCORING GUIDE:
+                - 0.9-1.0: Perfect match - title, authors, journal, year all align
+                - 0.7-0.8: Strong match with minor spelling/formatting differences
+                - 0.5-0.6: Core information matches but some discrepancies exist
+                - 0.3-0.4: Partial match, concerns about authenticity or accuracy
+                - 0.0-0.2: Document doesn't support the publication claim
+                
+                Focus on: Title accuracy, author verification, journal authenticity, publication year
+                """,
                 "validation_rules": {
-                    "participants": "must include institution members",
-                    "outcome": "must show tangible results"
+                    "year_of_publication": "must be within assessment period",
+                    "author_names": "at least one author must be from institution",
+                    "journal_name": "must be authentic and verifiable"
                 }
             },
             "3.2.2": {
@@ -77,14 +146,14 @@ class CriteriaValidator:
             }
         }
 
-    def validate_criteria_document(self, criteria_code: str, expected_data: Dict[str, Any], 
+    def validate_criteria_document(self, criteria_code: str, database_record: Dict[str, Any], 
                                   extracted_text: str) -> Dict[str, Any]:
         """
-        Validate document for specific NAAC criteria
+        Validate document for specific NAAC criteria against database record
         
         Args:
             criteria_code: NAAC criteria code (e.g., "3.1.1")
-            expected_data: Expected data from Excel template
+            database_record: Database record data to validate against
             extracted_text: Text extracted from document
         """
         
@@ -99,23 +168,25 @@ class CriteriaValidator:
         
         criteria_info = self.criteria_requirements[criteria_code]
         
-        # Perform content validation with criteria-specific context
-        result = self.content_validator.validate_criteria_specific(
-            criteria_code, expected_data, extracted_text
+        # Perform content validation with criteria-specific context and AI instructions
+        ai_instructions = criteria_info.get("ai_validation_instructions", "")
+        result = self.content_validator.validate_with_database_record(
+            criteria_code, database_record, extracted_text, ai_instructions
         )
         
         # Add criteria-specific validation
         criteria_validation = self._validate_criteria_requirements(
-            criteria_code, expected_data, extracted_text, criteria_info
+            criteria_code, database_record, extracted_text, criteria_info
         )
         
         # Merge results
         result.update({
             "criteria_code": criteria_code,
             "criteria_name": criteria_info["name"],
+            "database_model": criteria_info.get("database_model", ""),
             "criteria_validation": criteria_validation,
             "required_fields_check": self._check_required_fields(
-                expected_data, criteria_info["required_fields"]
+                database_record, criteria_info["required_fields"]
             )
         })
         
@@ -126,7 +197,7 @@ class CriteriaValidator:
         
         return result
 
-    def _validate_criteria_requirements(self, criteria_code: str, expected_data: Dict[str, Any], 
+    def _validate_criteria_requirements(self, criteria_code: str, database_record: Dict[str, Any], 
                                       extracted_text: str, criteria_info: Dict[str, Any]) -> Dict[str, Any]:
         """Validate criteria-specific requirements"""
         
@@ -141,7 +212,7 @@ class CriteriaValidator:
         
         # Apply criteria-specific validation rules
         for field, rule in validation_rules.items():
-            check_result = self._apply_validation_rule(field, rule, expected_data, extracted_text)
+            check_result = self._apply_validation_rule(field, rule, database_record, extracted_text)
             validation_result["requirement_checks"][field] = check_result
             
             if not check_result["passed"]:
@@ -153,7 +224,7 @@ class CriteriaValidator:
         
         return validation_result
 
-    def _apply_validation_rule(self, field: str, rule: str, expected_data: Dict[str, Any], 
+    def _apply_validation_rule(self, field: str, rule: str, database_record: Dict[str, Any], 
                               extracted_text: str) -> Dict[str, Any]:
         """Apply specific validation rule"""
         
@@ -163,7 +234,7 @@ class CriteriaValidator:
             "severity": "info"
         }
         
-        field_value = expected_data.get(field)
+        field_value = database_record.get(field)
         
         try:
             if "within last 5 years" in rule and field in ["joining_date", "sanction_year"]:

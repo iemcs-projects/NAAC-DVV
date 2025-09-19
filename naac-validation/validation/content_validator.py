@@ -32,7 +32,7 @@ class NAACContentValidator:
         
         self.llm = ChatGroq(
             groq_api_key=settings.GROQ_API_KEY,
-            model_name="mixtral-8x7b-32768",
+            model_name="llama-3.1-8b-instant",  # Updated to supported model
             temperature=0.1,
             max_tokens=4096
         )
@@ -45,6 +45,71 @@ class NAACContentValidator:
             logger.warning(f"Could not load validation rules: {str(e)}")
             self.validation_rules = {}
             self.confidence_factors = {}
+
+    def validate_with_database_record(self, criteria_code: str, database_record: Dict[str, Any], 
+                                    extracted_text: str, ai_instructions: str) -> Dict[str, Any]:
+        """
+        Validate document against database record using AI instructions
+        
+        Args:
+            criteria_code: NAAC criteria code
+            database_record: Database record to validate against
+            extracted_text: Text extracted from document
+            ai_instructions: Detailed instructions for AI validation
+            
+        Returns:
+            Dictionary with validation results
+        """
+        
+        if not extracted_text or not extracted_text.strip():
+            return {
+                "is_valid": False,
+                "decision": "REJECT",
+                "confidence_score": 0.0,
+                "error": "No text extracted from document",
+                "details": {}
+            }
+        
+        try:
+            # Create enhanced prompt with AI instructions
+            validation_prompt = self._create_database_validation_prompt(
+                criteria_code, database_record, extracted_text, ai_instructions
+            )
+            
+            # Get AI analysis
+            response = self.llm.invoke([HumanMessage(content=validation_prompt)])
+            analysis = self._parse_llm_response(response.content)
+            
+            # Calculate confidence score using AI analysis and database comparison
+            confidence_score = self._calculate_database_confidence(
+                database_record, extracted_text, analysis
+            )
+            
+            # Make validation decision
+            decision = self._make_decision(confidence_score)
+            
+            result = {
+                "is_valid": decision in ["ACCEPT", "FLAG_FOR_REVIEW"],
+                "decision": decision,
+                "confidence_score": confidence_score,
+                "criteria_code": criteria_code,
+                "ai_analysis": analysis,
+                "database_comparison": self._compare_with_database(database_record, extracted_text),
+                "validation_timestamp": datetime.now().isoformat()
+            }
+            
+            logger.info(f"Database validation completed for {criteria_code}: {decision} (confidence: {confidence_score:.3f})")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Database validation failed for {criteria_code}: {str(e)}")
+            return {
+                "is_valid": False,
+                "decision": "REJECT",
+                "confidence_score": 0.0,
+                "error": f"Validation error: {str(e)}",
+                "criteria_code": criteria_code
+            }
 
     def validate_document(self, expected_data: Dict[str, Any], 
                          extracted_text: str, 
@@ -372,10 +437,138 @@ VALIDATION GUIDELINES:
         
         return result
 
+    def _create_database_validation_prompt(self, criteria_code: str, database_record: Dict[str, Any], 
+                                         extracted_text: str, ai_instructions: str) -> str:
+        """Create validation prompt for database record comparison"""
+        
+        prompt = f"""
+{ai_instructions}
+
+DATABASE RECORD TO VALIDATE:
+{json.dumps(database_record, indent=2)}
+
+EXTRACTED DOCUMENT TEXT:
+{extracted_text}
+
+TASK:
+Compare the extracted document text with the database record for NAAC criteria {criteria_code}.
+Provide a detailed analysis and confidence score.
+
+RESPONSE FORMAT (JSON):
+{{
+    "confidence_score": <float 0.0-1.0>,
+    "field_matches": {{
+        "field_name": {{"found": true/false, "similarity": <float>, "notes": "explanation"}}
+    }},
+    "overall_assessment": "detailed explanation",
+    "concerns": ["list of any concerns or discrepancies"],
+    "strengths": ["list of supporting evidence found"],
+    "recommendation": "ACCEPT/FLAG_FOR_REVIEW/REJECT"
+}}
+"""
+        return prompt
+
+    def _calculate_database_confidence(self, database_record: Dict[str, Any], 
+                                     extracted_text: str, analysis: Dict[str, Any]) -> float:
+        """Calculate confidence score based on database comparison and AI analysis"""
+        
+        ai_confidence = analysis.get("confidence_score", 0.0)
+        if not isinstance(ai_confidence, (int, float)):
+            ai_confidence = 0.5
+        
+        # Get field matches from AI analysis
+        field_matches = analysis.get("field_matches", {})
+        
+        if not field_matches:
+            return max(0.0, min(1.0, ai_confidence * 0.8))  # Reduce confidence if no field analysis
+        
+        # Calculate field match score
+        match_scores = []
+        for field, match_info in field_matches.items():
+            if isinstance(match_info, dict):
+                similarity = match_info.get("similarity", 0.0)
+                found = match_info.get("found", False)
+                if found and isinstance(similarity, (int, float)):
+                    match_scores.append(similarity)
+        
+        # Combine AI confidence with field match scores
+        if match_scores:
+            field_avg = sum(match_scores) / len(match_scores)
+            final_confidence = (ai_confidence * 0.6) + (field_avg * 0.4)
+        else:
+            final_confidence = ai_confidence * 0.7  # Reduce if no specific field matches
+        
+        # Apply penalties for concerns
+        concerns = analysis.get("concerns", [])
+        if concerns:
+            penalty = min(0.3, len(concerns) * 0.1)
+            final_confidence *= (1 - penalty)
+        
+        return max(0.0, min(1.0, final_confidence))
+
+    def _compare_with_database(self, database_record: Dict[str, Any], extracted_text: str) -> Dict[str, Any]:
+        """Compare extracted text with database record fields"""
+        
+        comparison = {
+            "field_analysis": {},
+            "text_coverage": 0.0,
+            "missing_fields": [],
+            "found_fields": []
+        }
+        
+        if not extracted_text:
+            return comparison
+        
+        text_lower = extracted_text.lower()
+        fields_found = 0
+        total_fields = 0
+        
+        for field, value in database_record.items():
+            if field in ['id', 'sl_no', 'criteria_code', 'session', 'submitted_at']:
+                continue  # Skip system fields
+                
+            total_fields += 1
+            
+            if value and str(value).strip():
+                value_str = str(value).lower()
+                # Simple text matching
+                if value_str in text_lower:
+                    fields_found += 1
+                    comparison["found_fields"].append(field)
+                    comparison["field_analysis"][field] = {
+                        "found": True,
+                        "value": str(value),
+                        "match_type": "exact"
+                    }
+                else:
+                    # Try partial matching for names/titles
+                    words = value_str.split()
+                    if len(words) > 1 and any(word in text_lower for word in words if len(word) > 3):
+                        fields_found += 0.5
+                        comparison["found_fields"].append(field)
+                        comparison["field_analysis"][field] = {
+                            "found": True,
+                            "value": str(value),
+                            "match_type": "partial"
+                        }
+                    else:
+                        comparison["missing_fields"].append(field)
+                        comparison["field_analysis"][field] = {
+                            "found": False,
+                            "value": str(value),
+                            "match_type": "none"
+                        }
+            else:
+                comparison["missing_fields"].append(field)
+        
+        comparison["text_coverage"] = fields_found / total_fields if total_fields > 0 else 0.0
+        
+        return comparison
+
     def get_validator_info(self) -> Dict[str, Any]:
         """Get validator configuration information"""
         return {
-            "model": "mixtral-8x7b-32768",
+            "model": "llama-3.1-8b-instant",
             "langchain_available": LANGCHAIN_AVAILABLE,
             "api_configured": bool(settings.GROQ_API_KEY),
             "confidence_thresholds": {
@@ -385,5 +578,6 @@ VALIDATION GUIDELINES:
             "supported_document_types": [
                 "sanction_letter", "publication", "patent", 
                 "consultancy", "mou", "award"
-            ]
+            ],
+            "validation_modes": ["legacy", "database_record"]
         }
