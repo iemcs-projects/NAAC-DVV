@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
@@ -6,8 +6,11 @@ import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
 import LandingNavbar from "../../components/landing-navbar";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria2_2_1 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const { uploads, uploading, uploadFile, error: uploadError } = useUpload(); 
   const [useupload, setUseupload] = useState(false);
   const [currentYear, setCurrentYear] = useState("");
@@ -154,10 +157,9 @@ const Criteria2_2_1 = () => {
  
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         <div className="flex-1 mt-6 flex flex-col p-4">
           {/* Page Title and Date */}

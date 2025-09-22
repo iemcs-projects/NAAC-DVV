@@ -16,6 +16,7 @@ const Criteria2_3_3 = () => {
   const [file, setFile] = useState(null);
   const { sessions: sessionYears, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const [selectedYear, setSelectedYear] = useState("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (!isLoadingSessions && sessionYears && sessionYears.length > 0) {
@@ -146,10 +147,9 @@ const Criteria2_3_3 = () => {
   };
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden text-black">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
           <h2 className="text-2xl font-bold text-blue-900 mb-6">
             2.3.3.1 Mentor to Student Ratio

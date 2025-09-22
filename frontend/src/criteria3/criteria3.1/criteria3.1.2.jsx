@@ -10,6 +10,7 @@ import { useContext } from "react";
 import axios from "axios";
 
 const Criteria3_1_2 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
   const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
   const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
@@ -119,12 +120,10 @@ const validScore = getValidScore(score);
   const averagePrograms = (totalPrograms / years.length).toFixed(2);
 
   return (
-    <div className="w-[1690px] min-h-screen bg-gray-50 overflow-x-hidden">
-      <Header />
-      <Navbar />
-      <div className="flex w-full">
-        <Sidebar />
-        <div className="flex-1 p-6">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 mt-6 flex flex-col p-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">
               Criteria 3- Research, Innovations and Extension
@@ -207,106 +206,7 @@ const validScore = getValidScore(score);
           </div>
           </div>
 
-          {years.map((year) => (
-            <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
-              {yearData[year]?.length > 0 ? (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-200">
-                    <tr>
-                      <th className="border text-gray-900 px-2 py-1">#</th>
-                      <th className="border text-gray-900 px-2 py-1">proj</th>
-                      <th className="border text-gray-900 px-2 py-1">name</th>
-                      <th className="border text-gray-900 px-2 py-1">princ</th>
-                      <th className="border text-gray-900 px-2 py-1">dept</th>
-                      <th className="border text-gray-900 px-2 py-1">amt</th>
-                      <th className="border text-gray-900 px-2 py-1">duration</th>
-                      <th className="border text-gray-900 px-2 py-1">agency</th>
-                      <th className="border text-gray-900 px-2 py-1">type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {yearData[year].map((entry, idx) => (
-                      <tr key={idx} className="even:bg-gray-50">
-                        <td className="border text-gray-900 border-black px-2 py-1">{idx + 1}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.proj}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.name}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.princ}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.dept}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.amt}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.duration}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.agency}</td>
-                        <td className="border text-gray-900 border-black px-2 py-1">{entry.type}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-gray-600 p-4">No data available for {year}.</p>
-              )}
-            </div>
-          ))}
-
-          <div className="overflow-auto border rounded p-4">
-            <h2 className="text-lg font-semibold mb-2 text-gray-700">
-              Calculation Table (Last 5 Years)
-            </h2>
-            <table className="table-auto border-collapse w-full">
-              <thead>
-                <tr className="bg-gray-100 text-gray-600 font-semibold">
-                  <th className="border px-4 py-2">Year</th>
-                  {Object.keys(yearScores).map((year) => (
-                    <th key={year} className="border px-4 py-2">{year}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-4 py-2 font-medium text-gray-600">Calculated Score</td>
-                  {Object.keys(yearScores).map((year) => (
-                    <td key={year} className="border px-4 py-2 text-center">
-                      <input
-                        type="number"
-                        value={yearScores[year]}
-                        onChange={(e) =>
-                          setYearScores({ ...yearScores, [year]: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-20 text-center border px-1 rounded text-gray-950"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2 mt-4">
-              <label className="text-sm font-medium text-gray-700">
-                Enter number of years for average:
-              </label>
-              <input
-                type="number"
-                value={yearCount}
-                min={1}
-                max={5}
-                onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                className="w-20 border px-2 py-1 rounded text-center text-gray-950"
-              />
-              <button
-                className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:!bg-green-700"
-                onClick={() => {
-                  const values = Object.values(yearScores).slice(0, yearCount);
-                  const sum = values.reduce((acc, val) => acc + val, 0);
-                  setAverageScore((sum / yearCount).toFixed(2));
-                }}
-              >
-                Calculate Average
-              </button>
-            </div>
-            {averageScore !== null && (
-              <div className="mt-4 text-blue-700 font-semibold">
-                Average Score for last {yearCount} year(s): {averageScore}%
-              </div>
-            )}
-          </div>
+          
 
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />

@@ -31,6 +31,7 @@ const Criteria1_3_1 = () => {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [autoSaveTimestamp, setAutoSaveTimestamp] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const textareaRefs = useRef({});
   const autoSaveTimerRef = useRef(null);
 
@@ -148,12 +149,10 @@ const Criteria1_3_1 = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
-
-        <div className="flex-1 mt-6 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 flex flex-col">
           {/* Page Title and Date */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Criteria 1: Curricular Aspects</h2>

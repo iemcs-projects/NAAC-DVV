@@ -4,6 +4,7 @@ import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import Bottom from "../../components/bottom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import LandingNavbar from "../../components/landing-navbar";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
@@ -28,7 +29,8 @@ const Criteria2_1_2 = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
-    const [editKey, setEditKey] = useState(null);
+  const [editKey, setEditKey] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Fetch score when component mounts
   useEffect(() => {
@@ -229,12 +231,22 @@ const Criteria2_1_2 = () => {
     alert("Draft saved.");
   };
 
+  const goToNextPage = () => navigate("/criteria2.1.3");
+  const goToPreviousPage = () => navigate("/criteria2.1.1");
+  
+  const handleExport = () => {
+    window.open("http://localhost:8000/download-excel", "_blank");
+  };
+
   return (
-    <div className="w-screen min-h-screen bg-white text-black overflow-x-auto">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">6
-        <Sidebar />
-        <div className="flex-1 mt-6 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+      <div className="flex-1 flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-medium text-gray-800">Criteria 2: Teaching-Learning and Evaluation</h2>
+              <div className="text-sm text-gray-600">2.1 - Student Enrolment and Profile</div>
+            </div>
           <h2 className="text-lg font-semibold mb-4">
             2.1.2 Average percentage of seats filled against seats reserved for various categories (SC, ST, OBC, Divyangjan, etc.) during the last five years
           </h2>
@@ -481,34 +493,8 @@ const Criteria2_1_2 = () => {
             </div>
           ))}
 
-          {/* Navigation and Save Buttons */}
-          <div className="flex justify-between items-center mt-6 mb-10">
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-              onClick={() => navigate("/criteria2.1.1")}
-            >
-              ← Previous
-            </button>
-            <div className="space-x-3">
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={handleDraft}
-              >
-                Save draft
-              </button>
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={handleSubmit}
-              >
-                Submit entry
-              </button>
-              <button
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={() => navigate("/criteria2.1.3")}
-              >
-                Next →
-              </button>
-            </div>
+<div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} onSubmit={handleSubmit} />
           </div>
         </div>
       </div>

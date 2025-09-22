@@ -144,11 +144,10 @@ const navigate = useNavigate();
 
 
   return (
-    <div className="min-h-screen w-screen  bg-gray-50 flex flex-col">
-    
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        {/* Page Title and Date */}
 
         <div className="flex-1 flex mt-6 flex-col p-4">
           {/* Page Title and Date */}

@@ -4,11 +4,28 @@ import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
+import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+import { FaTrash, FaEdit } from 'react-icons/fa';
+import api from "../../api";
 
 const Criteria6_3_2 = () => {
+  const navigate = useNavigate();
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   
+  const [currentYear, setCurrentYear] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [yearData, setYearData] = useState({});
+  const [submittedData, setSubmittedData] = useState([]);
+
   const pastFiveYears = useMemo(
     () =>
       Array.from({ length: 5 }, (_, i) =>
@@ -17,35 +34,141 @@ const Criteria6_3_2 = () => {
     []
   );
 
-  const [currentYear, setCurrentYear] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [provisionalScore, setProvisionalScore] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [yearData, setYearData] = useState({});
+  // Form data for single entry
   const [formData, setFormData] = useState({
     year: "",
     name: "",
     conf: "",
     name_body: "",
     amt: "",
-  });
-  const [submittedData, setSubmittedData] = useState([]);
-  const [calculationData, setCalculationData] = useState({
-    2020: 0,
-    2021: 0,
-    2022: 0,
-    2023: 0,
-    2024: 0
+    supportLinks: []
   });
 
+  // Set default year when sessions are loaded
   useEffect(() => {
-    if (availableSessions && availableSessions.length > 0) {
-      setCurrentYear(availableSessions[0]); // Default to most recent session
+    if (availableSessions && availableSessions.length > 0 && !currentYear) {
+      const firstYear = availableSessions[0];
+      setCurrentYear(firstYear);
+      setFormData(prev => ({ ...prev, year: firstYear }));
     }
-  }, [availableSessions]);
+  }, [availableSessions, currentYear]);
 
+  // Fetch response data for a specific year
+  const fetchResponseData = async (year) => {
+      console.log('Fetching data for year:', year);
+      if (!year) {
+        console.log('No year provided, returning empty array');
+        return [];
+      }
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const yearToSend = year.split("-")[0];
+        console.log('Sending request with session:', yearToSend);
+        
+        const response = await api.get(
+          "/criteria2/getResponse/6.3.2", 
+          { 
+            params: { 
+              session: yearToSend
+            }
+          }
+        );
+        
+        console.log('Full API Response:', JSON.stringify(response, null, 2));
+        
+        if (!response.data) {
+          console.warn('No data in response');
+          return [];
+        }
+        
+        console.log('Response data structure:', {
+          hasData: !!response.data,
+          hasDataData: !!response.data.data,
+          dataKeys: Object.keys(response.data),
+          dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+          dataData: response.data.data ? 
+            (Array.isArray(response.data.data) ? 'array' : typeof response.data.data) : 'no data.data'
+        });
+        
+        // Handle both response.data and response.data.data
+        let data = response.data.data || response.data;
+        
+        // If data is not an array but is an object, convert it to an array
+        console.log('Data before processing:', data);
+        if (data) {
+          if (!Array.isArray(data)) {
+            console.log('Converting single object to array');
+            data = [data];
+          }
+        } else {
+          console.warn('Data is null or undefined');
+          return [];
+        }
+        
+        if (!data) {
+          console.warn('No data array in response');
+          return [];
+        }
+        
+        // Map the data to ensure consistent structure
+        const mappedData = data.map(item => {
+          console.log('Raw database item:', item);
+          
+          const mappedItem = {
+            id: item.id || item.sl_no,
+            sl_no: item.sl_no || item.id,
+            teacher_name: item.teacher_name || 'N/A',
+            conference_name: item.conference_name || 'N/A',
+            professional_body: item.professional_body || 'N/A',
+            amt_of_spt_received: item.amt_of_spt_received || 'N/A',
+            year: item.year || year,
+            ...item
+          };
+          
+          console.log('Mapped item:', mappedItem);
+          return mappedItem;
+        });
+        
+        console.log('Final mapped data:', mappedData);
+        
+        // Store the SL numbers in localStorage for each entry
+        mappedData.forEach(item => {
+          if (item.sl_no) {
+            localStorage.setItem(`criteria5.3.1_slNo_${item.id || item.sl_no}`, item.sl_no);
+          }
+        });
+        
+        return mappedData;
+      } catch (error) {
+        console.error('Error fetching response data:', error);
+        setError('Failed to fetch data. Please try again.');
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+
+  // Fetch score
   const fetchScore = async () => {
+    if (!currentYear) return;
+    
+    const cachedScore = localStorage.getItem(`criteria632_score_${currentYear}`);
+    if (cachedScore) {
+      try {
+        const parsedScore = JSON.parse(cachedScore);
+        if (Date.now() - parsedScore.timestamp < 60 * 60 * 1000) {
+          setProvisionalScore(parsedScore.data);
+        }
+      } catch (e) {
+        console.warn("Error parsing cached score:", e);
+        localStorage.removeItem(`criteria632_score_${currentYear}`);
+      }
+    }
+    
     console.log('Fetching score...');
     setLoading(true);
     setError(null);
@@ -53,13 +176,22 @@ const Criteria6_3_2 = () => {
       const response = await axios.get("http://localhost:3000/api/v1/criteria6/score632");
       console.log('API Response:', response);
       
-      // Handle different possible response structures
       const scoreData = response.data?.data?.entry || response.data?.data || response.data;
       
       if (scoreData) {
         console.log('Score data:', scoreData);
-        // Set the entire response data and let the display logic handle it
         setProvisionalScore(scoreData);
+        
+        if (scoreData) {
+          const cacheData = {
+            data: scoreData,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(
+            `criteria632_score_${currentYear}`, 
+            JSON.stringify(cacheData)
+          );
+        }
       } else {
         console.log('No score data found in response');
         setProvisionalScore(null);
@@ -76,35 +208,123 @@ const Criteria6_3_2 = () => {
       setLoading(false);
     }
   };
-  useEffect(() => {
-    fetchScore();
-  }, []);
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // Handle create new entry
+  const handleCreate = async (formDataToSubmit) => {
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year.split("-")[0];
+
+      const payload = {
+        session: parseInt(yearToSend, 10),  // int
+        year: yearToSend,  // Just the year part as string (e.g., "2023")
+        teacher_name: formDataToSubmit.name.trim(),  // string
+        conference_name: formDataToSubmit.conf.trim(),  // string (text in DB)
+        professional_body: formDataToSubmit.name_body.trim(),  // string (text in DB)
+        amt_of_spt_received: formDataToSubmit.amt ? formDataToSubmit.amt.toString() : '0',  // string (varchar)
+        support_links: JSON.stringify(formDataToSubmit.supportLinks || []),  // stringify array for DB
+        criteria: '6.3.2'  // string
+      };
+      
+      console.log('Sending request with payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await axios.post(
+        "http://localhost:3000/api/v1/criteria6/createResponse632", 
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          withCredentials: true,
+          validateStatus: (status) => status < 500 // Reject only if the status code is greater than or equal to 500
+        }
+      );
+      
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
+      
+      if (response.data && response.data.success) {
+        console.log('Request was successful');
+        setSuccess('Faculty financial support data submitted successfully!');
+        
+        // Refresh the data from the server
+        const updatedData = await fetchResponseData(currentYear);
+        
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSubmittedData(updatedData);
+        
+        // Reset form
+        setFormData({
+          year: currentYear,
+          name: "",
+          conf: "",
+          name_body: "",
+          amt: "",
+          supportLinks: []
+        });
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+        
+        // Refresh score
+        await fetchScore();
+      }
+    } catch (error) {
+      console.error("Submission failed:", error);
+      let errorMessage = "Submission failed!";
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error status:", error.response.status);
+        errorMessage = error.response.data.message || errorMessage;
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        errorMessage = "No response from server. Please check your connection.";
+      } else {
+        console.error('Error:', error.message);
+      }
+      setError(errorMessage);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    const { year, name, conf, name_body, amt } = formData;
-    const session = currentYear;
-
-    // Basic validation
-    if (!year || !name || !conf || !name_body || !amt) {
-      alert("Please fill in all required fields.");
-      return;
+  // Handle update entry
+  const handleUpdate = async (formDataToSubmit) => {
+    const entryId = formDataToSubmit.id;
+    if (!entryId) {
+      const errorMsg = "No entry selected for update";
+      setError(errorMsg);
+      throw new Error(errorMsg);
     }
-
+    
+    setSubmitting(true);
+    setError(null);
+    
     try {
-      const response = await axios.post(
-        "http://localhost:3000/api/v1/criteria6/createResponse632",
-        {
-          session: parseInt(session.split("-")[0], 10),
-          year: year,
-          teacher_name: name.trim(),
-          conference_name: conf.trim(),
-          professional_body: name_body.trim(),
-          amt_of_spt_received: parseFloat(amt) || 0,
-        },
+      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
+
+      const payload = {
+        session: parseInt(yearToSend, 10),  // int
+        year: yearToSend,  // Just the year part as string (e.g., "2023")
+        teacher_name: formDataToSubmit.name.trim(),  // string
+        conference_name: formDataToSubmit.conf.trim(),  // string (text in DB)
+        professional_body: formDataToSubmit.name_body.trim(),  // string (text in DB)
+        amt_of_spt_received: formDataToSubmit.amt ? formDataToSubmit.amt.toString() : '0',  // string (varchar)
+        support_links: JSON.stringify(formDataToSubmit.supportLinks || []),  // stringify array for DB
+        criteria: '6.3.2'  // string
+      };
+      
+      console.log('Sending update payload:', payload);
+      const response = await api.put(
+        `/criteria2/updateResponse/${entryId}`, 
+        payload,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -112,101 +332,277 @@ const Criteria6_3_2 = () => {
           withCredentials: true
         }
       );
-
-      // Update local state with the new entry
-      const newEntry = {
-        year,
-        name: name.trim(),
-        conf: conf.trim(),
-        name_body: name_body.trim(),
-        amt: parseFloat(amt) || 0,
-      };
-
-      setSubmittedData(prev => [...prev, newEntry]);
       
-      // Update yearData for year-wise display
+      if (!response.data || !response.data.success) {
+        const errorMsg = response.data?.message || "Failed to update entry";
+        throw new Error(errorMsg);
+      }
+      
+      // Refresh the data from the server
+      const updatedData = await fetchResponseData(currentYear);
+      
       setYearData(prev => ({
         ...prev,
-        [newEntry.year]: [...(prev[newEntry.year] || []), {
-          name: newEntry.name,
-          conf: newEntry.conf,
-          name_body: newEntry.name_body,
-          amt: newEntry.amt,
-        }],
+        [currentYear]: updatedData
       }));
+      setSubmittedData(updatedData);
       
-      // Reset form but keep the current year
+      setSuccess('Entry updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      return true;
+    } catch (err) {
+      console.error("Error updating entry:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Failed to update entry";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle delete entry
+  const handleDelete = async (entryId) => {
+    if (!entryId) {
+      console.error('No entry ID provided for deletion');
+      setError('Error: No entry selected for deletion');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this entry?')) {
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await api.delete(
+        `/criteria2/deleteResponse/${entryId}`,
+        { withCredentials: true }
+      );
+      
+      if (response.status === 200) {
+        // Remove from current display
+        setSubmittedData(prev => prev.filter(entry => entry.id !== entryId));
+        
+        // Update year data
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: (prev[currentYear] || []).filter(entry => entry.id !== entryId)
+        }));
+        
+        setSuccess('Entry deleted successfully!');
+        
+        // Refresh data and score
+        const updatedData = await fetchResponseData(currentYear);
+        setSubmittedData(updatedData || []);
+        await fetchScore();
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      setError(error.response?.data?.message || 'Failed to delete entry. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate form data before submission
+  const validateFormData = (data) => {
+    const errors = [];
+    
+    if (!data.name || data.name.trim() === '') {
+      errors.push('Teacher name is required');
+    }
+    
+    if (!data.conf || data.conf.trim() === '') {
+      errors.push('Conference name is required');
+    }
+    
+    if (!data.name_body || data.name_body.trim() === '') {
+      errors.push('Professional body name is required');
+    }
+    
+    if (!data.amt || isNaN(parseFloat(data.amt)) || parseFloat(data.amt) <= 0) {
+      errors.push('Please enter a valid amount');
+    }
+    
+    if (!data.year || isNaN(parseInt(data.year, 10))) {
+      errors.push('Please select a valid year');
+    }
+    
+    if (errors.length > 0) {
+      throw new Error(errors.join('\n'));
+    }
+  };
+
+  // Handle submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setSubmitting(true);
+      setError(null);
+      
+      const formDataWithYear = { 
+        ...formData,
+        year: formData.year?.toString() || currentYear.toString()
+      };
+      
+      console.log('Submitting form data:', formDataWithYear);
+      
+      // Validate form data
+      validateFormData(formDataWithYear);
+      
+      // Submit data
+      if (isEditMode && formData.id) {
+        console.log('Updating entry:', formDataWithYear);
+        await handleUpdate(formDataWithYear);
+        setIsEditMode(false);
+      } else {
+        console.log('Creating new entry:', formDataWithYear);
+        await handleCreate(formDataWithYear);
+      }
+      
+      // Reset form after successful operation
       setFormData({
         year: currentYear,
         name: "",
         conf: "",
         name_body: "",
         amt: "",
+        supportLinks: []
       });
-
-      alert("Data submitted successfully!");
+      
+      // Refresh data
+      const updatedData = await fetchResponseData(currentYear);
+      setSubmittedData(updatedData || []);
+      
     } catch (error) {
-      console.error("Error submitting:", error);
-      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+      console.error('Error submitting form:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit form';
+      setError(errorMessage);
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const calculateScore = () => {
-    // Placeholder calculation logic
-    const newCalculationData = { ...calculationData };
+  // Load data when component mounts or currentYear changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (currentYear) {
+        const data = await fetchResponseData(currentYear);
+        setSubmittedData(data || []);
+      }
+    };
     
-    // Group submitted data by year and calculate percentages
-    pastFiveYears.forEach(yearRange => {
-      const year = parseInt(yearRange.split('-')[0]);
-      const yearEntries = submittedData.filter(entry => entry.year === yearRange);
-      // This is a simplified calculation - you'll need to implement actual logic
-      // based on total number of teachers and those who received support
-      newCalculationData[year] = yearEntries.length; // Placeholder
+    loadData();
+  }, [currentYear]);
+
+  // Load data for all sessions
+  useEffect(() => {
+    const loadData = async () => {
+      if (availableSessions && availableSessions.length > 0) {
+        const promises = availableSessions.map(year => fetchResponseData(year));
+        const data = await Promise.all(promises);
+        
+        const newYearData = {};
+        availableSessions.forEach((year, index) => {
+          newYearData[year] = data[index];
+        });
+        
+        setYearData(newYearData);
+      }
+    };
+
+    loadData();
+  }, [availableSessions]);
+
+  // Fetch score when currentYear changes
+  useEffect(() => {
+    if (currentYear) {
+      fetchScore();
+    }
+  }, [currentYear]);
+
+  // Handle year change
+  const handleYearChange = (e) => {
+    const selectedYear = e.target.value;
+    setCurrentYear(selectedYear);
+    setFormData(prev => ({ ...prev, year: selectedYear }));
+    setIsEditMode(false);
+    setEditKey(null);
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Navigation functions
+  const goToNextPage = () => navigate("/criteria6.3.3");
+  const goToPreviousPage = () => navigate("/criteria6.3.1");
+
+  // Handle export to CSV
+  const handleExport = async () => {
+    if (!submittedData || submittedData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = [
+      'Serial No.',
+      'Year',
+      'Teacher Name',
+      'Conference/Workshop Name',
+      'Professional Body Name',
+      'Amount (INR)'
+    ];
+
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    
+    submittedData.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        `"${entry.year || ''}"`,
+        `"${entry.teacher_name || ''}"`,
+        `"${entry.conference_name || ''}"`,
+        `"${entry.professional_body || ''}"`,
+        entry.amt_of_spt_received || 0
+      ];
+      csvRows.push(row.join(','));
     });
-    
-    setCalculationData(newCalculationData);
-    alert("Score calculated successfully!");
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `criteria_6.3.2_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
       <Header />
       <Navbar />
-      <div className="flex min-h-screen">
+      <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 p-6">
+        <div className="flex-1 flex flex-col p-4">
           {/* Page Header */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-medium text-gray-800">
               Criteria 6: Governance, Leadership and Management
             </h2>
-            <div className="text-sm">
-              <span className="text-gray-600">6.3-Faculty Empowerment Strategies</span>
-              <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
+            <div className="text-sm text-gray-600">
+              6.3-Faculty Empowerment Strategies
             </div>
           </div>
 
-          {/* Provisional Score Section */}
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (6.3.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
-            ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
-            )}
-          </div>
-
           {/* Metric Information */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h3 className="text-blue-600 font-medium mb-2">6.3.2 Metric Information</h3>
             <p className="text-sm text-gray-700 mb-4">
               Average percentage of teachers provided with financial support to attend conferences/workshop and towards membership fee of professional bodies during the last five years
@@ -225,288 +621,363 @@ const Criteria6_3_2 = () => {
             </ul>
           </div>
 
-          {/* Year Selection */}
-          <div className="mb-6">
-            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+          {/* Session Selection */}
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Session:</label>
             <select
-              className="border border-gray-300 px-3 py-2 rounded text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border px-3 py-1 rounded text-black"
               value={currentYear}
-              onChange={(e) => setCurrentYear(e.target.value)}
+              onChange={handleYearChange}
+              disabled={isLoadingSessions}
             >
-              {availableSessions && availableSessions.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
+              {isLoadingSessions ? (
+                <option>Loading sessions...</option>
+              ) : availableSessions ? (
+                availableSessions.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))
+              ) : (
+                <option>No sessions available</option>
+              )}
             </select>
+            {sessionError && <p className="text-red-500 text-sm mt-1">{sessionError}</p>}
           </div>
 
-          {/* Data Entry Section */}
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-700 mb-4">Faculty Financial Support Entry</h2>
+          {/* Provisional Score Section */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (6.3.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
 
-            {/* Input Form */}
-            <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">Add New Entry</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Year
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Name of Teacher
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Conference/Workshop Name
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Professional Body Name
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Amount (INR)
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="bg-white">
-                      <td className="px-2 py-2 border border-gray-300">
-                        <input
-                          type="text"
-                          value={formData.year}
-                          onChange={(e) => handleChange("year", e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder={currentYear}
-                        />
-                      </td>
-                      <td className="px-2 py-2 border border-gray-300">
-                        <input
-                          type="text"
-                          value={formData.name}
-                          onChange={(e) => handleChange("name", e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter teacher name"
-                        />
-                      </td>
-                      <td className="px-2 py-2 border border-gray-300">
-                        <input
-                          type="text"
-                          value={formData.conf}
-                          onChange={(e) => handleChange("conf", e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter conference/workshop name"
-                        />
-                      </td>
-                      <td className="px-2 py-2 border border-gray-300">
-                        <input
-                          type="text"
-                          value={formData.name_body}
-                          onChange={(e) => handleChange("name_body", e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter professional body name"
-                        />
-                      </td>
-                      <td className="px-2 py-2 border border-gray-300">
-                        <input
-                          type="number"
-                          value={formData.amt}
-                          onChange={(e) => handleChange("amt", e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Enter amount"
-                          min="0"
-                          step="0.01"
-                        />
-                      </td>
-                      <td className="px-2 py-2 border border-gray-300">
-                        <button
-                          onClick={handleSubmit}
-                          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                        >
-                          Add Entry
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <h2 className="text-xl font-bold text-gray-500 mb-4">Faculty Financial Support Entry</h2>
 
-            {/* Submitted Data Display */}
-            <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">Submitted Entries</h3>
-              {submittedData.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border-collapse border border-gray-300">
-                    <thead className="bg-gray-800">
-                      <tr>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          S.No.
-                        </th>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          Year
-                        </th>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          Teacher Name
-                        </th>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          Conference/Workshop
-                        </th>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          Professional Body
-                        </th>
-                        <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-white">
-                          Amount (INR)
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {submittedData.map((entry, index) => (
-                        <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            {index + 1}
-                          </td>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            {entry.year}
-                          </td>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            {entry.name}
-                          </td>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            {entry.conf}
-                          </td>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            {entry.name_body}
-                          </td>
-                          <td className="px-4 py-3 border border-gray-300 text-sm text-gray-900">
-                            ₹{entry.amt.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {/* Input Form */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              {isEditMode ? 'Edit Financial Support Entry' : 'Add Financial Support Entry'}
+            </h3>
+            
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-12 gap-3 mb-4 items-end">
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Teacher Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Teacher name"
+                    required
+                  />
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No entries submitted yet.</p>
-                  <p className="text-sm text-gray-400">Add your first entry using the form above.</p>
+
+                <div className="col-span-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Conference/Workshop *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.conf}
+                    onChange={(e) => handleChange("conf", e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Conference/workshop name"
+                    required
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Professional Body *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name_body}
+                    onChange={(e) => handleChange("name_body", e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Professional body"
+                    required
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Amount (INR) *
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.amt}
+                    onChange={(e) => handleChange("amt", e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`w-full px-3 py-1.5 text-sm text-white rounded ${
+                      isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                    } ${submitting ? 'opacity-50' : ''} transition-colors`}
+                  >
+                    {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add Entry')}
+                  </button>
+                </div>
+              </div>
+
+              {isEditMode && (
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditMode(false);
+                      setEditKey(null);
+                      setFormData({
+                        year: currentYear,
+                        name: "",
+                        conf: "",
+                        name_body: "",
+                        amt: "",
+                        supportLinks: []
+                      });
+                    }}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                  >
+                    Cancel Edit
+                  </button>
                 </div>
               )}
+            </form>
+          </div>
+
+          {/* Upload Documents Section */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h3 className="text-blue-600 font-medium mb-4">Supporting Documents</h3>
+            <div className="bg-blue-50 p-4 rounded-md mb-4">
+              <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
+                <li>Minutes of relevant Academic Council/ BOS meetings</li>
+                <li>Details of teachers provided with financial support</li>
+                <li>Any additional supporting information</li>
+              </ul>
             </div>
+            
+            <div className="mb-4">
+              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                <i className="fas fa-upload mr-2"></i> Choose Files
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const filesArray = Array.from(e.target.files);
+                    for (const file of filesArray) {
+                      try {
+                        const uploaded = await uploadFile(
+                          "criteria6_3_2",
+                          file,
+                          "6.3.2",
+                          currentYear
+                        );
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
+                        }));
+                      } catch (err) {
+                        console.error("Upload error:", err);
+                        alert(err.message || "Upload failed");
+                      }
+                    }
+                  }}
+                />
+              </label>
+              {uploading && <span className="ml-2 text-gray-600">Uploading...</span>}
+              {uploadError && <span className="ml-2 text-red-600">{uploadError}</span>}
+            </div>
+            
+            {formData.supportLinks && formData.supportLinks.length > 0 && (
+              <ul className="list-disc pl-5 text-gray-700">
+                {formData.supportLinks.map((link, index) => (
+                  <li key={index} className="flex justify-between items-center mb-1">
+                    <a
+                      href={`http://localhost:3000${link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {link.split("/").pop()}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: prev.supportLinks.filter(l => l !== link)
+                        }));
+                        removeFile("criteria6_3_2", link);
+                      }}
+                      className="text-red-600 ml-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-            {/* Year-wise Data Display */}
-            {availableSessions && availableSessions.map((year) => (
-              <div key={year} className="mb-8 bg-white rounded-lg shadow-sm border">
-                <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-3 rounded-t-lg">
-                  Year: {year}
-                </h3>
-                {yearData[year] && yearData[year].length > 0 ? (
-                  <div className="p-4">
-                    <table className="w-full text-sm border-collapse border border-gray-300">
-                      <thead className="bg-gray-200">
-                        <tr>
-                          <th className="border border-gray-300 px-4 py-2 text-gray-800 text-left">#</th>
-                          <th className="border border-gray-300 px-4 py-2 text-gray-800 text-left">Teacher Name</th>
-                          <th className="border border-gray-300 px-4 py-2 text-gray-800 text-left">Conference/Workshop</th>
-                          <th className="border border-gray-300 px-4 py-2 text-gray-800 text-left">Professional Body</th>
-                          <th className="border border-gray-300 px-4 py-2 text-gray-800 text-left">Amount (INR)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {yearData[year].map((entry, index) => (
-                          <tr key={index} className="even:bg-gray-50">
-                            <td className="border border-gray-300 px-2 py-1 text-gray-700">{index + 1}</td>
-                            <td className="border border-gray-300 px-2 py-1 text-gray-700">{entry.name}</td>
-                            <td className="border border-gray-300 px-2 py-1 text-gray-700">{entry.conf}</td>
-                            <td className="border border-gray-300 px-2 py-1 text-gray-700">{entry.name_body}</td>
-                            <td className="border border-gray-300 px-2 py-1 text-gray-700">₹{entry.amt.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-600 px-4 py-3">No data submitted for this year.</p>
-                )}
-              </div>
-            ))}
-
-            {/* Calculation Table */}
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Calculation Table (Last 5 Years)
-                </h3>
-                <button
-                  onClick={calculateScore}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors"
-                >
-                  Calculate Score
-                </button>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
+          {/* Year-wise Data Display */}
+          {availableSessions?.map((session) => (
+            <div key={session} className="mb-8 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
+              {yearData[session] && yearData[session].length > 0 ? (
+                <table className="w-full text-sm border border-black">
+                  <thead className="bg-gray-200">
                     <tr>
-                      <th className="px-4 py-3 border border-gray-300 text-left text-sm font-medium text-gray-700">
-                        YEAR
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-center text-sm font-medium text-gray-700">
-                        2020
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-center text-sm font-medium text-gray-700">
-                        2021
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-center text-sm font-medium text-gray-700">
-                        2022
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-center text-sm font-medium text-gray-700">
-                        2023
-                      </th>
-                      <th className="px-4 py-3 border border-gray-300 text-center text-sm font-medium text-gray-700">
-                        2024
-                      </th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Conference/Workshop</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Professional Body</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Amount (INR)</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="bg-white">
-                      <td className="px-4 py-3 border border-gray-300 font-medium text-gray-700">
-                        Calculated Score
-                      </td>
-                      <td className="px-4 py-3 border border-gray-300 text-center text-gray-900">
-                        {calculationData[2020] || 0}
-                      </td>
-                      <td className="px-4 py-3 border border-gray-300 text-center text-gray-900">
-                        {calculationData[2021] || 0}
-                      </td>
-                      <td className="px-4 py-3 border border-gray-300 text-center text-gray-900">
-                        {calculationData[2022] || 0}
-                      </td>
-                      <td className="px-4 py-3 border border-gray-300 text-center text-gray-900">
-                        {calculationData[2023] || 0}
-                      </td>
-                      <td className="px-4 py-3 border border-gray-300 text-center text-gray-900">
-                        {calculationData[2024] || 0}
-                      </td>
-                    </tr>
+                    {yearData[session].map((entry, index) => (
+                      <tr key={`${entry.teacher_name}-${entry.conference_name}-${index}`}>
+                        <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.teacher_name}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.conference_name}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.professional_body}</td>
+                        <td className="border border-black text-black px-4 py-2">₹{entry.amt_of_spt_received?.toLocaleString()}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              onClick={() => handleEdit(entry)}
+                              title="Edit entry"
+                            >
+                              <FaEdit className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(entry.id);
+                              }}
+                              disabled={submitting}
+                              title="Delete entry"
+                            >
+                              <FaTrash className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+              ) : (
+                <p className="px-4 py-2 text-gray-500">No financial support data submitted for this year.</p>
+              )}
+            </div>
+          ))}
+
+          {/* Summary Statistics */}
+          <div className="mt-8 bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-4 text-gray-700">Financial Support Summary</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg border-2 border-blue-500 bg-blue-50">
+                <h4 className="font-medium text-blue-800 mb-2">Total Entries</h4>
+                <div className="text-2xl font-bold text-blue-700">
+                  {Object.values(yearData).reduce((total, yearEntries) => 
+                    total + (yearEntries ? yearEntries.length : 0), 0
+                  )}
+                </div>
               </div>
               
-              <div className="mt-4 text-sm text-gray-600">
-                <p>Total number of years considered: 5</p>
-                <p className="mt-1">
-                  <strong>Average Score:</strong> {
-                    (Object.values(calculationData).reduce((sum, val) => sum + val, 0) / 5).toFixed(2)
-                  }%
-                </p>
+              <div className="p-4 rounded-lg border-2 border-green-500 bg-green-50">
+                <h4 className="font-medium text-green-800 mb-2">Total Amount Supported</h4>
+                <div className="text-2xl font-bold text-green-700">
+                  ₹{Object.values(yearData).reduce((total, yearEntries) => {
+                    if (!yearEntries) return total;
+                    return total + yearEntries.reduce((sum, entry) => 
+                      sum + (entry.amt_of_spt_received || 0), 0
+                    );
+                  }, 0).toLocaleString()}
+                </div>
+              </div>
+              
+              <div className="p-4 rounded-lg border-2 border-purple-500 bg-purple-50">
+                <h4 className="font-medium text-purple-800 mb-2">Years with Data</h4>
+                <div className="text-2xl font-bold text-purple-700">
+                  {Object.values(yearData).filter(yearEntries => 
+                    yearEntries && yearEntries.length > 0
+                  ).length} / {availableSessions?.length || 0}
+                </div>
               </div>
             </div>
           </div>
 
-          <Bottom />
+          {/* Calculation Actions */}
+          <div className="flex justify-center mb-6">
+            <button 
+              onClick={fetchScore}
+              disabled={loading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Calculating...' : 'Calculate Score'}
+            </button>
+          </div>
+
+          {/* Status Messages */}
+          {error && (
+            <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
+          
+          {success && (
+            <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                <span className="mr-2">✓</span>
+                <span>Data saved successfully!</span>
+              </div>
+            </div>
+          )}
+          
+          {loading && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+                  <span>Loading data...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
+          </div>
         </div>
       </div>
     </div>

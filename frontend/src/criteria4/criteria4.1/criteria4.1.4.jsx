@@ -1,445 +1,932 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
-import { useContext } from "react";
+import LandingNavbar from "../../components/landing-navbar";
+import api from "../../api";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 import { SessionContext } from "../../contextprovider/sessioncontext";
-import axios from "axios";
-import { useEffect } from "react";
+import { FaTrash, FaEdit } from 'react-icons/fa';
 
 const Criteria4_1_4 = () => {
-  const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [currentYear, setCurrentYear] = useState(pastFiveYears[0]);
-  const [provisionalScore, setProvisionalScore] = useState(null);
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+  const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [submittedData, setSubmittedData] = useState([]);
-  const { sessions: availableSessions } = useContext(SessionContext);
-  
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [yearData, setYearData] = useState({});
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [error, setError] = useState(null);
+
   const [formData, setFormData] = useState({
+    slNo: '',
     year: "",
-    budget: "",
-    expen: "",
-    total: "",
-    academic: "",
-    physical: "",
-    supportLinks: [""], // Initialize with one empty link
+    budget_allocated_infra_aug: "",
+    expenditure_infra_aug: "",
+    expenditure_academic_maint: "",
+    expenditure_physical_maint: "",
+    supportLinks: []
   });
 
-  useEffect(() => {
-    if (availableSessions && availableSessions.length > 0) {
-      setCurrentYear(availableSessions[0]);
-      setSelectedYear(availableSessions[0]);
-    }
-  }, [availableSessions]);
+  const [submittedData, setSubmittedData] = useState([]);
+  const navigate = useNavigate();
 
-  const fetchScore = async () => {
-    console.log('Fetching score...');
+  const convertToPaddedFormat = (code) => {
+    return '040104040104';
+  };
+
+  const fetchResponseData = async (year) => {
+    console.log('Fetching data for year:', year);
+    if (!year) {
+      console.log('No year provided, returning empty array');
+      return [];
+    }
+    
     setLoading(true);
     setError(null);
+    
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/criteria4/score414");
-      console.log('API Response:', response);
-      console.log('Response data:', response.data);
-      setProvisionalScore(response.data);
-      console.log('provisionalScore after set:', provisionalScore);
-    } catch (error) {
-      console.error("Error fetching provisional score:", error);
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-        console.error('Error status:', error.response.status);
+      const yearToSend = year.split("-")[0];
+      console.log('Sending request with session:', yearToSend);
+      
+      const response = await api.get(
+        "/criteria2/getResponse/4.1.4", 
+        { 
+          params: { 
+            session: yearToSend
+          }
+        }
+      );
+      
+      console.log('Full API Response:', JSON.stringify(response, null, 2));
+      
+      if (!response.data) {
+        console.warn('No data in response');
+        return [];
       }
-      setError(error.message || "Failed to fetch score");
+      
+      console.log('Response data structure:', {
+        hasData: !!response.data,
+        hasDataData: !!response.data.data,
+        dataKeys: Object.keys(response.data),
+        dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+        dataData: response.data.data ? 
+          (Array.isArray(response.data.data) ? 'array' : typeof response.data.data) : 'no data.data'
+      });
+      
+      // Handle both response.data and response.data.data
+      let data = response.data.data || response.data;
+      
+      console.log('Data before processing:', data);
+      
+      // If data is not an array but is an object, convert it to an array
+      if (data) {
+        if (!Array.isArray(data)) {
+          console.log('Converting single object to array');
+          data = [data];
+        }
+      } else {
+        console.warn('Data is null or undefined');
+        return [];
+      }
+      
+      // Map the data to ensure consistent structure
+      const mappedData = data.map(item => {
+        console.log('Raw database item:', item);
+        
+        const mappedItem = {
+          id: item.id || item.sl_no,  // Use sl_no as fallback for id
+          sl_no: item.sl_no || item.id,  // Use id as fallback for sl_no
+          year: item.year,
+          budget_allocated_infra_aug: item.budget_allocated_infra_aug,
+          expenditure_infra_aug: item.expenditure_infra_aug,
+          expenditure_academic_maint: item.expenditure_academic_maint,
+          expenditure_physical_maint: item.expenditure_physical_maint,
+          // Map any other fields that might be needed
+          ...item
+        };
+        
+        console.log('Mapped item:', mappedItem);
+        return mappedItem;
+      });
+      
+      console.log('Final mapped data:', mappedData);
+      
+      // Store the SL numbers in localStorage for each entry
+      mappedData.forEach(item => {
+        if (item.sl_no) {
+          localStorage.setItem(`criteria4.1.4_slNo_${item.id || item.sl_no}`, item.sl_no);
+        }
+      });
+      
+      return mappedData;
+    } catch (error) {
+      console.error('Error fetching response data:', error);
+      setError('Failed to fetch data. Please try again.');
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchScore();
-  }, []);
-
-  const [yearScores, setYearScores] = useState(
-    pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
-  );
-  const [yearCount, setYearCount] = useState(5);
-  const [averageScore, setAverageScore] = useState(null);
-
-  const navigate = useNavigate();
-  const years = pastFiveYears;
-
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...formData.supportLinks];
-      updatedLinks[index] = value;
-      setFormData({ ...formData, supportLinks: updatedLinks });
-    } else {
-      setFormData({ ...formData, [field]: value });
+  // Fetch score for the current year
+  const fetchScore = async () => {
+    if (!currentYear) return;
+    
+    const cachedScore = localStorage.getItem(`criteria414_score_${currentYear}`);
+    if (cachedScore) {
+      try {
+        const parsedScore = JSON.parse(cachedScore);
+        if (Date.now() - parsedScore.timestamp < 60 * 60 * 1000) {
+          setProvisionalScore(parsedScore.data);
+        }
+      } catch (e) {
+        console.warn("Error parsing cached score:", e);
+        localStorage.removeItem(`criteria414_score_${currentYear}`);
+      }
+    }
+    
+    try {
+      const response = await api.get(`/criteria4/score414`);
+      setProvisionalScore(response.data);
+      
+      if (response.data) {
+        const cacheData = {
+          data: response.data,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(
+          `criteria414_score_${currentYear}`, 
+          JSON.stringify(cacheData)
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching score:", err);
+      setError("Failed to load score");
     }
   };
 
-  const handleSubmit = async () => {
-    const { year, budget, expen, total, academic, physical } = formData;
+  // Handle create new entry
+  const handleCreate = async (formDataToSubmit) => {
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const payload = {
+        year: formDataToSubmit.year,
+        budget_allocated_infra_aug: parseFloat(formDataToSubmit.budget_allocated_infra_aug) || 0,
+        expenditure_infra_aug: parseFloat(formDataToSubmit.expenditure_infra_aug) || 0,
+        expenditure_academic_maint: parseFloat(formDataToSubmit.expenditure_academic_maint) || 0,
+        expenditure_physical_maint: parseFloat(formDataToSubmit.expenditure_physical_maint) || 0,
+        session: parseInt(yearToSend),
+      };
+      
+      console.log('Sending request with payload:', payload);
+      const response = await api.post('/criteria4/createResponse414', payload);
+      console.log('Response received:', response);
+      
+      if (response.status >= 200 && response.status < 300) {
+        console.log('Request was successful, showing alert');
+        
+        alert('Infrastructure expenditure data submitted successfully!');
+        
+        if (response.data?.data?.sl_no) {
+          localStorage.setItem(
+            `criteria414_${formDataToSubmit.year}_${yearToSend}`, 
+            response.data.data.sl_no
+          );
+        }
+        
+        const updatedData = await fetchResponseData(currentYear);
+        
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSubmittedData(prev => [
+          ...prev,
+          {
+            ...formDataToSubmit,
+            slNo: response.data?.data?.sl_no || Date.now(),
+            year: currentYear
+          }
+        ]);
+        
+        // Reset form
+        setFormData({
+          slNo: '',
+          year: "",
+          budget_allocated_infra_aug: "",
+          expenditure_infra_aug: "",
+          expenditure_academic_maint: "",
+          expenditure_physical_maint: "",
+          supportLinks: []
+        });
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error creating entry:", err);
+      setError(err.response?.data?.message || "Failed to create entry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    if (!budget || !expen || !total || !academic || !physical) {
-      alert("Please fill in all required fields.");
+  // Handle update entry
+  const handleUpdate = async (formDataToSubmit) => {
+    const entryId = formDataToSubmit.id || formDataToSubmit.slNo;
+    if (!entryId) {
+      const errorMsg = "No entry selected for update";
+      setError(errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
+      const payload = {
+        sl_no: entryId,
+        year: formDataToSubmit.year,
+        budget_allocated_infra_aug: parseFloat(formDataToSubmit.budget_allocated_infra_aug) || 0,
+        expenditure_infra_aug: parseFloat(formDataToSubmit.expenditure_infra_aug) || 0,
+        expenditure_academic_maint: parseFloat(formDataToSubmit.expenditure_academic_maint) || 0,
+        expenditure_physical_maint: parseFloat(formDataToSubmit.expenditure_physical_maint) || 0,
+        session: parseInt(yearToSend),
+        year: yearToSend,
+      };
+      
+      console.log('Sending update payload:', payload);
+      const response = await api.put(`/criteria4/updateResponse414/${entryId}`, payload);
+      
+      if (!response.data || !response.data.success) {
+        const errorMsg = response.data?.message || "Failed to update entry";
+        throw new Error(errorMsg);
+      }
+      
+      const updatedData = await fetchResponseData(currentYear);
+      
+      setYearData(prev => ({
+        ...prev,
+        [currentYear]: updatedData
+      }));
+      setSubmittedData(updatedData);
+      
+      setSuccess('Entry updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      return true;
+    } catch (err) {
+      console.error("Error updating entry:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Failed to update entry";
+      setError(errorMsg);
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate form data
+  const validateFormData = (dataToSubmit) => {
+    const yearInput = dataToSubmit.year || currentYear;
+    const yearToSend = yearInput.split("-")[0];
+    const session = parseInt(yearToSend);
+    const currentYearNum = new Date().getFullYear();
+    const missingFields = [];
+
+    // Helper function to check numeric fields
+    const checkNumericField = (value, fieldName) => {
+      if (value === null || value === undefined || value === '') return false;
+      const numValue = parseFloat(value);
+      return !isNaN(numValue) && numValue >= 0;
+    };
+
+    // Check each required field
+    if (!checkNumericField(dataToSubmit.budget_allocated_infra_aug)) missingFields.push("Budget Allocated for Infrastructure");
+    if (!checkNumericField(dataToSubmit.expenditure_infra_aug)) missingFields.push("Infrastructure Expenditure");
+    if (!checkNumericField(dataToSubmit.expenditure_academic_maint)) missingFields.push("Academic Maintenance Expenditure");
+    if (!checkNumericField(dataToSubmit.expenditure_physical_maint)) missingFields.push("Physical Maintenance Expenditure");
+    
+    if (missingFields.length > 0) {
+      throw new Error(`Please fill in all required fields with valid numbers: ${missingFields.join(', ')}`);
+    }
+    
+    if (isNaN(session) || session < 1990 || session > currentYearNum) {
+      throw new Error(`Year must be between 1990 and ${currentYearNum}.`);
+    }
+
+    return true;
+  };
+
+  // Handle edit
+  const handleEdit = (entry) => {
+    const formData = {
+      slNo: '',
+      year: "",
+      budget_allocated_infra_aug: '',
+      expenditure_infra_aug: '',
+      expenditure_academic_maint: '',
+      expenditure_physical_maint: '',
+      supportLinks: [],
+      year: currentYear,
+      // Override with entry data
+      ...entry,
+      // Ensure these fields are set from the entry or use defaults
+      id: entry.id || entry.slNo,
+      year: entry.year || currentYear
+    };
+    
+    setFormData(formData);
+    setIsEditMode(true);
+    setEditKey(entry.id || entry.slNo);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle delete entry
+  const handleDelete = async (slNo, year) => {
+    if (!slNo) {
+      console.error('No SL number provided for deletion');
+      setError('Error: No entry selected for deletion');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this entry?')) {
       return;
     }
 
     try {
-      const response = await axios.post(
-        "http://localhost:3000/api/v1/criteria4/createResponse414",
-        {
-          session: parseInt(year, 10),
-          year: year,
-          budget_allocated_infra_aug: parseFloat(budget) || 0,
-          expenditure_infra_aug: parseFloat(expen) || 0,
-          // total_expenditure_excl_salary: parseFloat(total) || 0,
-          expenditure_academic_maint: parseFloat(academic) || 0,
-          expenditure_physical_maint: parseFloat(physical) || 0
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          withCredentials: true
-        }
-      );
-
-      const newEntry = {
-        year: year,
-        budget: budget,
-        expen: expen,
-        // total: total,
-        academic: academic,
-        physical: physical
-      };
-
-      setSubmittedData((prev) => [...prev, newEntry]);
-      setYearData((prev) => ({
-        ...prev,
-        [year]: [...(prev[year] || []), newEntry],
-      }));
-
-      // Reset form
-      setFormData({
-        year: "",
-        budget: "",
-        expen: "",
-        // total: "",
-        academic: "",
-        physical: "",
-        supportLinks: [""],
-      });
+      setSubmitting(true);
+      const response = await api.delete(`/criteria4/deleteResponse414/${slNo}`);
       
-      fetchScore();
-      alert("Data submitted successfully!");
+      if (response.status === 200) {
+        setYearData(prev => ({
+          ...prev,
+          [year]: (prev[year] || []).filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        }));
+        
+        setSubmittedData(prev => 
+          prev.filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        );
+        
+        setSuccess('Entry deleted successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+      }
     } catch (error) {
-      console.error("Error submitting:", error);
-      alert(error.response?.data?.message || error.message || "Submission failed due to server error");
+      console.error('Error deleting entry:', error);
+      setError(error.response?.data?.message || 'Failed to delete entry. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const goToNextPage = () => navigate("/criteria4.4.2");
-  const goToPreviousPage = () => navigate("/criteria4.3.3s");
+  // Handle submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const formDataWithYear = { 
+        ...formData,
+        year: formData.year?.toString() || currentYear.toString(),
+        budget_allocated_infra_aug: formData.budget_allocated_infra_aug ? 
+          parseFloat(formData.budget_allocated_infra_aug) : 0,
+        expenditure_infra_aug: formData.expenditure_infra_aug ? 
+          parseFloat(formData.expenditure_infra_aug) : 0,
+        expenditure_academic_maint: formData.expenditure_academic_maint ? 
+          parseFloat(formData.expenditure_academic_maint) : 0,
+        expenditure_physical_maint: formData.expenditure_physical_maint ? 
+          parseFloat(formData.expenditure_physical_maint) : 0
+      };
+      
+      console.log('Submitting form data:', formDataWithYear);
+      
+      validateFormData(formDataWithYear);
+      
+      if (isEditMode && (formData.id || formData.slNo)) {
+        console.log('Updating entry:', formDataWithYear);
+        await handleUpdate(formDataWithYear);
+        setIsEditMode(false);
+      } else {
+        console.log('Creating new entry:', formDataWithYear);
+        await handleCreate(formDataWithYear);
+      }
+      
+      // Reset form after successful operation
+      setFormData({
+        slNo: '',
+        year: currentYear,
+        budget_allocated_infra_aug: "",
+        expenditure_infra_aug: "",
+        expenditure_academic_maint: "",
+        expenditure_physical_maint: "",
+        supportLinks: [],
+        year: currentYear
+      });
+      
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setTimeout(() => setError(null), 5000);
+      return;
+    }
+    
+    try {
+      const data = await fetchResponseData(currentYear);
+      setSubmittedData(data || []);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
 
-  const totalPrograms = years.reduce((acc, year) => acc + (yearData[year]?.length || 0), 0);
-  const averagePrograms = (totalPrograms / years.length).toFixed(2);
+  // Load data when component mounts or currentYear changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (currentYear) {
+        const data = await fetchResponseData(currentYear);
+        setSubmittedData(data || []);
+      }
+    };
+    
+    loadData();
+  }, [currentYear]);
 
+  // Load data for all sessions
+  useEffect(() => {
+    const loadData = async () => {
+      if (availableSessions && availableSessions.length > 0) {
+        const promises = availableSessions.map(year => fetchResponseData(year));
+        const data = await Promise.all(promises);
+        
+        const newYearData = {};
+        availableSessions.forEach((year, index) => {
+          newYearData[year] = data[index];
+        });
+        
+        setYearData(newYearData);
+      }
+    };
+
+    loadData();
+  }, [availableSessions]);
+
+  // Fetch score when currentYear changes
+  useEffect(() => {
+    if (currentYear) {
+      fetchScore();
+    }
+  }, [currentYear]);
+
+  // Set default current year when sessions load
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0 && !currentYear) {
+      const firstYear = availableSessions[0];
+      setCurrentYear(firstYear);
+      setFormData(prev => ({ ...prev, year: firstYear }));
+    }
+  }, [availableSessions, currentYear]);
+
+  // Handle year change
+  const handleYearChange = (e) => {
+    const selectedYear = e.target.value;
+    setCurrentYear(selectedYear);
+    setFormData(prev => ({ ...prev, year: selectedYear }));
+    setIsEditMode(false);
+    setEditKey(null);
+  };
+
+  const handleChange = (field, value, index = null) => {
+    if (field === "supportLinks") {
+      const updatedLinks = [...(formData.supportLinks || [])];
+      updatedLinks[index] = value;
+      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  // Navigation functions
+  const goToNextPage = () => {
+    navigate('/criteria4.4.2');
+  };
+
+  const goToPreviousPage = () => {
+    navigate('/criteria4.3.3s');
+  };
+
+  // Handle export to CSV
+  const handleExport = async () => {
+    if (!submittedData || submittedData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = [
+      'Year',
+      'Budget Allocated (Lakhs)',
+      'Infrastructure Expenditure (Lakhs)',
+      'Academic Maintenance (Lakhs)',
+      'Physical Maintenance (Lakhs)'
+    ];
+
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    
+    submittedData.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        entry.year || '',
+        entry.budget_allocated_infra_aug || '',
+        entry.expenditure_infra_aug || '',
+        entry.expenditure_academic_maint || '',
+        entry.expenditure_physical_maint || ''
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `criteria_4.1.4_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Main component render
   return (
-    <div className="w-[1690px] min-h-screen bg-gray-50 overflow-x-hidden">
-      <Header />
-      <Navbar />
-      <div className="flex w-full">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 p-6">
-            {/* --- Intro Section --- */}
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-medium text-gray-800">
-                Criterion 4 - Infrastructure and Learning Resources
-              </h2>
-              <div className="text-sm text-gray-600">4.1 Physical Facilities</div>
-            </div>
-            
-            {/* --- Metric Info --- */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h3 className="text-blue-600 font-medium mb-2">4.1.4 Metric Information</h3>
-              <p className="text-sm text-gray-700">
-                Average percentage of expenditure, excluding salary for infrastructure
-                augmentation during last five years(INR in Lakhs)
-              </p>
-              <h3 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h3>
-              <ul className="list-disc pl-5 text-sm text-gray-700">
-                <li>Expenditure for infrastructure augmentation</li>
-                <li>Total expenditure excluding salary</li>
-              </ul>
-            </div>
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
-            {/* Provisional Score */}
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+        <div className="flex-1 mt-6 flex flex-col p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-medium text-gray-800">Criterion 4 - Infrastructure and Learning Resources</h2>
+            <div className="text-sm text-gray-600">4.1 Physical Facilities</div>
+          </div>
+
+          <div className="bg-white p-6 rounded shadow mb-6">
+            <h3 className="text-blue-600 font-semibold mb-2">4.1.4 Metric Information</h3>
+            <p className="text-sm text-gray-700 mb-2">
+              Average percentage of expenditure, excluding salary for infrastructure augmentation during last five years (INR in Lakhs)
+            </p>
+            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              <li className="mb-1">Expenditure for infrastructure augmentation</li>
+              <li className="mb-1">Total expenditure excluding salary</li>
+            </ul>
+          </div>
+
+          <h2 className="text-xl font-bold text-gray-500 mb-4">Infrastructure Expenditure Entry</h2>
+
+          {/* Year Dropdown */}
+          <div className="mb-4">
+            <label className="font-medium text-gray-700 mr-2">Select Year:</label>
+            <select
+              className="border px-3 py-1 rounded text-black"
+              value={currentYear}
+              onChange={handleYearChange}
+              disabled={sessionLoading}
+            >
+              {sessionLoading ? (
+                <option>Loading sessions...</option>
+              ) : (
+                availableSessions?.map((session) => (
+                  <option key={session} value={session}>
+                    {session}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (4.1.4): {provisionalScore.data.score_sub_sub_criteria || provisionalScore.data.score || 0}%
+                </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore.data.sub_sub_cr_grade || provisionalScore.data.grade || 'N/A'}
+                </p>
+              </div>
             ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+              <p className="text-gray-600">No score data available.</p>
             )}
           </div>
 
-            {/* --- Year Selection & Entry Form --- */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <div className="mb-4">
-                <label className="font-medium text-gray-700 mr-2">Select Year:</label>
-                <select
-                  className="border px-3 py-1 rounded text-black"
-                  value={currentYear}
-                  onChange={(e) => setCurrentYear(e.target.value)}
-                >
-                  {availableSessions && availableSessions.map((year) => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Input Table */}
-              <div className="overflow-x-auto mb-6">
-                <table className="w-full border text-sm">
-                  <thead className="bg-gray-100 text-gray-950">
-                    <tr>
-                      <th className="border px-2 py-2">Year</th>
-                      <th className="border px-2 py-2">Budget allocated for infrastructure
-                      augmentation(INR in Lakh)</th>
-                      <th className="border px-2 py-2">Expenditure for infrastructure
-augmentation(INR in Lakh)
-</th>
-                      <th className="border px-2 py-2">Total expenditure
-excluding Salary (INR
-in Lakh)</th>
-                      <th className="border px-2 py-2">Expenditure on maintenance of academic
-facilities (excluding salary for human
-resources) (INR in Lakh)
-</th>
-                      <th className="border px-2 py-2">Expenditure on maintenance of physical
-facilities (excluding salary for human
-resources) (INR in Lakh)
-</th>
-                      <th className="border px-2 py-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border px-2 py-1">
-                        <input
-                          type="number"
-                          min="2000"
-                          max="2100"
-                          step="1"
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="YYYY"
-                          value={formData.year}
-                          onChange={(e) => handleChange("year", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1">
-                        <input
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="Budget"
-                          value={formData.budget}
-                          onChange={(e) => handleChange("budget", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1">
-                        <input
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="Expenditure"
-                          value={formData.expen}
-                          onChange={(e) => handleChange("expen", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1">
-                        <input
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="Total"
-                          value={formData.total}
-                          onChange={(e) => handleChange("total", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1">
-                        <input
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="Academic"
-                          value={formData.academic}
-                          onChange={(e) => handleChange("academic", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1">
-                        <input
-                          className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                          placeholder="Physical"
-                          value={formData.physical}
-                          onChange={(e) => handleChange("physical", e.target.value)}
-                        />
-                      </td>
-                      <td className="border px-2 py-1 text-center">
+          {/* Input Table */}
+          <div className="overflow-auto border rounded mb-6">
+            <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
+              Infrastructure Expenditure - {isEditMode ? 'Edit Mode' : 'Add New'}
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <table className="min-w-full border text-sm text-left">
+                <thead className="bg-gray-100 font-semibold text-gray-950">
+                  <tr>
+                    <th className="px-4 py-2 border">Year</th>
+                    <th className="px-4 py-2 border">Budget Allocated (Lakhs)</th>
+                    <th className="px-4 py-2 border">Infrastructure Expenditure (Lakhs)</th>
+                    <th className="px-4 py-2 border">Academic Maintenance (Lakhs)</th>
+                    <th className="px-4 py-2 border">Physical Maintenance (Lakhs)</th>
+                    <th className="px-4 py-2 border">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        min="2000"
+                        max={new Date().getFullYear()}
+                        value={formData.year}
+                        onChange={(e) => handleChange("year", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Year"
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.budget_allocated_infra_aug}
+                        onChange={(e) => handleChange("budget_allocated_infra_aug", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Budget"
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.expenditure_infra_aug}
+                        onChange={(e) => handleChange("expenditure_infra_aug", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Infrastructure Exp."
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.expenditure_academic_maint}
+                        onChange={(e) => handleChange("expenditure_academic_maint", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Academic Exp."
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.expenditure_physical_maint}
+                        onChange={(e) => handleChange("expenditure_physical_maint", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Physical Exp."
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <div className="flex gap-2">
                         <button
-                          className="!bg-blue-600 text-white px-3 py-1 rounded hover:!bg-blue-700"
-                          onClick={handleSubmit}
+                          type="submit"
+                          disabled={submitting}
+                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          Add
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
                         </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Support Links */}
-              <div>
-                <label className="block text-gray-700 font-medium mb-2">
-                  Links to relevant documents:
-                </label>
-                <div className="flex flex-col gap-2">
-                  {formData.supportLinks.map((link, index) => (
-                    <input
-                      key={index}
-                      type="url"
-                      placeholder={`Enter support link ${index + 1}`}
-                      className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                      value={link}
-                      onChange={(e) => handleChange("supportLinks", e.target.value, index)}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                    className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:!bg-blue-700 w-fit"
-                  >
-                    + Add Another Link
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Display Table Per Year */}
-            {years.map((year) => (
-              <div key={year} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
-                <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {year}</h3>
-                {yearData[year]?.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-200">
-                        <tr>
-                          <th className="border text-gray-900 px-2 py-1">#</th>
-                          <th className="border text-gray-900 px-2 py-1">Year</th>
-                          <th className="border text-gray-900 px-2 py-1">Budget allocated for infrastructure
-                          augmentation(INR in Lakh)</th>
-                          <th className="border text-gray-900 px-2 py-1">Expenditure</th>
-                          <th className="border text-gray-900 px-2 py-1">Total</th>
-                          <th className="border text-gray-900 px-2 py-1">Academic</th>
-                          <th className="border text-gray-900 px-2 py-1">Physical</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {yearData[year].map((entry, idx) => (
-                          <tr key={idx} className="even:bg-gray-50">
-                            <td className="border text-gray-900 border-black px-2 py-1">{idx + 1}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.year}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.budget}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.expen}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.total}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.academic}</td>
-                            <td className="border text-gray-900 border-black px-2 py-1">{entry.physical}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-600 p-4">No data available for {year}.</p>
-                )}
-              </div>
-            ))}
-
-            {/* Average Calculator */}
-            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-4 text-gray-700">
-                Calculation Table (Last 5 Years)
-              </h2>
-              <div className="overflow-x-auto mb-4">
-                <table className="table-auto border-collapse w-full">
-                  <thead>
-                    <tr className="bg-gray-100 text-gray-600 font-semibold">
-                      <th className="border px-4 py-2">Year</th>
-                      {Object.keys(yearScores).map((year) => (
-                        <th key={year} className="border px-4 py-2">{year}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="border px-4 py-2 font-medium text-gray-600">Calculated Score</td>
-                      {Object.keys(yearScores).map((year) => (
-                        <td key={year} className="border px-4 py-2 text-center">
-                          <input
-                            type="number"
-                            value={yearScores[year]}
-                            onChange={(e) =>
-                              setYearScores({ ...yearScores, [year]: parseFloat(e.target.value) || 0 })
-                            }
-                            className="w-20 text-center border px-1 rounded text-gray-950"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Enter number of years for average:
-                </label>
-                <input
-                  type="number"
-                  value={yearCount}
-                  min={1}
-                  max={5}
-                  onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                  className="w-20 border px-2 py-1 rounded text-center text-gray-950"
-                />
-                <button
-                  className="ml-4 px-4 py-2 !bg-blue-600 text-white rounded hover:!bg-green-700"
-                  onClick={() => {
-                    const values = Object.values(yearScores).slice(0, yearCount);
-                    const sum = values.reduce((acc, val) => acc + val, 0);
-                    setAverageScore((sum / yearCount).toFixed(2));
-                  }}
-                >
-                  Calculate Average
-                </button>
-              </div>
-              {averageScore !== null && (
-                <div className="mt-4 text-blue-700 font-semibold">
-                  Average Score for last {yearCount} year(s): {averageScore}%
-                </div>
-              )}
-            </div>
+                        {isEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditMode(false);
+                              setFormData({
+                                slNo: '',
+                                year: "",
+                                budget_allocated_infra_aug: "",
+                                expenditure_infra_aug: "",
+                                expenditure_academic_maint: "",
+                                expenditure_physical_maint: "",
+                                supportLinks: []
+                              });
+                            }}
+                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </form>
           </div>
 
-          {/* Navigation Footer */}
-          <div className="bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+          {/* Upload Documents Section */}
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">
+              Upload Documents (Financial Records | Budget Documents)
+            </label>
+            <div className="flex items-center gap-4 mb-2">
+              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                <i className="fas fa-upload mr-2"></i> Choose Files
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const filesArray = Array.from(e.target.files);
+                    for (const file of filesArray) {
+                      try {
+                        const uploaded = await uploadFile(
+                          "criteria4_1_4",
+                          file,
+                          "4.1.4",
+                          currentYear
+                        );
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
+                        }));
+                      } catch (err) {
+                        console.error("Upload error:", err);
+                        alert(err.message || "Upload failed");
+                      }
+                    }
+                  }}
+                />
+              </label>
+              {uploading && <span className="text-gray-600">Uploading...</span>}
+              {uploadError && <span className="text-red-600">{uploadError}</span>}
+            </div>
+            
+            {formData.supportLinks && formData.supportLinks.length > 0 && (
+              <ul className="list-disc pl-5 text-gray-700">
+                {formData.supportLinks.map((link, index) => (
+                  <li key={index} className="flex justify-between items-center mb-1">
+                    <a
+                      href={`http://localhost:3000${link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {link.split("/").pop()}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: prev.supportLinks.filter(l => l !== link)
+                        }));
+                        removeFile("criteria4_1_4", link);
+                      }}
+                      className="text-red-600 ml-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Year-wise Data Display */}
+          {availableSessions?.map((session) => (
+            <div key={session} className="mb-8 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
+              {yearData[session] && yearData[session].length > 0 ? (
+                <table className="w-full text-sm border border-black">
+                  <thead className="bg-gray-200">
+                    <tr>
+                      <th className="border border-black px-4 py-2 text-gray-800">#</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Year</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Year</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Budget (Lakhs)</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Infrastructure Exp. (Lakhs)</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Academic Exp. (Lakhs)</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Physical Exp. (Lakhs)</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {yearData[session].map((entry, index) => (
+                      <tr key={`${entry.year}-${entry.budget_allocated_infra_aug}-${index}`}>
+                        <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.year}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.budget_allocated_infra_aug}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.expenditure_infra_aug}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.expenditure_academic_maint}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.expenditure_physical_maint}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              onClick={() => {
+                                setFormData({
+                                  slNo: entry.sl_no || entry.slNo,
+                                  year: entry.year,
+                                  budget_allocated_infra_aug: entry.budget_allocated_infra_aug,
+                                  expenditure_infra_aug: entry.expenditure_infra_aug,
+                                  expenditure_academic_maint: entry.expenditure_academic_maint,
+                                  expenditure_physical_maint: entry.expenditure_physical_maint,
+                                  supportLinks: [],
+                                });
+                                setEditKey({ 
+                                  slNo: entry.sl_no || entry.slNo, 
+                                  year: entry.year 
+                                });
+                                setIsEditMode(true);
+                              }}
+                              title="Edit entry"
+                            >
+                              <FaEdit className="w-4 h-4" />
+                            </button>
+                            <button
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
+                              }}
+                              disabled={submitting}
+                              title="Delete entry"
+                            >
+                              <FaTrash className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="px-4 py-2 text-gray-500">No infrastructure expenditure data submitted for this year.</p>
+              )}
+            </div>
+          ))}
+
+          {/* Status Messages */}
+          {error && (
+            <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
+          
+          {success && (
+            <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                <span className="mr-2">✓</span>
+                <span>Data saved successfully!</span>
+              </div>
+            </div>
+          )}
+          
+          {loading && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+                  <span>Loading data...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Navigation */}
+          <div className="mt-6">
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
           </div>
         </div>
       </div>

@@ -84,7 +84,7 @@ router.route('/score243')
 router.route('/score241')
     .get(verifyToken, score241);
 router.route('/getResponse/:criteriaCode')
-    .get(verifyToken, getResponsesByCriteriaCode);
+    .get( getResponsesByCriteriaCode);
 // router.route('/score233')
 //     .get(score233);
 

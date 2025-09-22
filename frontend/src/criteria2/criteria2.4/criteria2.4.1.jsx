@@ -13,6 +13,7 @@ const Criteria2_4_1 = () => {
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const [useupload, setUseupload] = useState(false);
   const [file, setFile] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const error = uploadError;
   const { sessions, isLoading: sessionsLoading, error: sessionsError } = useContext(SessionContext);
 
@@ -217,10 +218,9 @@ const Criteria2_4_1 = () => {
   };
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden text-black">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
           {/* Metric Info Block */}
           <div className="bg-white border-l-4 border-blue-900 p-4 mb-6 rounded shadow-sm">

@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria4_4_1 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
   const navigate = useNavigate();
    const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
@@ -117,11 +118,9 @@ const Criteria4_4_1 = () => {
   const totalEntries = entries.length;
 
   return (
-    <div className="w-[1690px] min-h-screen bg-gray-50 overflow-x-hidden">
-      <Header />
-      <Navbar />
-      <div className="flex w-full">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 p-6">
 
           {/* --- Intro Section --- */}

@@ -1,37 +1,40 @@
 import React, { useState, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import LandingNavbar from "../../components/landing-navbar";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+
+
 const Criteria2_4_2 = () => {
-  const { sessions = ["2023-24", "2024-25"] } = useContext(SessionContext);
-
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const [useupload, setUseupload] = useState(false);
+  const { sessions: availableSessions, isLoading: isLoadingSessions } = useContext(SessionContext);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+  const [currentYear, setCurrentYear] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [yearData, setYearData] = useState({});
-  const [currentYear, setCurrentYear] = useState(sessions[0] || "");
-
+  const [provisionalScore, setProvisionalScore] = useState(null);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
+    slNo: '',
     teacherName: "",
     qualification: "",
     qualificationYear: "",
     isResearchGuide: "",
     recognitionYear: "",
+    year: "",
+    supportLinks: [],
   });
 
-  const [provisionalScore, setProvisionalScore] = useState({
-    score: {
-      score_sub_sub_criteria: 0,
-      score_sub_criteria: 0,
-      score_criteria: 0,
-      grade: 0,
-      weighted_cr_score: 0
-    },
-    message: ''
-  });
-  const [loadingScore, setLoadingScore] = useState(true);
   const navigate = useNavigate();
 
   const qualificationOptions = [
@@ -46,302 +49,691 @@ const Criteria2_4_2 = () => {
   const goToNextPage = () => navigate("/criteria2.4.3");
   const goToPreviousPage = () => navigate("/criteria2.4.1");
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async () => {
+  // Fetch data for the current year
+  const fetchResponseData = async (year) => {
+    if (!year) return [];
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      // Validation
-      if (!formData.teacherName.trim()) throw new Error("Teacher name is required");
-      if (!formData.qualification) throw new Error("Qualification is required");
-      if (!formData.qualificationYear || isNaN(Number(formData.qualificationYear)))
-        throw new Error("Valid qualification year is required");
-      if (!formData.isResearchGuide) throw new Error("Please specify if the teacher is a research guide");
-
-      if (formData.isResearchGuide.toUpperCase() === "YES") {
-        if (!formData.recognitionYear || isNaN(Number(formData.recognitionYear)))
-          throw new Error("Valid recognition year is required for research guides");
-      }
-
-      if (!currentYear) throw new Error("Please select a session year before submitting.");
-
-      // Extract first year if format is "YYYY-YY" or "YYYY-YYYY"
-      const sessionYear = currentYear.split("-")[0];
-
-      const submissionData = {
-        session: sessionYear,
-        number_of_full_time_teachers: 1, // static value for now
-        qualification: formData.qualification,
-        year_of_obtaining_the_qualification: Number(formData.qualificationYear),
-        whether_recognised_as_research_guide:
-          formData.isResearchGuide.toUpperCase() === "YES" ? 1 : 0,
-        year_of_recognition_as_research_guide:
-          formData.isResearchGuide.toUpperCase() === "YES"
-            ? Number(formData.recognitionYear)
-            : null,
-      };
-
-      console.log("Submitting data:", submissionData);
-
-      await axios.post(
-        "http://localhost:3000/api/v1/criteria2/createResponse242",
-        submissionData
+      const yearToSend = year.split("-")[0];
+      const response = await api.get(
+        `/criteria2/getResponse/2.4.2`, 
+        { params: { session: yearToSend } }
       );
-
-      const updatedYearData = {
-        ...yearData,
-        [currentYear]: [...(yearData[currentYear] || []), formData],
-      };
-      setYearData(updatedYearData);
-
-      // Reset form
-      setFormData({
-        teacherName: "",
-        qualification: "",
-        qualificationYear: "",
-        isResearchGuide: "",
-        recognitionYear: "",
-      });
-
-      // Re-fetch score
-      await fetchScore();
-
-      alert("Data submitted successfully!");
-    } catch (error) {
-      console.error("Error saving data:", error);
-      const errMsg =
-        error.response?.data?.message || error.message || "Failed to save data. Please try again.";
-      alert(`Error: ${errMsg}`);
-    }
-  };
-
-  const fetchScore = async () => {
-    try {
-      setLoadingScore(true);
-      const response = await axios.get(
-        "http://localhost:3000/api/v1/criteria2/score242",
-        { withCredentials: true }
-      );
-
-      console.log("Fetched score data:", response.data);
       
-      // Handle the actual response structure
-      const responseData = response.data;
-      const scoreData = responseData.data; // The scores are in the data property
+      const data = response.data?.data || [];
       
-      console.log('Score data:', {
-        sub_sub_criteria: scoreData.score_sub_sub_criteria,
-        sub_criteria: scoreData.score_sub_criteria,
-        criteria: scoreData.score_criteria,
-        grade: scoreData.sub_sub_cr_grade,
-        weighted_score: scoreData.weighted_cr_score
+      // Store the SL numbers in localStorage for each entry
+      data.forEach(item => {
+        if (item.sl_no) {
+          localStorage.setItem(`criteria242_${item.teacher_name}_${yearToSend}`, item.sl_no);
+        }
       });
       
-      // Format the scores to match the component's expected structure
-      const parsedScore = {
-        score_sub_sub_criteria: parseFloat(scoreData.score_sub_sub_criteria) || 0,
-        score_sub_criteria: parseFloat(scoreData.score_sub_criteria) || 0,
-        score_criteria: parseFloat(scoreData.score_criteria) || 0,
-        grade: scoreData.sub_sub_cr_grade || 0,
-        weighted_cr_score: scoreData.weighted_cr_score || 0
-      };
-  
-      setProvisionalScore({
-        score: parsedScore,
-        message: responseData.message || "Score loaded successfully"
-      });
-    } catch (error) {
-      console.error("Error fetching provisional score:", error);
-      setProvisionalScore({
-        score: {
-          score_sub_sub_criteria: 0,
-          score_sub_criteria: 0,
-          score_criteria: 0,
-          grade: 0,
-          weighted_cr_score: 0
-        },
-        message: error.response?.data?.message || "Failed to fetch provisional score"
-      });
+      return data.map(item => ({
+        slNo: item.sl_no,
+        year: year,
+        teacherName: item.teacher_name,
+        qualification: item.qualification,
+        qualificationYear: item.year_of_obtaining_the_qualification,
+        isResearchGuide: item.whether_recognised_as_research_guide ? "Yes" : "No",
+        recognitionYear: item.year_of_recognition_as_research_guide || "",
+        session: item.session
+      }));
+    } catch (err) {
+      console.error("Error fetching response data:", err);
+      setError("Failed to load response data. Please try again.");
+      return [];
     } finally {
-      setLoadingScore(false);
+      setLoading(false);
     }
   };
 
+  // Fetch score for the current year
+  const fetchScore = async () => {
+    if (!currentYear) return;
+    
+    // Try to load from localStorage first
+    const cachedScore = localStorage.getItem(`criteria242_score_${currentYear}`);
+    if (cachedScore) {
+      try {
+        const parsedScore = JSON.parse(cachedScore);
+        // Only use cached score if it's not too old (e.g., less than 1 hour old)
+        if (Date.now() - parsedScore.timestamp < 60 * 60 * 1000) {
+          setProvisionalScore(parsedScore.data);
+        }
+      } catch (e) {
+        console.warn("Error parsing cached score:", e);
+        localStorage.removeItem(`criteria242_score_${currentYear}`);
+      }
+    }
+    
+    try {
+      const response = await api.get(`/criteria2/score242`, { 
+        params: { session: currentYear.split("-")[0] } 
+      });
+      
+      // Save to state
+      setProvisionalScore(response.data);
+      
+      // Cache the response in localStorage with a timestamp
+      if (response.data) {
+        const cacheData = {
+          data: response.data,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(
+          `criteria242_score_${currentYear}`, 
+          JSON.stringify(cacheData)
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching score:", err);
+      setError("Failed to load score");
+    }
+  };
+
+  // Handle create new entry
+  const handleCreate = async (formDataToSubmit) => {
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const payload = {
+        session: parseInt(yearToSend),
+        number_of_full_time_teachers: 1,
+        teacher_name: formDataToSubmit.teacherName.trim(),
+        qualification: formDataToSubmit.qualification,
+        year_of_obtaining_the_qualification: Number(formDataToSubmit.qualificationYear),
+        whether_recognised_as_research_guide: formDataToSubmit.isResearchGuide.toUpperCase() === "YES" ? 1 : 0,
+        year_of_recognition_as_research_guide: 
+          formDataToSubmit.isResearchGuide.toUpperCase() === "YES" ? Number(formDataToSubmit.recognitionYear) : null,
+      };
+      
+      const response = await api.post('/criteria2/createResponse242', payload);
+      
+      if (response.data.success) {
+        // Store the SL number in localStorage
+        if (response.data.data.sl_no) {
+          localStorage.setItem(
+            `criteria242_${payload.teacher_name}_${yearToSend}`, 
+            response.data.data.sl_no
+          );
+        }
+        
+        // Refresh the data
+        const updatedData = await fetchResponseData(currentYear);
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        // Reset form
+        setFormData({
+          slNo: '',
+          teacherName: "",
+          qualification: "",
+          qualificationYear: "",
+          isResearchGuide: "",
+          recognitionYear: "",
+          year: currentYear,
+          supportLinks: []
+        });
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error creating entry:", err);
+      setError(err.response?.data?.message || "Failed to create entry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle update entry
+  const handleUpdate = async (formDataToSubmit) => {
+    if (!formDataToSubmit.slNo) {
+      setError("No entry selected for update");
+      return;
+    }
+    
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const payload = {
+        session: parseInt(yearToSend),
+        number_of_full_time_teachers: 1,
+        teacher_name: formDataToSubmit.teacherName.trim(),
+        qualification: formDataToSubmit.qualification,
+        year_of_obtaining_the_qualification: Number(formDataToSubmit.qualificationYear),
+        whether_recognised_as_research_guide: formDataToSubmit.isResearchGuide.toUpperCase() === "YES" ? 1 : 0,
+        year_of_recognition_as_research_guide: 
+          formDataToSubmit.isResearchGuide.toUpperCase() === "YES" ? Number(formDataToSubmit.recognitionYear) : null,
+      };
+      
+      const response = await api.put(`/criteria2/updateResponse242/${formDataToSubmit.slNo}`, payload);
+      
+      if (response.data.success) {
+        // Refresh the data
+        const updatedData = await fetchResponseData(currentYear);
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error updating entry:", err);
+      setError(err.response?.data?.message || "Failed to update entry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate form data
+  const validateFormData = (dataToSubmit) => {
+    const teacherName = dataToSubmit.teacherName.trim();
+    const qualification = dataToSubmit.qualification;
+    const qualificationYear = Number(dataToSubmit.qualificationYear);
+    const isResearchGuide = dataToSubmit.isResearchGuide;
+    const recognitionYear = Number(dataToSubmit.recognitionYear);
+    const yearInput = dataToSubmit.year || currentYear;
+    const yearToSend = yearInput.split("-")[0];
+    const session = parseInt(yearToSend);
+    const currentYearNum = new Date().getFullYear();
+
+    if (!teacherName || !qualification || !qualificationYear || !isResearchGuide) {
+      throw new Error("Please fill in all required fields.");
+    }
+    
+    if (qualificationYear < 1990 || qualificationYear > currentYearNum) {
+      throw new Error("Qualification year must be between 1990 and current year.");
+    }
+
+    if (isResearchGuide.toUpperCase() === "YES" && 
+        (!recognitionYear || recognitionYear < 1990 || recognitionYear > currentYearNum)) {
+      throw new Error("Valid recognition year is required for research guides.");
+    }
+
+    if (session < 1990 || session > currentYearNum) {
+      throw new Error("Session year must be between 1990 and current year.");
+    }
+
+    return true;
+  };
+
+  // Handle form submission (create or update)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      validateFormData(formData);
+      
+      if (isEditMode) {
+        // Find the entry to update
+        const entryToUpdate = yearData[currentYear]?.find(
+          entry => entry.teacherName === editKey?.teacherName && entry.year === editKey?.year
+        );
+        
+        if (entryToUpdate) {
+          const updateData = { ...formData, slNo: entryToUpdate.slNo };
+          await handleUpdate(updateData);
+        } else {
+          setError("Entry not found for update");
+          return;
+        }
+      } else {
+        await handleCreate(formData);
+      }
+      
+      // Reset edit mode
+      setIsEditMode(false);
+      setEditKey(null);
+      
+    } catch (err) {
+      setError(err.message);
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  // Fetch data when currentYear changes
   useEffect(() => {
-    fetchScore();
-  }, []);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Fetch data for all available years
+        const promises = availableSessions.map(year => fetchResponseData(year));
+        const data = await Promise.all(promises);
+        
+        // Create yearData object with all years' data
+        const newYearData = {};
+        availableSessions.forEach((year, index) => {
+          newYearData[year] = data[index];
+        });
+        
+        setYearData(newYearData);
+      } catch (err) {
+        console.error("Error loading data:", err);
+        setError("Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [currentYear, availableSessions]);
+
+  // Fetch score when currentYear changes
+  useEffect(() => {
+    if (currentYear) {
+      fetchScore();
+    }
+  }, [currentYear]);
+
+  // Set default current year when sessions load
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0 && !currentYear) {
+      const firstYear = availableSessions[0];
+      setCurrentYear(firstYear);
+      setFormData(prev => ({ ...prev, year: firstYear }));
+    }
+  }, [availableSessions, currentYear]);
+
+  // Handle year change
+  const handleYearChange = (e) => {
+    const selectedYear = e.target.value;
+    setCurrentYear(selectedYear);
+    setFormData(prev => ({ ...prev, year: selectedYear }));
+    setIsEditMode(false);
+    setEditKey(null);
+  };
+
+  const handleChange = (field, value, index = null) => {
+    if (field === "supportLinks") {
+      const updatedLinks = [...(formData.supportLinks || [])];
+      updatedLinks[index] = value;
+      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleExport = () => {
+    window.open("http://localhost:8000/download-excel", "_blank");
+  };
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden text-black">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            2.4.2 Average percentage of full time teachers with Ph.D./D.M./M.Ch./D.N.B Super speciality/D.Sc./D.Litt. during the last five years
-          </h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-medium text-gray-800">
+              Criteria 2: Teaching-Learning and Evaluation
+            </h2>
+            <div className="text-sm text-gray-600">
+              2.4-Student Performance and Learning Outcomes
+            </div>
+          </div>
 
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loadingScore ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore.score.score_sub_sub_criteria > 0 ? (
-              <div>
-                <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (2.4.2): {provisionalScore.score.score_sub_sub_criteria.toFixed(2)} %
-                </p>
-                <p className="text-sm text-gray-600">
-                  Sub-criteria Score: {provisionalScore.score.score_sub_criteria.toFixed(2)} %
-                </p>
-                <p className="text-sm text-gray-600">
-                  Overall Criteria Score: {provisionalScore.score.score_criteria.toFixed(2)} %
-                </p>
-                <p className="text-sm text-gray-600">
-                  Grade: {provisionalScore.score.grade}
-                </p>
-                <p className="text-sm text-gray-600">
-                  Weighted Score: {provisionalScore.score.weighted_cr_score}
+          <div className="flex-1 flex flex-col p-4">
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+              <div className="mb-4">
+                <h3 className="text-blue-600 font-medium mb-2">2.4.2 Metric Information</h3>
+                <p className="text-sm text-gray-700">
+                  Average percentage of full time teachers with Ph.D./D.M./M.Ch./D.N.B Super speciality/D.Sc./D.Litt. during the last five years
                 </p>
               </div>
-            ) : (
-              <p className="text-gray-600">No score data available. Please submit data to calculate score.</p>
-            )}
-            {provisionalScore.message && !loadingScore && (
-              <p className="text-sm mt-2 text-blue-600">{provisionalScore.message}</p>
-            )}
+              <div className="mb-6">
+                <h3 className="text-blue-600 font-medium mb-2">Required Documents:</h3>
+                <ul className="list-disc pl-5 text-sm text-gray-700">
+                  <li>Any additional information</li>
+                  <li>Institutional data in prescribed format</li>
+                  <li>List of full time teachers along with their highest qualification</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           <div className="mb-4">
-            <label className="font-medium text-black mr-2">Select Year:</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year:</label>
             <select
-              className="border rounded px-3 py-1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-black"
               value={currentYear}
-              onChange={(e) => setCurrentYear(e.target.value)}
+              onChange={handleYearChange}
+              disabled={isLoadingSessions}
             >
-              <option value="" disabled>Select Year</option>
-              {sessions.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
+              {isLoadingSessions ? (
+                <option>Loading sessions...</option>
+              ) : availableSessions.length > 0 ? (
+                availableSessions.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))
+              ) : (
+                <option>No sessions available</option>
+              )}
             </select>
           </div>
 
-          <table className="w-full border text-sm mb-6">
-            <thead className="bg-gray-200">
-              <tr className="text-black font-semibold">
-                <th className="border px-2 py-1">Name of full time teacher</th>
-                <th className="border px-2 py-1">Highest Qualification</th>
-                <th className="border px-2 py-1">Year of Qualification</th>
-                <th className="border px-2 py-1">Recognised as Research Guide</th>
-                <th className="border px-2 py-1">Year of Recognition</th>
-                <th className="border px-2 py-1">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border px-2 py-1">
-                  <input
-                    type="text"
-                    className="w-full border rounded px-2 py-1 text-black"
-                    value={formData.teacherName}
-                    onChange={(e) => handleChange("teacherName", e.target.value)}
-                    placeholder="Teacher Name"
-                  />
-                </td>
-                <td className="border px-2 py-1">
-                  <select
-                    className="w-full border rounded px-2 py-1 text-black"
-                    value={formData.qualification}
-                    onChange={(e) => handleChange("qualification", e.target.value)}
-                  >
-                    <option value="">Select Qualification</option>
-                    {qualificationOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="border px-2 py-1">
-                  <input
-                    type="number"
-                    className="w-full border rounded px-2 py-1 text-black"
-                    value={formData.qualificationYear}
-                    onChange={(e) => handleChange("qualificationYear", e.target.value)}
-                    placeholder="Qualification Year"
-                  />
-                </td>
-                <td className="border px-2 py-1">
-                  <select
-                    className="w-full border rounded px-2 py-1 text-black"
-                    value={formData.isResearchGuide}
-                    onChange={(e) => handleChange("isResearchGuide", e.target.value)}
-                  >
-                    <option value="">Select</option>
-                    <option value="YES">YES</option>
-                    <option value="NO">NO</option>
-                  </select>
-                </td>
-                <td className="border px-2 py-1">
-                  <input
-                    type="number"
-                    className="w-full border rounded px-2 py-1 text-black"
-                    value={formData.recognitionYear}
-                    onChange={(e) => handleChange("recognitionYear", e.target.value)}
-                    placeholder="Recognition Year"
-                  />
-                </td>
-                <td className="border px-2 py-1 text-center">
-                  <button
-                    className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                    onClick={handleSubmit}
-                  >
-                    Add
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
+              <p className="text-lg font-semibold text-green-800">
+                Provisional Score (2.4.2): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
+                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
+                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
+                </span>
+              </p>
+            ) : (
+              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+            )}
+          </div>
 
-          {sessions.map((year) => (
+          {/* Input Form */}
+          <div className="border rounded mb-8">
+            <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
+              Full Time Teachers with Advanced Qualifications - {isEditMode ? 'Edit Mode' : 'Add New'}
+            </h2>
+            <table className="w-full border text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="border px-4 py-2 text-gray-800">Name of Full Time Teacher</th>
+                  <th className="border px-4 py-2 text-gray-800">Highest Qualification</th>
+                  <th className="border px-4 py-2 text-gray-800">Year of Qualification</th>
+                  <th className="border px-4 py-2 text-gray-800">Recognised as Research Guide</th>
+                  <th className="border px-4 py-2 text-gray-800">Year of Recognition</th>
+                  <th className="border px-4 py-2 text-gray-800">Year (Entry)</th>
+                  <th className="border px-4 py-2 text-gray-800">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border px-2 py-1">
+                    <input
+                      type="text"
+                      className="w-full border rounded px-2 py-1 text-gray-600"
+                      placeholder="Teacher Name"
+                      value={formData.teacherName}
+                      onChange={(e) => handleChange('teacherName', e.target.value)}
+                    />
+                  </td>
+                  <td className="border px-2 py-1">
+                    <select
+                      className="w-full border rounded px-2 py-1 text-gray-600"
+                      value={formData.qualification}
+                      onChange={(e) => handleChange('qualification', e.target.value)}
+                    >
+                      <option value="">Select Qualification</option>
+                      {qualificationOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="border px-2 py-1">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-2 py-1 text-gray-600"
+                      placeholder="Qualification Year"
+                      value={formData.qualificationYear}
+                      onChange={(e) => handleChange('qualificationYear', e.target.value)}
+                    />
+                  </td>
+                  <td className="border px-2 py-1">
+                    <select
+                      className="w-full border rounded px-2 py-1 text-gray-600"
+                      value={formData.isResearchGuide}
+                      onChange={(e) => handleChange('isResearchGuide', e.target.value)}
+                    >
+                      <option value="">Select</option>
+                      <option value="YES">YES</option>
+                      <option value="NO">NO</option>
+                    </select>
+                  </td>
+                  <td className="border px-2 py-1">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-2 py-1 text-gray-600"
+                      placeholder="Recognition Year"
+                      value={formData.recognitionYear}
+                      onChange={(e) => handleChange('recognitionYear', e.target.value)}
+                    />
+                  </td>
+                  <td className="border px-2 py-1">
+                    <select
+                      className="w-full border rounded px-2 py-1 text-black"
+                      value={formData.year}
+                      onChange={(e) => handleChange('year', e.target.value)}
+                    >
+                      {isLoadingSessions ? (
+                        <option>Loading sessions...</option>
+                      ) : availableSessions.length > 0 ? (
+                        availableSessions.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))
+                      ) : (
+                        <option>No sessions available</option>
+                      )}
+                    </select>
+                  </td>
+                  <td className="border px-2 py-1">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        className={`px-3 py-1 rounded text-white ${
+                          submitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}
+                      </button>
+                      {isEditMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              slNo: '',
+                              teacherName: "",
+                              qualification: "",
+                              qualificationYear: "",
+                              isResearchGuide: "",
+                              recognitionYear: "",
+                              year: currentYear,
+                              supportLinks: [],
+                            });
+                            setEditKey(null);
+                            setIsEditMode(false);
+                          }}
+                          className="px-3 py-1 bg-gray-400 text-white rounded hover:bg-gray-500"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-gray-700 font-medium mb-2">
+              Upload Documents
+            </label>
+            <div className="flex items-center gap-4 mb-2">
+              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                <i className="fas fa-upload mr-2"></i> Choose Files
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const filesArray = Array.from(e.target.files);
+                    for (const file of filesArray) {
+                      try {
+                        const uploaded = await uploadFile(
+                          "criteria2_4_2",
+                          file,
+                          "2.4.2",
+                          currentYear
+                        );
+                        setFormData((prev) => ({
+                          ...prev,
+                          supportLinks: [...prev.supportLinks, uploaded.file_url],
+                        }));
+                      } catch (err) {
+                        alert(err.message || "Upload failed");
+                      }
+                    }
+                  }}
+                />
+              </label>
+
+              {/* Status Messages */}
+              {uploading && <span className="text-gray-600">Uploading...</span>}
+              {error && <span className="text-red-600">{error}</span>}
+            </div>
+
+            {formData.supportLinks.length > 0 && (
+              <ul className="list-disc pl-5 text-gray-700">
+                {formData.supportLinks.map((link, index) => (
+                  <li key={index} className="flex justify-between items-center mb-1">
+                    <a
+                      href={`http://localhost:3000${link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {link.split("/").pop()}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Remove from local formData
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: prev.supportLinks.filter(l => l !== link)
+                        }));
+                        // Also remove from context
+                        removeFile("criteria2_4_2", link);
+                      }}
+                      className="text-red-600 ml-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Display Data for All Years */}
+          {availableSessions.map((year) => (
             <div key={year} className="mb-8 border rounded">
-              <h3 className="bg-blue-100 px-4 py-2 font-semibold text-black">
+              <h3 className="text-lg font-semibold bg-gray-100 !text-gray-800 px-4 py-2">
                 Year: {year}
               </h3>
               {yearData[year] && yearData[year].length > 0 ? (
-                <table className="w-full text-sm border">
-                  <thead className="bg-gray-200 text-black font-semibold">
+                <table className="w-full text-sm border border-black">
+                  <thead className="bg-gray-200">
                     <tr>
-                      <th className="border px-2 py-1">#</th>
-                      <th className="border px-2 py-1">Teacher Name</th>
-                      <th className="border px-2 py-1">Qualification</th>
-                      <th className="border px-2 py-1">Year of Qualification</th>
-                      <th className="border px-2 py-1">Research Guide</th>
-                      <th className="border px-2 py-1">Year of Recognition</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">#</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Teacher Name</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Qualification</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Year of Qualification</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Research Guide</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Year of Recognition</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {yearData[year].map((entry, index) => (
-                      <tr key={index} className="even:bg-gray-50 text-black">
-                        <td className="border px-2 py-1">{index + 1}</td>
-                        <td className="border px-2 py-1">{entry.teacherName}</td>
-                        <td className="border px-2 py-1">{entry.qualification}</td>
-                        <td className="border px-2 py-1">{entry.qualificationYear}</td>
-                        <td className="border px-2 py-1">{entry.isResearchGuide}</td>
-                        <td className="border px-2 py-1">{entry.recognitionYear}</td>
+                      <tr key={entry.teacherName + year}>
+                        <td className="border border-black text-black px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.teacherName}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.qualification}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{entry.qualificationYear}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{entry.isResearchGuide}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{entry.recognitionYear}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">
+                          <button
+                            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            onClick={() => {
+                              setFormData({
+                                slNo: entry.slNo,
+                                teacherName: entry.teacherName,
+                                qualification: entry.qualification,
+                                qualificationYear: entry.qualificationYear,
+                                isResearchGuide: entry.isResearchGuide,
+                                recognitionYear: entry.recognitionYear,
+                                year: entry.year,
+                                supportLinks: [],
+                              });
+                              setEditKey({ teacherName: entry.teacherName, year: entry.year });
+                              setIsEditMode(true);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-600 px-4 py-2">No data submitted for this year.</p>
+                <p className="px-4 py-2 text-gray-500">No data submitted for this year.</p>
               )}
             </div>
           ))}
 
+          {/* Status Messages */}
+          {error && (
+            <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md">
+              <div className="flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
+              </div>
+            </div>
+          )}
+          
+          {success && (
+            <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md">
+              <div className="flex items-center">
+                <span className="mr-2">✓</span>
+                <span>Data saved successfully!</span>
+              </div>
+            </div>
+          )}
+          
+          {loading && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+                  <span>Loading data...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} onSubmit={handleSubmit} />
           </div>
         </div>
       </div>

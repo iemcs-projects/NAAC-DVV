@@ -22,6 +22,7 @@ const Criteria2_1_1 = () => {
   const [yearData, setYearData] = useState({});
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [error, setError] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [formData, setFormData] = useState({
     slNo: '',
     name: "",
@@ -349,12 +350,14 @@ const Criteria2_1_1 = () => {
 
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden">
-      <LandingNavbar />
-    
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
-        <div className="flex-1 mt-6 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-medium text-gray-800">Criteria 2: Teaching-Learning and Evaluation</h2>
+            <div className="text-sm text-gray-600">2.1 - Student Enrolment and Profile</div>
+          </div>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">
               Criteria 2: Teaching-Learning and Evaluation
@@ -363,9 +366,6 @@ const Criteria2_1_1 = () => {
               2.1-Student Enrolment and Profile
             </div>
           </div>
-
-          <div className="flex-1 flex flex-col p-4">
-          
 
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <div className="mb-4">
@@ -381,8 +381,7 @@ const Criteria2_1_1 = () => {
                 <li>Institutional data in prescribed format</li>
               </ul>
             </div>
-        </div>
-        </div>
+          </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year:</label>
@@ -535,77 +534,75 @@ const Criteria2_1_1 = () => {
           </div>
 
           <div className="mb-6">
-      <label className="block text-gray-700 font-medium mb-2">
-        Upload Documents
-      </label>
-      <div className="flex items-center gap-4 mb-2">
-        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-          <i className="fas fa-upload mr-2"></i> Choose Files
-          <input
-            type="file"
-            className="hidden"
-            multiple
-            onChange={async (e) => {
-              const filesArray = Array.from(e.target.files);
-              for (const file of filesArray) {
-                try {
-                  const uploaded = await uploadFile(
-                    "criteria1_1_3",
-                    file,
-                    "1.1.3",
-                    currentYear
-                  );
-                  setFormData((prev) => ({
-                    ...prev,
-                    supportLinks: [...prev.supportLinks, uploaded.file_url],
-                  }));
-                } catch (err) {
-                  alert(err.message || "Upload failed");
-                }
-              }
-            }}
-          />
-        </label>
+            <label className="block text-gray-700 font-medium mb-2">
+              Upload Documents
+            </label>
+            <div className="flex items-center gap-4 mb-2">
+              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                <i className="fas fa-upload mr-2"></i> Choose Files
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const filesArray = Array.from(e.target.files);
+                    for (const file of filesArray) {
+                      try {
+                        const uploaded = await uploadFile(
+                          "criteria1_1_3",
+                          file,
+                          "1.1.3",
+                          currentYear
+                        );
+                        setFormData((prev) => ({
+                          ...prev,
+                          supportLinks: [...prev.supportLinks, uploaded.file_url],
+                        }));
+                      } catch (err) {
+                        alert(err.message || "Upload failed");
+                      }
+                    }
+                  }}
+                />
+              </label>
 
-        {/* Status Messages */}
-        {uploading && <span className="text-gray-600">Uploading...</span>}
-        {error && <span className="text-red-600">{error}</span>}
-      </div>
-    
+              {/* Status Messages */}
+              {uploading && <span className="text-gray-600">Uploading...</span>}
+              {error && <span className="text-red-600">{error}</span>}
+            </div>
 
-
-  {formData.supportLinks.length > 0 && (
-    <ul className="list-disc pl-5 text-gray-700">
-      {formData.supportLinks.map((link, index) => (
-        <li key={index} className="flex justify-between items-center mb-1">
-          <a
-            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {link.split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              // Remove from local formData
-              setFormData(prev => ({
-                ...prev,
-                supportLinks: prev.supportLinks.filter(l => l !== link)
-              }));
-              // Also remove from context
-              removeFile("criteria1_1_3", link);
-            }}
-            className="text-red-600 ml-2"
-          >
-            Remove
-          </button>
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
+            {formData.supportLinks.length > 0 && (
+              <ul className="list-disc pl-5 text-gray-700">
+                {formData.supportLinks.map((link, index) => (
+                  <li key={index} className="flex justify-between items-center mb-1">
+                    <a
+                      href={`http://localhost:3000${link}`} // prefix with backend base URL
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {link.split("/").pop()}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Remove from local formData
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: prev.supportLinks.filter(l => l !== link)
+                        }));
+                        // Also remove from context
+                        removeFile("criteria1_1_3", link);
+                      }}
+                      className="text-red-600 ml-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {/* Display Data for All Years */}
           {availableSessions.map((year) => (
@@ -618,8 +615,8 @@ const Criteria2_1_1 = () => {
                   <thead className="bg-gray-200">
                     <tr>
                       <th className="border border-black px-4 py-2 text-gray-800">#</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">Program Name</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">Program Code</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Programme Name</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Programme Code</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Seats Sanctioned</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Students Admitted</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Actions</th>

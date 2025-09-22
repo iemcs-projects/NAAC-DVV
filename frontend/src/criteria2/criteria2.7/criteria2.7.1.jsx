@@ -24,6 +24,7 @@ const Criteria2_7_1 = () => {
   });
 
   const navigate = useNavigate();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const goToNextPage = () => {
     navigate("/criteria7.1.1");
@@ -63,10 +64,9 @@ const Criteria2_7_1 = () => {
   };
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden text-black">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">

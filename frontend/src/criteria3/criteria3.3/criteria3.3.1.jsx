@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
+import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria3_3_1 = () => {
-  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [metrics, setMetrics] = useState([
     {
       id: '3.3.1',
@@ -134,13 +135,10 @@ const Criteria3_3_1 = () => {
 
 
   return (
-    <div className="min-h-screen w-[1470px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
-
-        <div className="flex-1 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 mt-6 flex flex-col">
           {/* Page Title and Date */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Criteria 1: Curricular Aspects</h2>
@@ -275,6 +273,7 @@ impact thereof during the last five years </p>
 </div>
         </div>
       </div>
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
     </div>
   );
 };

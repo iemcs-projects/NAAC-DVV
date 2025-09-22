@@ -27,6 +27,7 @@ const Criteria2_2_2 = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -87,10 +88,9 @@ const Criteria2_2_2 = () => {
   }, []);
 
   return (
-    <div className="w-screen min-h-screen bg-white text-black overflow-x-auto">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
           <h2 className="text-2xl font-bold text-blue-900">
             2.2.2 Student - Full-time Teacher Ratio

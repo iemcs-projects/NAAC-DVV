@@ -8,10 +8,16 @@ import {
   faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 
-const Sidebar = () => {
+const Sidebar = ({ onCollapse }) => {
   const [expandedCriteria, setExpandedCriteria] = useState(null);
   const [expandedSubCriteria, setExpandedSubCriteria] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
+  
+  const toggleSidebar = () => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    if (onCollapse) onCollapse(newState);
+  };
   const navigate = useNavigate();
 
   const toggleCriteria = (criteriaId) => {
@@ -224,48 +230,49 @@ const Sidebar = () => {
     <div
       className={`${
         collapsed ? "w-12" : "w-64"
-      } !bg-[white] border-r min-h-[calc(100vh-104px)] transition-all duration-300`}
+      } !bg-gray-800 min-h-screen transition-all duration-300 fixed top-0 left-0 overflow-y-auto`}
+      style={{ maxHeight: '100vh' }}
     >
-      <div className="flex justify-between items-center p-2 border-b">
-        <span className="text-sm font-medium text-gray-700">
+      <div className="flex justify-between !bg-gray-800 items-center p-2">
+        <span className="text-sm font-medium !bg-gray-800 text-gray-300">
           {!collapsed && "Criteria"}
         </span>
         <button
-          onClick={() => setCollapsed((prev) => !prev)}
-          className="bg-white hover:text-white"
+          onClick={toggleSidebar}
+          className="!bg-gray-700 !border-white hover:text-white"
         >
           <FontAwesomeIcon icon={collapsed ? faAngleRight : faAngleLeft} />
         </button>
       </div>
 
       {!collapsed && (
-        <div className="border-t">
+        <div className="text-gray-300 !bg-gray-800 pb-20">
           {fullCriteriaList.map((criteria) => (
-            <div className="relative border-t" key={criteria.id}>
+            <div className="relative text-gray-300 !bg-gray-800" key={criteria.id}>
               <button
-  className="w-full text-left p-4 pr-10 text-sm font-medium !text-blue-700 !bg-white cursor-pointer"
+  className="w-full text-left p-4 pr-10 text-sm font-medium !text-gray-300 !bg-gray-800 cursor-pointer"
   onClick={() => toggleCriteria(criteria.id)}
 >
   {criteria.title}
 </button>
               {expandedCriteria === criteria.id && (
-                <div className="pl-6 border-l ml-4 mt-2">
+                <div className="pl-6 bg-gray-800 ml-4 mt-2">
                   {criteria.subCriteria.map((sub) => (
                     <div key={sub.id}>
                       <div
-                        className="py-2 px-4 text-sm !text-blue-700 !bg-blue-50 font-medium cursor-pointer"
+                        className="py-2 px-4 text-sm !text-gray-300 !bg-gray-800 font-medium cursor-pointer"
                         onClick={() => toggleSubCriteria(sub.id)}
                       >
                         {sub.name}
                       </div>
 
                       {expandedSubCriteria === sub.id && (
-                        <div className="pl-6 border-l ml-4">
+                        <div className="pl-6 !bg-gray-800 ml-4">
                           {sub.subItems.map((item) => (
                             <div
                               key={item}
                               onClick={() => navigate(`/criteria${item}`)}
-                              className="py-2 px-4 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                              className="py-2 px-4 text-sm !text-gray-300 !bg-gray-800 hover:bg-gray-50 cursor-pointer"
                             >
                               {item}
                             </div>

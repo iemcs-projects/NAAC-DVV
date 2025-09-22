@@ -1,443 +1,860 @@
 import React, { useState, useEffect, useContext } from "react";
-import axios from "axios";
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
+import LandingNavbar from "../../components/landing-navbar";
+import api from "../../api";
+import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria3_1_3 = () => {
-  const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+  const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
-  const [availableSessions, setAvailableSessions] = useState([]);
-  const [currentYear, setCurrentYear] = useState("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editKey, setEditKey] = useState(null);
+  const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [yearData, setYearData] = useState({});
+  const [provisionalScore, setProvisionalScore] = useState(null);
   const [error, setError] = useState(null);
 
-  const pastFiveYears = Array.from(
-    { length: 5 },
-    (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`
-  );
-
-  const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
-  const [yearData, setYearData] = useState({});
-  const [yearScores, setYearScores] = useState(
-    pastFiveYears.reduce((acc, year) => ({ ...acc, [year]: 0 }), {})
-  );
-  const [yearCount, setYearCount] = useState(5);
-  const [averageScore, setAverageScore] = useState(null);
-  const [provisionalScore, setProvisionalScore] = useState(null);
-  const [submittedData, setSubmittedData] = useState([]);
-
   const [formData, setFormData] = useState({
-    year: currentYear ? currentYear.split('-')[0] : "",
+    slNo: '',
     workshop_name: "",
     participants: "",
     date_from: "",
     date_to: "",
     supportLinks: []
   });
-  useEffect(() => {
-    if (sessions && sessions.length > 0) {
-      setAvailableSessions(sessions);
-      setCurrentYear(sessions[0]);
-      setSelectedYear(sessions[0]);
-      setFormData(prev => ({
-        ...prev,
-        year: sessions[0].split('-')[0]
-      }));
-    }
-  }, [sessions]);
 
-  useEffect(() => {
-    const yearToUse = availableSessions?.length > 0 ? availableSessions[0] : pastFiveYears[0];
-    if (yearToUse && currentYear !== yearToUse) {
-      setCurrentYear(yearToUse);
-      setSelectedYear(yearToUse);
-      setFormData(prev => ({
-        ...prev,
-        year: yearToUse.split('-')[0]
-      }));
-    }
-  }, [availableSessions, pastFiveYears, currentYear]);
+  const [submittedData, setSubmittedData] = useState([]);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!availableSessions?.length && pastFiveYears.length > 0) {
-      setCurrentYear(pastFiveYears[0]);
-      setSelectedYear(pastFiveYears[0]);
-      setFormData(prev => ({
-        ...prev,
-        year: pastFiveYears[0].split('-')[0]
-      }));
-    }
-  }, [availableSessions, pastFiveYears]);
+  const convertToPaddedFormat = (code) => {
+    return '030101010103';
+  };
 
-  const fetchScore = async () => {
-    console.log('Fetching score...');
+  const fetchResponseData = async (year) => {
+    console.log('Fetching data for year:', year);
+    if (!year) {
+      console.log('No year provided, returning empty array');
+      return [];
+    }
+    
     setLoading(true);
     setError(null);
+    
     try {
-      const response = await axios.get("http://localhost:3000/api/v1/criteria3/score313");
-      console.log('API Response:', response);
+      const yearToSend = year.split("-")[0];
+      console.log('Sending request with session:', yearToSend);
       
-      // Check if response has data and the expected score property
-      if (response.data && response.data.data && response.data.data.entry) {
-        console.log('Score data:', response.data.data.entry);
-        setProvisionalScore(response.data.data.entry);
+      const response = await api.get(
+        "/criteria2/getResponse/3.1.3", 
+        { 
+          params: { 
+            session: yearToSend,
+            criteriaCode: '030101010103'
+          }
+        }
+      );
+      
+      console.log('API Response:', response.data);
+      
+      if (!response.data || !response.data.data) {
+        console.warn('No data in response');
+        return [];
+      }
+      
+      const data = response.data.data;
+      
+      // Store the SL numbers in localStorage for each entry
+      data.forEach(item => {
+        if (item.slNo) {
+          localStorage.setItem(`criteria3.1.3_slNo_${item.id}`, item.slNo);
+        }
+      });
+      
+      return data;
+    } catch (error) {
+      console.error('Error fetching response data:', error);
+      setError('Failed to fetch data. Please try again.');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Fetch score for the current year
+  const fetchScore = async () => {
+    if (!currentYear) return;
+    
+    const cachedScore = localStorage.getItem(`criteria313_score_${currentYear}`);
+    if (cachedScore) {
+      try {
+        const parsedScore = JSON.parse(cachedScore);
+        if (Date.now() - parsedScore.timestamp < 60 * 60 * 1000) {
+          setProvisionalScore(parsedScore.data);
+        }
+      } catch (e) {
+        console.warn("Error parsing cached score:", e);
+        localStorage.removeItem(`criteria313_score_${currentYear}`);
+      }
+    }
+    
+    try {
+      const response = await api.get(`/criteria3/score313`);
+      setProvisionalScore(response.data);
+      
+      if (response.data) {
+        const cacheData = {
+          data: response.data,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(
+          `criteria313_score_${currentYear}`, 
+          JSON.stringify(cacheData)
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching score:", err);
+      setError("Failed to load score");
+    }
+  };
+
+  // Handle create new entry
+  const handleCreate = async (formDataToSubmit) => {
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const payload = {
+        workshop_name: formDataToSubmit.workshop_name,
+        participants: parseInt(formDataToSubmit.participants),
+        date_from: formDataToSubmit.date_from,
+        date_to: formDataToSubmit.date_to,
+        year: yearToSend,
+        session: parseInt(yearToSend),
+      };
+      
+      console.log('Sending request with payload:', payload);
+      const response = await api.post('/criteria3/createResponse313', payload);
+      console.log('Response received:', response);
+      
+      if (response.status >= 200 && response.status < 300) {
+        console.log('Request was successful, showing alert');
+        
+        alert('Data submitted successfully!');
+        
+        if (response.data?.data?.sl_no) {
+          localStorage.setItem(
+            `criteria313_${formDataToSubmit.workshop_name}_${yearToSend}`, 
+            response.data.data.sl_no
+          );
+        }
+        
+        const updatedData = await fetchResponseData(currentYear);
+        
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSubmittedData(prev => [
+          ...prev,
+          {
+            ...formDataToSubmit,
+            slNo: response.data?.data?.sl_no || Date.now(),
+            year: currentYear
+          }
+        ]);
+        
+        // Reset form
+        setFormData({
+          slNo: '',
+          workshop_name: "",
+          participants: "",
+          date_from: "",
+          date_to: "",
+          supportLinks: []
+        });
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error creating entry:", err);
+      setError(err.response?.data?.message || "Failed to create entry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle update entry
+  const handleUpdate = async (formDataToSubmit) => {
+    if (!formDataToSubmit.sl_no && !formDataToSubmit.slNo) {
+      setError("No entry selected for update");
+      return;
+    }
+    
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      // Ensure sl_no is a number
+      const sl_no = parseInt(formDataToSubmit.sl_no || formDataToSubmit.slNo, 10);
+      if (isNaN(sl_no)) {
+        throw new Error('Invalid entry ID');
+      }
+      
+      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
+      
+      console.log('Update payload:', {
+        sl_no,
+        yearToSend,
+        formDataToSubmit
+      });
+      
+      const payload = {
+        workshop_name: formDataToSubmit.workshop_name,
+        participants: parseInt(formDataToSubmit.participants) || 0,
+        date_from: formDataToSubmit.date_from,
+        date_to: formDataToSubmit.date_to,
+        year: yearToSend,
+        session: parseInt(yearToSend),
+      };
+      
+      console.log('Sending update request to:', `/criteria3/updateResponse313/${sl_no}`, 'with payload:', payload);
+      const response = await api.put(`/criteria3/updateResponse313/${sl_no}`, payload);
+      
+      if (response.data.success) {
+        const updatedData = await fetchResponseData(currentYear);
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error("Error updating entry:", err);
+      setError(err.response?.data?.message || "Failed to update entry");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Validate form data
+  const validateFormData = (dataToSubmit) => {
+    const yearInput = dataToSubmit.year || currentYear;
+    const yearToSend = yearInput.split("-")[0];
+    const session = parseInt(yearToSend);
+    const currentYearNum = new Date().getFullYear();
+
+    if (!dataToSubmit.workshop_name || !dataToSubmit.participants || 
+        !dataToSubmit.date_from || !dataToSubmit.date_to) {
+      throw new Error("Please fill in all required fields.");
+    }
+    
+    if (isNaN(session) || session < 1990 || session > currentYearNum) {
+      throw new Error(`Year must be between 1990 and ${currentYearNum}.`);
+    }
+
+    if (isNaN(parseInt(dataToSubmit.participants)) || parseInt(dataToSubmit.participants) <= 0) {
+      throw new Error("Participants must be a positive number.");
+    }
+
+    return true;
+  };
+
+  // Handle edit
+  const handleEdit = (entry) => {
+    setFormData({
+      ...entry,
+      id: entry.id,
+      year: currentYear
+    });
+    setIsEditMode(true);
+    setEditKey(entry.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle delete entry
+  const handleDelete = async (id) => {
+    if (!id) {
+      setError('No ID provided for deletion');
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete this entry?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Convert ID to string to match backend expectations
+      const response = await api.delete(`/criteria3/deleteResponse313/${String(id)}`);
+      
+      if (response.data) {
+        // Update the UI by removing the deleted entry
+        setSubmittedData(prev => prev.filter(item => (item.id !== id && item.sl_no !== id && item.slNo !== id)));
+        
+        // Update yearData to reflect the deletion
+        if (currentYear) {
+          setYearData(prev => ({
+            ...prev,
+            [currentYear]: (prev[currentYear] || []).filter(item => 
+              (item.id !== id && item.sl_no !== id && item.slNo !== id)
+            )
+          }));
+        }
+
+        // Show success message
+        setSuccess('Entry deleted successfully');
+        setTimeout(() => setSuccess(''), 3000);
+
+        // If we're in edit mode for the deleted entry, reset the form
+        if (isEditMode && (formData.id === id || formData.slNo === id)) {
+          setIsEditMode(false);
+          setEditKey(null);
+          setFormData({
+            slNo: '',
+            workshop_name: "",
+            participants: "",
+            date_from: "",
+            date_to: "",
+            supportLinks: []
+          });
+        }
+
+        // Refresh the score
+        await fetchScore();
       } else {
-        console.log('No score data found in response');
-        setProvisionalScore(null);
+        throw new Error(response.data?.message || 'Failed to delete entry');
       }
     } catch (error) {
-      console.error("Error fetching provisional score:", error);
-      if (error.response) {
-        console.error('Error response data:', error.response.data);
-        console.error('Error status:', error.response.status);
-      }
-      setError(error.message || "Failed to fetch score");
-      setProvisionalScore(null);
+      console.error('Error deleting entry:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete entry. Please try again.';
+      setError(errorMessage);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const formDataWithYear = { ...formData, year: currentYear };
+      validateFormData(formDataWithYear);
+      
+      if (isEditMode && (formData.slNo || formData.sl_no)) {
+        console.log('Updating entry:', formDataWithYear);
+        await handleUpdate(formDataWithYear);
+      } else {
+        console.log('Creating new entry:', formDataWithYear);
+        await handleCreate(formDataWithYear);
+      }
+      
+      // Reset form and edit mode
+      setIsEditMode(false);
+      setEditKey(null);
+      setFormData({
+        slNo: '',
+        workshop_name: "",
+        participants: "",
+        date_from: "",
+        date_to: "",
+        supportLinks: []
+      });
+      
+      // Refresh data
+      const data = await fetchResponseData(currentYear);
+      setYearData(prev => ({
+        ...prev,
+        [currentYear]: data || []
+      }));
+      setSubmittedData(data || []);
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setError(error.message || 'Failed to submit form. Please try again.');
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  // Load data when component mounts or currentYear changes
   useEffect(() => {
-    fetchScore();
-  }, []);
+    const loadData = async () => {
+      if (currentYear) {
+        const data = await fetchResponseData(currentYear);
+        setSubmittedData(data || []);
+      }
+    };
+    
+    loadData();
+  }, [currentYear]);
 
-  const navigate = useNavigate();
+  // Load data for all sessions
+  useEffect(() => {
+    const loadData = async () => {
+      if (availableSessions && availableSessions.length > 0) {
+        const promises = availableSessions.map(year => fetchResponseData(year));
+        const data = await Promise.all(promises);
+        
+        const newYearData = {};
+        availableSessions.forEach((year, index) => {
+          newYearData[year] = data[index];
+        });
+        
+        setYearData(newYearData);
+      }
+    };
 
-  const handleChange = (field, value, index) => {
-    if (field === 'supportLinks') {
-      const newSupportLinks = [...formData.supportLinks];
-      newSupportLinks[index] = value;
-      setFormData(prev => ({ ...prev, supportLinks: newSupportLinks }));
+    loadData();
+  }, [availableSessions]);
+
+  // Fetch score when currentYear changes
+  useEffect(() => {
+    if (currentYear) {
+      fetchScore();
+    }
+  }, [currentYear]);
+
+  // Set default current year when sessions load
+  useEffect(() => {
+    if (availableSessions && availableSessions.length > 0 && !currentYear) {
+      const firstYear = availableSessions[0];
+      setCurrentYear(firstYear);
+      setFormData(prev => ({ ...prev, year: firstYear }));
+    }
+  }, [availableSessions, currentYear]);
+
+  // Handle year change
+  const handleYearChange = (e) => {
+    const selectedYear = e.target.value;
+    setCurrentYear(selectedYear);
+    setFormData(prev => ({ ...prev, year: selectedYear }));
+    setIsEditMode(false);
+    setEditKey(null);
+  };
+
+  const handleChange = (field, value, index = null) => {
+    if (field === "supportLinks") {
+      const updatedLinks = [...(formData.supportLinks || [])];
+      updatedLinks[index] = value;
+      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
   };
-  console.log(formData);
 
-  const handleSubmit = async () => {
-    const workshop_name = formData.workshop_name.trim();
-    const participants = formData.participants.trim();
-    const date_from = formData.date_from.trim();
-    const date_to = formData.date_to.trim();
-    console.log("Current Year:", currentYear); // Add this line
-    const sessionFull = currentYear;
-    const session = sessionFull.split("-")[0];
-    const year = sessionFull.split("-")[0]; 
-    console.log("Session:", year); // This is already correct
-  
-    if (!workshop_name || !participants || !date_from || !date_to) {
-      alert("Please fill in all required fields: Workshop Name, Participants, Date From, and Date To");
-      return;
-    }
-  
-    try {
-      const response = await axios.post("http://localhost:3000/api/v1/criteria3/createResponse313", {
-        session: parseInt(session),
-        year: year,  // Make sure this is included in the request
-        workshop_name,
-        participants: parseInt(participants),
-        date_from,
-        date_to,
-      });
-
-      const resp = response?.data?.data || {};
-      const newEntry = {
-        year: resp.year || year,
-        workshop_name: resp.workshop_name || workshop_name,
-        participants: resp.participants || participants,
-        date_from: resp.date_from || date_from,
-        date_to: resp.date_to || date_to,
-      };
-
-      setSubmittedData((prev) => [...prev, newEntry]);
-      setYearData((prev) => ({
-        ...prev,
-        [newEntry.year]: [...(prev[newEntry.year] || []), {
-          workshop_name: newEntry.workshop_name,
-          participants: newEntry.participants,
-          date_from: newEntry.date_from,
-          date_to: newEntry.date_to,
-        }],
-      }));
-
-      // Add the new entry to submittedData
-      setSubmittedData(prevData => [...prevData, newEntry]);
-      
-      // Reset form
-      setFormData(prev => ({
-        ...prev,
-        workshop_name: "",
-        participants: "",
-        date_from: "",
-        date_to: ""
-      }));
-      
-      // Fetch updated score
-      await fetchScore();
-      alert("Workshop data submitted successfully!");
-    } catch (error) {
-      console.error("Error submitting workshop data:", error);
-      alert(error.response?.data?.message || error.message || "Failed to submit workshop data");
-    }
+  const goToNextPage = () => {
+    navigate("/criteria3.2.1");
   };
-// Replace these two useEffects with this single one:
 
-  
+  const goToPreviousPage = () => {
+    navigate("/criteria3.1.2");
+  };
 
-  const goToNextPage = () => navigate("/criteria3.2.1");
-  const goToPreviousPage = () => navigate("/criteria3.1.2");
+  const handleExport = () => {
+    const headers = [
+      'SL No',
+      'Workshop Name',
+      'Participants',
+      'Date From',
+      'Date To'
+    ];
+
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    
+    submittedData.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        `"${entry.workshop_name || ''}"`,
+        entry.participants || '',
+        entry.date_from || '',
+        entry.date_to || ''
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `criteria_3.1.3_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <Navbar />
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex-1 p-6">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-medium text-black">
-              Criteria 3 - Research, Innovations and Extension
-            </h2>
-            <span className="text-sm text-black">
-              3.1 – Resource Mobilization for Research
-            </span>
+        <div className="flex-1 mt-6 flex flex-col p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-medium text-gray-800">Criteria 3: Research, Innovations and Extension</h2>
+            <div className="text-sm text-gray-600">3.1 - Resource Mobilization for Research</div>
           </div>
 
-          {/* Provisional Score */}
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
-            {loading ? (
-              <p className="text-gray-600">Loading provisional score...</p>
-            ) : provisionalScore?.data?.score_sub_sub_criteria !== undefined || provisionalScore?.score_sub_sub_criteria !== undefined ? (
-              <p className="text-lg font-semibold text-green-800">
-                Provisional Score (3.1.3): {typeof (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria) === 'number'
-                  ? (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria).toFixed(2)
-                  : (provisionalScore.data?.score_sub_sub_criteria ?? provisionalScore.score_sub_sub_criteria)} %
-                <span className="ml-2 text-sm font-normal text-gray-500">
-                  (Last updated: {new Date(provisionalScore.timestamp || Date.now()).toLocaleString()})
-                </span>
-              </p>
-            ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
-            )}
-          </div>
-
-          {/* Metric Info */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-2">3.1.3 Metric Information</h3>
-            <p className="text-gray-700">
+          <div className="bg-white p-6 rounded shadow mb-6">
+            <h3 className="text-blue-600 font-semibold mb-2">3.1.3 Metric Information</h3>
+            <p className="text-sm text-gray-700 mb-2">
               Number of seminars/conferences/workshops conducted by the institution during the last five years
             </p>
-            <h3 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h3>
-            <ul className="list-disc pl-5 text-gray-700">
-              <li>Report of the event</li>
-              <li>Any additional information</li>
-              <li>List of workshops/seminars during last 5 years (Data Template)</li>
+            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              <li className="mb-1">Report of the event</li>
+              <li className="mb-1">Any additional information</li>
+              <li className="mb-1">List of workshops/seminars during last 5 years (Data Template)</li>
             </ul>
           </div>
 
-          {/* Year Selector */}
-         
+          <h2 className="text-xl font-bold text-gray-500 mb-4">Seminars/Conferences/Workshops Entry</h2>
+
+          {/* Year Dropdown */}
           <div className="mb-4">
             <label className="font-medium text-gray-700 mr-2">Select Year:</label>
             <select
-  value={currentYear}
-  onChange={(e) => {
-    setCurrentYear(e.target.value);
-    setSelectedYear(e.target.value);
-  }}
-  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
->
-  {availableSessions.map((session) => (
-    <option key={session} value={session}>
-      {session}
-    </option>
-  ))}
-</select>
+              className="border px-3 py-1 rounded text-black"
+              value={currentYear}
+              onChange={handleYearChange}
+              disabled={sessionLoading}
+            >
+              {sessionLoading ? (
+                <option>Loading sessions...</option>
+              ) : (
+                availableSessions?.map((session) => (
+                  <option key={session} value={session}>
+                    {session}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
 
-          {/* Form Input */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
+            {loading ? (
+              <p className="text-gray-600">Loading provisional score...</p>
+            ) : provisionalScore?.data ? (
+              <div>
+                <p className="text-lg font-semibold text-green-800">
+                  Provisional Score (3.1.3): {provisionalScore.data.score_sub_sub_criteria || provisionalScore.data.score || 0}
+                </p>
+              </div>
+            ) : (
+              <p className="text-gray-600">No score data available.</p>
+            )}
+          </div>
+
+          {/* Input Table */}
           <div className="overflow-auto border rounded mb-6">
-            <table className="min-w-full border text-black text-sm">
-              <thead className="bg-gray-100 font-semibold">
-                <tr>
-                  <th className="border px-2">Year</th>
-                  <th className="border px-2">Name of Seminar/Workshop/Conference</th>
-                  <th className="border px-2">Number of Participants</th>
-                  <th className="border px-2">Date From (YYYY)</th>
-                  <th className="border px-2">Date To (YYYY)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-2">
-                    <input
-                      type="text"
-                      value={formData.year}
-                      readOnly
-                      className="w-full border px-2 py-1 bg-gray-100"
-                    />
-                  </td>
-                  {['workshop_name', 'participants', 'date_from', 'date_to'].map((key) => (
-                    <td key={key} className="border px-2">
+            <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
+              Seminars/Conferences/Workshops - {isEditMode ? 'Edit Mode' : 'Add New'}
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <table className="min-w-full border text-sm text-left">
+                <thead className="bg-gray-100 font-semibold text-gray-950">
+                  <tr>
+                    <th className="px-4 py-2 border">Workshop Name</th>
+                    <th className="px-4 py-2 border">Participants</th>
+                    <th className="px-4 py-2 border">Date From (YYYY)</th>
+                    <th className="px-4 py-2 border">Date To (YYYY)</th>
+                    <th className="px-4 py-2 border">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="px-2 py-2 border">
                       <input
-                        type={key.includes('date') ? 'number' : 'text'}
-                        placeholder={key.includes('date') ? 'YYYY' : ''}
-                        min={key === 'date_from' || key === 'date_to' ? '1900' : undefined}
-                        max={new Date().getFullYear()}
-                        value={formData[key]}
-                        onChange={(e) => handleChange(key, e.target.value)}
-                        className="w-full border px-2 py-1 text-black"
+                        type="text"
+                        value={formData.workshop_name}
+                        onChange={(e) => handleChange("workshop_name", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Workshop/Seminar Name"
+                        required
                       />
                     </td>
-                  ))}
-                  <td className="border px-2">
-                    <button
-                      onClick={handleSubmit}
-                      className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 w-full"
-                    >
-                      Add
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        value={formData.participants}
+                        onChange={(e) => handleChange("participants", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Number of Participants"
+                        required
+                        min="1"
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        value={formData.date_from}
+                        onChange={(e) => handleChange("date_from", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="YYYY"
+                        min="1900"
+                        max={new Date().getFullYear()}
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="number"
+                        value={formData.date_to}
+                        onChange={(e) => handleChange("date_to", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="YYYY"
+                        min="1900"
+                        max={new Date().getFullYear()}
+                        required
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                        >
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                        </button>
+                        {isEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditMode(false);
+                              setFormData({
+                                slNo: '',
+                                workshop_name: "",
+                                participants: "",
+                                date_from: "",
+                                date_to: "",
+                                supportLinks: []
+                              });
+                            }}
+                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </form>
           </div>
 
+          {/* Upload Documents Section */}
           <div className="mb-6">
             <label className="block text-gray-700 font-medium mb-2">
-            Link to Activity Report:
+              Upload Documents
             </label>
-            <div className="flex flex-col gap-2">
-              {formData.supportLinks.map((link, index) => (
+            <div className="flex items-center gap-4 mb-2">
+              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+                <i className="fas fa-upload mr-2"></i> Choose Files
                 <input
-                  key={index}
-                  type="url"
-                  placeholder={`Enter support link ${index + 1}`}
-                  className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-                  value={link}
-                  onChange={(e) => handleChange("supportLinks", e.target.value, index)}
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={async (e) => {
+                    const filesArray = Array.from(e.target.files);
+                    for (const file of filesArray) {
+                      try {
+                        const uploaded = await uploadFile(
+                          "criteria3_1_3",
+                          file,
+                          "3.1.3",
+                          currentYear
+                        );
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
+                        }));
+                      } catch (err) {
+                        console.error("Upload error:", err);
+                        alert(err.message || "Upload failed");
+                      }
+                    }
+                  }}
                 />
-              ))}
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, supportLinks: [...formData.supportLinks, ""] })}
-                className="mt-2 px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700 w-fit"
-              >
-                + Add Another Link
-              </button>
+              </label>
+              {uploading && <span className="text-gray-600">Uploading...</span>}
+              {uploadError && <span className="text-red-600">{uploadError}</span>}
             </div>
+            
+            {formData.supportLinks && formData.supportLinks.length > 0 && (
+              <ul className="list-disc pl-5 text-gray-700">
+                {formData.supportLinks.map((link, index) => (
+                  <li key={index} className="flex justify-between items-center mb-1">
+                    <a
+                      href={`http://localhost:3000${link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 underline"
+                    >
+                      {link.split("/").pop()}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          supportLinks: prev.supportLinks.filter(l => l !== link)
+                        }));
+                        removeFile("criteria3_1_3", link);
+                      }}
+                      className="text-red-600 ml-2"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
-          {/* Year-wise Data */}
-          {pastFiveYears.map((yr) => (
-            <div key={yr} className="mb-6 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 px-4 py-2 text-black">Year: {yr}</h3>
-              {yearData[yr]?.length ? (
-                <table className="min-w-full border text-black text-sm">
-                  <thead className="bg-gray-100 font-semibold">
+          
+          {/* Year-wise Data Display */}
+          {availableSessions?.map((session) => (
+            <div key={session} className="mb-8 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
+              {yearData[session] && yearData[session].length > 0 ? (
+                <table className="w-full text-sm border border-black">
+                  <thead className="bg-gray-200">
                     <tr>
-                      <th className="border px-2 py-1 text-center">#</th>
-                      {Object.keys(formData).map((key) => (
-                        <th key={key} className="border px-2 py-1 text-center capitalize">
-                          {key}
-                        </th>
-                      ))}
+                      <th className="border border-black px-4 py-2 text-gray-800">#</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Workshop Name</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Participants</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Date From</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Date To</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {yearData[yr].map((entry, idx) => (
-                      <tr key={idx} className="even:bg-gray-50">
-                        <td className="border px-2 py-1 text-center">{idx + 1}</td>
-                        {Object.values(entry).map((val, i) => (
-                          <td key={i} className="border px-2 py-1">{val}</td>
-                        ))}
+                    {yearData[session].map((entry, index) => (
+                      <tr key={`${entry.workshop_name}-${entry.year}-${index}`}>
+                        <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.workshop_name}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.participants}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.date_from}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.date_to}</td>
+                        <td className="border border-black text-black px-2 py-2 w-48">
+                          <div className="flex justify-between gap-1">
+                            <button
+                              type="button"
+                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              onClick={() => {
+                                setFormData({
+                                  id: entry.id,
+                                  slNo: entry.sl_no || entry.slNo,
+                                  workshop_name: entry.workshop_name,
+                                  participants: entry.participants,
+                                  date_from: entry.date_from,
+                                  date_to: entry.date_to,
+                                  supportLinks: [],
+                                });
+                                setEditKey(entry.id);
+                                setIsEditMode(true);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              title="Edit entry"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const entryId = entry.id || entry.sl_no || entry.slNo;
+                                  if (!entryId) {
+                                    throw new Error('No valid ID found for this entry');
+                                  }
+                                  await handleDelete(entryId);
+                                } catch (error) {
+                                  console.error('Delete error:', error);
+                                  setError('Failed to delete entry. Please try again.');
+                                  setTimeout(() => setError(''), 3000);
+                                }
+                              }}
+                              disabled={loading}
+                              title="Delete entry"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-black px-4 py-2">No data submitted for this year.</p>
+                <p className="px-4 py-2 text-gray-500">No data submitted for this year.</p>
               )}
             </div>
           ))}
 
-          {/* Calculation Table */}
-          <div className="overflow-auto border rounded p-4">
-            <h2 className="text-lg font-semibold mb-2 text-black">
-              Calculation Table (Last 5 Years)
-            </h2>
-            <table className="table-auto border-collapse w-full text-black">
-              <thead>
-                <tr className="bg-gray-100 font-semibold">
-                  <th className="border px-4 py-2">Year</th>
-                  {pastFiveYears.map((yr) => (
-                    <th key={yr} className="border px-4 py-2">{yr}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="border px-4 py-2 font-medium text-black">Calculated Score</td>
-                  {pastFiveYears.map((yr) => (
-                    <td key={yr} className="border px-4 py-2 text-center">
-                      <input
-                        type="number"
-                        value={yearScores[yr]}
-                        onChange={(e) =>
-                          setYearScores({ ...yearScores, [yr]: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-20 rounded border px-1 text-center text-black"
-                      />
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-            <div className="flex items-center gap-2 mt-4">
-              <label className="text-sm font-medium text-black">
-                Enter number of years for average:
-              </label>
-              <input
-                type="number"
-                value={yearCount}
-                min={1}
-                max={5}
-                onChange={(e) => setYearCount(parseInt(e.target.value) || 1)}
-                className="w-20 border px-2 py-1 rounded text-center text-black"
-              />
-              <button
-                onClick={() => {
-                  const vals = Object.values(yearScores).slice(0, yearCount);
-                  const sum = vals.reduce((acc, v) => acc + v, 0);
-                  setAverageScore((sum / yearCount).toFixed(2));
-                }}
-                className="ml-4 bg-blue-600 px-4 py-2 text-white rounded hover:bg-green-700"
-              >
-                Calculate Average
-              </button>
-            </div>
-            {averageScore !== null && (
-              <div className="mt-4 text-blue-700 font-semibold">
-                Average Score for last {yearCount} year(s): {averageScore}%
+          {/* Status Messages */}
+          {error && (
+            <div className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
               </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <div className="bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-            <Bottom onPrevious={goToPreviousPage} onNext={goToNextPage} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Criteria3_1_3;
-
+            </div>
+          )}
+          
+          {success && (
+            <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-md z-50">
+              <div className="flex items-center">
+                                <span className="mr-2">✓</span>
+                                <span>Data saved successfully!</span>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {loading && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                              <div className="bg-white p-6 rounded-lg shadow-xl">
+                                <div className="flex items-center">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mr-3"></div>
+                                  <span>Loading data...</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                
+                          {/* Bottom Navigation */}
+                          <div className="mt-6">
+                            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                };
+                
+                export default Criteria3_1_3;

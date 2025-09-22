@@ -10,6 +10,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria2_4_3 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const [useupload, setUseupload] = useState(false);
   const [file, setFile] = useState(null);
@@ -121,10 +122,9 @@ const Criteria2_4_3 = () => {
   }, [currentYear]);
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden text-black">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 mt-6 flex flex-col p-4">
           <h2 className="text-2xl font-bold text-blue-900 mb-4">
             2.4.3 Average teaching experience of full-time teachers in the same institution

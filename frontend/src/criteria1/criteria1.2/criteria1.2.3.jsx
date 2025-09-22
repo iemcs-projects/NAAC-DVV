@@ -42,6 +42,7 @@ const Criteria1_2_3 = () => {
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [scoreLoading, setScoreLoading] = useState(false);
   const [scoreError, setScoreError] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const navigate = useNavigate();
 
@@ -158,11 +159,10 @@ const Criteria1_2_3 = () => {
   };
 
   return (
-    <div className="w-screen min-h-screen bg-gray-50 overflow-x-hidden">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
-        <div className="flex-1 mt-6 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">Criteria 1: Curricular Aspects</h2>
             <div className="text-sm">

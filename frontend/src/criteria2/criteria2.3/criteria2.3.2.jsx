@@ -23,6 +23,7 @@ const Criteria2_3_2 = () => {
     }
   ]);
   const navigate = useNavigate(); 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
 
   const [saving, setSaving] = useState(false);
@@ -136,12 +137,10 @@ const Criteria2_3_2 = () => {
 
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <LandingNavbar />
-      <div className="flex-1 mt-6 flex flex-col p-4">
-        <Sidebar />
-
-        <div className="flex-1 flex flex-col p-4">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 mt-6 flex flex-col p-4">
           {/* Page Title and Date */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Criteria 2- Teaching- Learning and Evaluation</h2>

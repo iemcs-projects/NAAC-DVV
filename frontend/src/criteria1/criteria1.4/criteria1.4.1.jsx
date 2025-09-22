@@ -20,6 +20,7 @@ const Criteria1_4_1 = () => {
   const [error, setError] = useState(null);
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [currentYear, setCurrentYear] = useState("");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [department, setDepartment] = useState("");
   const [facultyId, setFacultyId] = useState("");
   const [facultyName, setFacultyName] = useState("");
@@ -163,19 +164,12 @@ const goToNextPage = () => {
     navigate('/criteria1.3.3'); 
   };
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <LandingNavbar />
-
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
-
-        <div className="flex-1 mt-6 flex flex-col p-4">
-          {/* Page Title and Score */}
-           
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+      <Sidebar onCollapse={setIsSidebarCollapsed} />
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 flex flex-col">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-medium text-gray-800">
-              Criteria 1: Curricular Aspects
-            </h2>
+            <h2 className="text-xl font-medium text-gray-800">Criteria 1: Curricular Aspects</h2>
             <div className="text-sm text-gray-600">1.4 - Feedback System</div>
           </div>
 
@@ -417,11 +411,10 @@ minutes of the Governing Council, Syndicate, Board of Management
           <div className="mt-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
           </div>
-          
-          
         </div>
       </div>
     </div>
+
     </div>
   );
 };
