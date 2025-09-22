@@ -12,6 +12,7 @@ import api from "../../api";
 
 const Criteria6_3_3 = () => {
   const navigate = useNavigate();
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   
@@ -623,11 +624,9 @@ const Criteria6_3_3 = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 flex flex-col p-4">
           {/* Page Header */}
           <div className="flex justify-between items-center mb-4">

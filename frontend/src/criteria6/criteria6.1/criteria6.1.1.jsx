@@ -23,6 +23,7 @@ const Criteria6_1_1 = () => {
 
 
   const [saving, setSaving] = useState(false);
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const [autoSaveTimestamp, setAutoSaveTimestamp] = useState(null);
   const textareaRefs = useRef({});
   const autoSaveTimerRef = useRef(null);
@@ -122,11 +123,9 @@ const Criteria6_1_1 = () => {
   }, [metrics]);
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         <div className="flex-1 flex flex-col p-4">
           {/* Page Title and Date */}

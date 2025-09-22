@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 const Criteria7_1_10 = () => {
   const [selectedOption, setSelectedOption] = useState("");
   const navigate = useNavigate();
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
 
   const handleRadioChange = (option) => {
     setSelectedOption(option);
@@ -22,14 +23,9 @@ const Criteria7_1_10 = () => {
   };
 
   return (
-    <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <Sidebar />
-
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         {/* Main Content */}
         <div className="flex-1 p-6">
           {/* Page Title */}

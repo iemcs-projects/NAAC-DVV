@@ -10,6 +10,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 const Criteria7_1_6 = () => {
   const { sessions, isLoading: isSessionLoading } = useContext(SessionContext);
   const [selectedYear, setSelectedYear] = useState("");
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const [selectedOptions, setSelectedOptions] = useState({
     option1: false,
     option2: false,
@@ -165,13 +166,9 @@ const Criteria7_1_6 = () => {
   };
 
   return (
-    <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-
-      <div className="flex flex-1">
-        <Sidebar />
-
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 p-6">
           {/* Page Title */}
           <div className="flex justify-between items-center mb-4">

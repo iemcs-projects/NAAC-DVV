@@ -21,6 +21,7 @@ const Criteria7_3_1 = () => {
   ]);
 
   const navigate = useNavigate();
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const [saving, setSaving] = useState(false);
   const [autoSaveTimestamp, setAutoSaveTimestamp] = useState(null);
   const textareaRefs = useRef({});
@@ -106,11 +107,9 @@ const Criteria7_3_1 = () => {
   const goToPreviousPage = () => navigate('/criteria7.1.1');
 
   return (
-    <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 flex flex-col p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">Criteria 7: Institutional Values and Best Practices</h2>

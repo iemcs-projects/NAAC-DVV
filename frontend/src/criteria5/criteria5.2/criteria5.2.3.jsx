@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 
 const Criteria5_2_3= () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
    const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
    const [selectedYear, setSelectedYear] = useState(pastFiveYears[0]);
    const [yearData, setYearData] = useState({});
@@ -320,7 +321,7 @@ const goToNextPage = () => {
       <Header />
       <Navbar />
       <div className="flex w-full">
-        <Sidebar />
+        <Sidebar onCollapse={setIsSidebarCollapsed} />
         <div className="flex-1 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">Criteria 5: Student Support and Progression </h2>

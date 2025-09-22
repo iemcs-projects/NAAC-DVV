@@ -11,6 +11,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import { FaTrash, FaEdit } from 'react-icons/fa';
 
 const Criteria5_1_4 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
@@ -579,10 +580,9 @@ const Criteria5_1_4 = () => {
 
   // Main component render
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <LandingNavbar />
-      <div className="flex mt-6 flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         <div className="flex-1 mt-6 flex flex-col p-4">
           <div className="flex justify-between items-center mb-4">

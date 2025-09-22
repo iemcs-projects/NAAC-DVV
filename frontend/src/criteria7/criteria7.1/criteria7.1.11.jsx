@@ -20,6 +20,7 @@ const Criteria7_1_11 = () => {
     }
   ]);
   const [selectedYear, setSelectedYear] = useState("2024-25");
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const years = ["2024-25", "2023-24", "2022-23", "2021-22", "2020-21"];
 
   const navigate = useNavigate();
@@ -117,11 +118,9 @@ const Criteria7_1_11 = () => {
   }, [metrics]);
 
   return (
-    <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         <div className="flex-1 flex flex-col p-4">
           {/* Page Title */}

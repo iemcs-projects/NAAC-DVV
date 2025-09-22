@@ -10,6 +10,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import { FaTrash, FaEdit } from 'react-icons/fa';
 
 const Criteria5_3_1 = () => {
+  
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
@@ -610,12 +611,9 @@ const Criteria5_3_1 = () => {
 
   // Main component render
   return (
-    <div className="min-h-screen w-[1520px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
-
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
         <div className="flex-1 flex flex-col p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-medium text-gray-800">Criterion 5 - Student Support and Progression</h2>

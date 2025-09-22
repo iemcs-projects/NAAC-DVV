@@ -18,6 +18,7 @@ const Criteria7_1_7 = () => {
     option5: false,
   });
   const [department, setDepartment] = useState("");
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const [facultyId, setFacultyId] = useState("");
   const [facultyName, setFacultyName] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
@@ -193,12 +194,10 @@ const Criteria7_1_7 = () => {
   ];
 
   return (
-    <div className="min-h-screen w-[1690px] bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
-        <div className="flex-1 p-8">
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
+        <div className="flex-1 p-6">
           <h1 className="text-2xl font-bold text-gray-800 mb-6">
             7.1.7 The Institution has disabled-friendly, barrier free environment
           </h1>

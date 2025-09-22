@@ -8,6 +8,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import { useContext } from "react";
 
 const Criteria6_4_2 = () => {
+  const [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const { sessions: availableSessions, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const [currentSession, setCurrentSession] = useState("");
   const [currentyear, setCurrentYear] = useState("");
@@ -130,12 +131,9 @@ const Criteria6_4_2 = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <Navbar />
-      <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         {/* Main Content */}
         <div className="flex-1 p-6">

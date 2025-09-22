@@ -8,6 +8,7 @@ import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
 
 const Criteria5_1_5 = () => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { sessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
   const [availableSessions, setAvailableSessions] = useState([]);
   const [currentYear, setCurrentYear] = useState("");
@@ -192,12 +193,9 @@ const handleSubmit = async () => {
 };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-      <Header />
-      <Navbar />
-
-      <div className="flex flex-1">
-        <Sidebar />
+    <div className="min-h-screen w-screen bg-gray-50 flex">
+    <Sidebar onCollapse={setIsSidebarCollapsed} />
+    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
 
         <div className="flex-1 flex flex-col p-2 mt-[20px]">
           {/* Page Title and Score */}
