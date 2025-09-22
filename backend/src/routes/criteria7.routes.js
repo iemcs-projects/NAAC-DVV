@@ -13,7 +13,13 @@ import {
   score715,
   score716,
   score717,
-  score7110
+  score7110,
+  deleteResponse712,
+  deleteResponse714,
+  deleteResponse715,
+  deleteResponse716,
+  deleteResponse717,
+  deleteResponse7110
 } from '../controllers/criteria7.controller.js';
 
 
@@ -56,6 +62,24 @@ router.route('/score717')
 
 router.route('/score7110')
     .get(score7110);
+
+router.route('/deleteResponse712/:sl_no')
+    .delete(deleteResponse712);
+
+router.route('/deleteResponse714/:sl_no')
+    .delete(deleteResponse714);
+    
+router.route('/deleteResponse715/:sl_no')
+    .delete(deleteResponse715);
+    
+router.route('/deleteResponse716/:sl_no')
+    .delete(deleteResponse716);
+    
+router.route('/deleteResponse717/:sl_no')
+    .delete(deleteResponse717);
+    
+router.route('/deleteResponse7110/:sl_no')
+    .delete(deleteResponse7110);    
 
 export default router;
 

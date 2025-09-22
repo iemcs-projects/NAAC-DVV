@@ -20,6 +20,9 @@ const IIQAStaffDetails = db.iiqa_staff_details;
 const extended_profile = db.extended_profile;
 const CriteriaMaster = db.criteria_master;
 
+
+
+
 // Helper function to convert criteria code to padded format
 const convertToPaddedFormat = (code) => {
   // First remove any dots, then split into individual characters
@@ -438,6 +441,7 @@ const score212 = asyncHandler(async (req, res) => {
   }
 
   const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+
   console.log(groupedByYear)
   console.log(scores)
   console.log(average)
@@ -2312,460 +2316,229 @@ const score233 = asyncHandler(async (req, res) => {
   }
 })
 
-// // response 241242222233
+//THE2.7.1
+const createResponse271 = asyncHandler(async (req, res) => {
+  const criteria_code = convertToPaddedFormat("2.7.1");
+
+  const criteria = await CriteriaMaster.findOne({
+    where: { 
+      sub_sub_criterion_id: criteria_code
+    }
+  });
+
+  if (!criteria) {
+    throw new apiError(404, "Criteria 2.7.1 not found in criteria_master");
+  }
+  const { session,name_of_the_student,gender,category,state_of_domicile,
+    nationality_if_other_than_indian,email_id,program_name,
+    unique_enrolment_id_college_id,mobile_number,year_of_joining,
+    q1_syllabus_coverage, q2_teacher_preparedness, q3_teacher_communication,
+    q4_teaching_approach, q5_internal_evaluation_fairness, q6_assignment_discussion,
+    q7_internship_support, q8_mentoring_growth, q9_learning_opportunities,
+    q10_competency_info, q11_mentor_followup, q12_examples_usage,
+    q13_strengths_identification, q14_weakness_support, q15_student_engagement,
+    q16_student_centric_methods, q17_extracurricular_encouragement, q18_softskills_training,
+    q19_ict_usage, q20_teaching_learning_quality, q21_suggestions } = req.body;
+  console.log(session, name_of_the_student, gender, category, state_of_domicile, nationality_if_other_than_indian, email_id, program_name, unique_enrolment_id_college_id, mobile_number, year_of_joining);
+
+  if (!session || !name_of_the_student || !gender || !category || 
+    !state_of_domicile || !nationality_if_other_than_indian || 
+    !email_id || !program_name || !unique_enrolment_id_college_id || 
+    !mobile_number || !year_of_joining || !q1_syllabus_coverage || 
+    !q2_teacher_preparedness || !q3_teacher_communication || 
+    !q4_teaching_approach || !q5_internal_evaluation_fairness || 
+    !q6_assignment_discussion || !q7_internship_support || 
+    !q8_mentoring_growth || !q9_learning_opportunities || 
+    !q10_competency_info || !q11_mentor_followup || !q12_examples_usage ||
+     !q13_strengths_identification || !q14_weakness_support || 
+     !q15_student_engagement || !q16_student_centric_methods || 
+     !q17_extracurricular_encouragement || !q18_softskills_training || 
+     !q19_ict_usage || !q20_teaching_learning_quality || !q21_suggestions) {
+    throw new apiError(400, "Missing required fields");
+  }
+
+  if (session < 1990 || session > new Date().getFullYear()) {
+    throw new apiError(400, "Session must be between 1990 and current year");
+  }
+
+  const latestIIQA = await IIQA.findOne({
+    attributes: ['session_end_year'],
+    order: [['created_at', 'DESC']]
+  });
+
+  if (!latestIIQA) {
+    throw new apiError(404, "No IIQA form found");
+  }
+
+  const endYear = latestIIQA.session_end_year;
+  const startYear = endYear - 5;
+
+  if (session < startYear || session > endYear) {
+    throw new apiError(400, "Session must be between the last 5 years");
+  }
+
+  const responses = await Criteria271.findAll({
+    where: {
+      session: session
+    }
+  });
+
+  if (responses.length > 0) {
+    throw new apiError(400, "Response already exists for this session");
+  }
+
+  console.log("reached till here")
+
+  const newResponse = await Criteria271.create({
+    id: criteria.id,
+    criteria_code: criteria.criteria_code,
+    session,name_of_the_student,gender,category,state_of_domicile,
+    nationality_if_other_than_indian,email_id,program_name,
+    unique_enrolment_id_college_id,mobile_number,year_of_joining,
+    q1_syllabus_coverage, q2_teacher_preparedness, q3_teacher_communication,
+    q4_teaching_approach, q5_internal_evaluation_fairness, q6_assignment_discussion,
+    q7_internship_support, q8_mentoring_growth, q9_learning_opportunities,
+    q10_competency_info, q11_mentor_followup, q12_examples_usage,
+    q13_strengths_identification, q14_weakness_support, q15_student_engagement,
+    q16_student_centric_methods, q17_extracurricular_encouragement, q18_softskills_training,
+    q19_ict_usage, q20_teaching_learning_quality, q21_suggestions
+
+  });
+
+  return res.status(201).json(
+    new apiResponse(201, newResponse, "Response created successfully")
+  );
+
+})
+
+const score271 = asyncHandler(async (req, res) => {
+  const criteria_code = convertToPaddedFormat("2.7.1");
+  const currentYear = new Date().getFullYear();
+  const sessionDate = currentYear;
+
+  // Get criteria details
+  const criteria = await CriteriaMaster.findOne({
+    where: { 
+      sub_sub_criterion_id: criteria_code
+    }
+  });
+
+  if (!criteria) {
+    throw new apiError(404, "Criteria 2.7.1 not found in criteria_master");
+  }
+
+  // Get the latest response for this criteria
+  const response = await Criteria271.findOne({
+    where: {
+      criteria_code: criteria.criteria_code
+    },
+    order: [['session', 'DESC']], // Use session instead of created_at
+    raw: true
+  });
+
+  if (!response) {
+    throw new apiError(404, "No response found for criteria 2.7.1");
+  }
+
+  const q1 = parseInt(response.q1_syllabus_coverage);
+  console.log("q1"+q1)
+  const q2 = parseInt(response.q2_teacher_preparedness);
+  console.log("q2"+q2)
+  const q3 = parseInt(response.q3_teacher_communication);
+  console.log("q3"+q3)
+  const q4 = parseInt(response.q4_teaching_approach);
+  console.log("q4"+q4)
+  const q5 = parseInt(response.q5_internal_evaluation_fairness);
+  console.log("q5"+q5)
+  const q6 = parseInt(response.q6_assignment_discussion);
+  console.log("q6"+q6)
+  const q7 = parseInt(response.q7_internship_support);
+  console.log("q7"+q7)
+  const q8 = parseInt(response.q8_mentoring_growth);
+  console.log("q8"+q8)
+  const q9 = parseInt(response.q9_learning_opportunities);
+  console.log("q9"+q9)
+  const q10 = parseInt(response.q10_competency_info);
+  console.log("q10"+q10)
+  const q11 = parseInt(response.q11_mentor_followup);
+  console.log("q11"+q11)
+  const q12 = parseInt(response.q12_examples_usage);
+  console.log("q12"+q12)
+  const q13 = parseInt(response.q13_strengths_identification);
+  console.log("q13"+q13)
+  const q14 = parseInt(response.q14_weakness_support);
+  console.log("q14"+q14)
+  const q15 = parseInt(response.q15_student_engagement);
+  console.log("q15"+q15)
+  const q16 = parseInt(response.q16_student_centric_methods);
+  console.log("q16"+q16)
+  const q17 = parseInt(response.q17_extracurricular_encouragement);
+  console.log("q17"+q17)
+  const q18 = parseInt(response.q18_softskills_training);
+  console.log("q18"+q18)
+  const q19 = parseInt(response.q19_ict_usage);
+  console.log("q19"+q19)
+  const q20 = parseInt(response.q20_teaching_learning_quality);
+  console.log("q20"+q20)
+  const q = Math.round((q1+q2+q3+q4+q5+q6+q7+q8+q9+q10+q11+q12+q13+q14+q15+q16+q17+q18+q19+q20)/20);
+  let score, grade, optionSelected;
+  console.log("average"+q);
+  // Map option to score and grade
+  switch(q) {
+    case 4:
+      score = 4;
+      grade = 4;
+      optionSelected = "Strongly Agree";
+      break;
+    case 3:
+      score = 3;
+      grade = 3;
+      optionSelected = "Agree";
+      break;
+    case 2:
+      score = 2;
+      grade = 2;
+      optionSelected = "Disagree";
+      break;
+    case 1:
+      score = 1;
+      grade = 1;
+      optionSelected = "Strongly Disagree";
+      break;
+    case 0:
+    default:
+      score = 0;
+      grade = 0;
+      optionSelected = "No Response";
+  }
+
+  // Create or update score entry
+  const [entry, created] = await Score.upsert({
+    criteria_code: criteria.criteria_code,
+    criteria_id: criteria.criterion_id,
+    sub_criteria_id: criteria.sub_criterion_id,
+    sub_sub_criteria_id: criteria.sub_sub_criterion_id,
+    score_criteria: 0,
+    score_sub_criteria: 0,
+    score_sub_sub_criteria: score,
+    sub_sub_cr_grade: grade,
+    session: sessionDate,
+    year: currentYear,
+    cycle_year: 1
+  }, {
+    conflictFields: ['criteria_code', 'session', 'year']
+  });
+
+  return res.status(200).json(
+    new apiResponse(200, {
+      score,
+      grade,
+      message: `Grade is ${grade} (Selected option: ${optionSelected}, Average Score: ${q.toFixed(2)})`
+    }, created ? "Score created successfully" : "Score updated successfully")
+  );
+});
 
 
-// const getAllCriteria241243222233 = asyncHandler(async (req, res) => {
-//   const criteria = await Criteria241243222233.findAll();
-//   if (!criteria) {
-//       throw new apiError(404, "Criteria not found");
-//   }
-  
-//   res.status(200).json(
-//       new apiResponse(200, criteria, "Criteria found")
-//   );
-// });
-
-// /**
-// * @route POST /api/response/2.4.1and2.4.3and2.2.2and2.3.3
-// * @description Create a new response for criteria 2.4.1 and 2.4.3 and 2.2.2 and 2.3.3
-// * @access Private/Admin
-// */
-//   const createResponse241 = asyncHandler(async (req, res) => {
-//         console.log(CriteriaMaster)
-//         const criteria = await CriteriaMaster.findOne({
-//             where: {
-//               sub_sub_criterion_id: '020401',
-//               sub_criterion_id: '0204',
-//               criterion_id: '02'
-//             }
-//           });
-      
-//           if (!criteria) {
-//             throw new apiError(404, "Criteria not found");
-//           }
-      
-//           // Validate required fields
-//           const {session,name_of_the_fulltime_teachers,designation, year_of_appointment,nature_of_appointment,name_of_department,total_number_of_years_of_experience_in_the_same_institution,is_the_teacprogramme_name} = req.body;
-//           if (!year_of_appointment || !name_of_the_fulltime_teachers || !designation || !nature_of_appointment || !name_of_department || !total_number_of_years_of_experience_in_the_same_institution || !is_the_teacprogramme_name) {
-//             throw new apiError(400, "Missing required fields");
-//           }
-
-//           if (year_of_appointment < 1990 || year_of_appointment > new Date().getFullYear()) {
-//             throw new apiError(400, "Year must be between 1990 and current year");
-//           }
-
-//           // Create proper Date objects for session
-//           const sessionDate = new Date(session, 0, 1); // Jan 1st of the given year
-//           console.log(criteria.criteria_code)
-//           // Insert into response_2_4_1and2_4_3and2_2_2and2_3_3_data
-//           const entry = await Criteria241.create({
-//             id: criteria.id,
-//             criteria_code: criteria.criteria_code,
-//             session: sessionDate,  // Store as Date object
-//             year_of_appointment: year_of_appointment,        // Store as Date object
-//             name_of_the_fulltime_teachers,
-//             designation,
-//             nature_of_appointment,
-//             name_of_department,
-//             total_number_of_years_of_experience_in_the_same_institution,
-//             is_the_teacprogramme_name
-//           });
-      
-//           res.status(201).json(
-//             new apiResponse(201, entry, "Response created successfully")
-//           );
-//   });
-// /**
-// * @route GET /api/response/2.4.1and2.4.3and2.2.2and2.3.3/:criteriaCode
-// * @description Get all responses for a specific criteria code
-// * @access Public
-// */
-// const getResponsesByCriteriaCode241243222233 = async (req, res, next) => {
-//   try {
-//       const { criteriaCode } = req.params;
-      
-//       const responses = await db.response_2_4_1and_2_4_3and2_2_2and2_3_3.findAll({
-//           where: { criteria_code: criteriaCode },
-//           include: [{
-//               model: db.criteria_master,
-//               as: 'criteria',
-//               attributes: ['criterion_id', 'sub_criterion_id', 'sub_sub_criterion_id']
-//           }],
-//           order: [['submitted_at', 'DESC']]
-//       });
-
-//       return res.status(200).json(
-//           new apiResponse(200, responses, 'Responses retrieved successfully')
-//       );
-
-//   } catch (error) {
-//       next(error);
-//   }
-//   };
-
-// // score 241
-//   const score241 = asyncHandler(async (req, res) => {
-//     /*
-//     1. get the user input from the req body
-//     2. query the criteria_master table to get the id and criteria_code 
-//     3. validate the user input
-//     4. create a new response
-//     5. return the response
-//     */
-//     const criteria_code = convertToPaddedFormat("2.4.1");
-//     console.log(criteria_code)
-//     console.log(CriteriaMaster)
-//     const criteria = await CriteriaMaster.findOne({
-//       where: { 
-//         sub_sub_criterion_id: criteria_code
-//       }
-//     });
-//     const responses = await Criteria212.findAll({
-//       attributes: ['name_of_full_time_teachers', ],  // Only get the option_selected field
-//       where: {
-//           criteria_code:criteria.criteria_code  
-//       }
-//   });
-
-//   // Count number of full-time teachers
-
-//   let fullTimeTeacherCount = 0;
-//   responses.forEach(response => {
-//     if (response.name_of_full_time_teachers) {
-//       const names = response.name_of_full_time_teachers
-//         .split(',')
-//         .map(name => name.trim())
-//         .filter(name => name.length > 0);
-//       fullTimeTeacherCount += names.length;
-//     }
-//   });
-//   let score = 0;
-//   score= (fullTimeTeacherCount/2000)*100;
-
-//   const currentYear = new Date().getFullYear();
-//   const sessionDate = new Date(currentYear, 0, 1); 
-//   const entry = await Score.create(
-//     {
-//       criteria_code: criteria.criteria_code,
-//       criteria_id: criteria.criterion_id,
-//       sub_criteria_id: criteria.sub_criterion_id,
-//       sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-//       score_criteria: 0,
-//       score_sub_criteria: 0,
-//       score_sub_sub_criteria: score,
-//       session: sessionDate,
-//       year: currentYear,
-//       cycle_year: 1
-//     }
-//   );
-
-//   res.status(200).json(
-//     new apiResponse(200, entry, "Response created successfully")
-//   );
-
-// });
-
-
-
-
-
-// const getAllCriteria242 = asyncHandler(async (req, res) => {
-//   const criteria = await Criteria212.findAll();
-//   if (!criteria) {
-//       throw new apiError(404, "Criteria not found");
-//   }
-  
-//   res.status(200).json(
-//       new apiResponse(200, criteria, "Criteria found")
-//   );
-// });
-
-/**
-* @route POST /api/response/2.4.2
-* @description Create a new response for criteria 2.4.2
-* @access Private/Admin
-*/
-
-// /**
-// * @route GET /api/response/2.4.2/:criteriaCode
-// * @description Get all responses for a specific criteria code
-// * @access Public
-// */
-// const getResponsesByCriteriaCode242 = (async (req, res, next) => {
-//   try {
-//       const { criteriaCode } = req.params;
-      
-//       const responses = await db.response_2_4_2.findAll({
-//           where: { criteria_code: criteriaCode },
-//           include: [{
-//               model: db.criteria_master,
-//               as: 'criteria',
-//               attributes: ['criterion_id', 'sub_criterion_id', 'sub_sub_criterion_id']
-//           }],
-//           order: [['submitted_at', 'DESC']]
-//       });
-
-//       return res.status(200).json(
-//           new apiResponse(200, responses, 'Responses retrieved successfully')
-//       );
-
-//   } catch (error) {
-//       next(error);
-//   }
-// });
-
-
-
-// const getAllCriteria263 = asyncHandler(async (req, res) => {
-//   const criteria = await Criteria263.findAll();
-//   if (!criteria) {
-//       throw new apiError(404, "Criteria not found");
-//   }
-  
-//   res.status(200).json(
-//       new apiResponse(200, criteria, "Criteria found")
-//   );
-// });
-
-// /**
-// * @route POST /api/response/2.6.3
-// * @description Create a new response for criteria 2.6.3
-// * @access Private/Admin
-// */
-// const createResponse263 = asyncHandler(async (req, res) => {
-//       console.log(CriteriaMaster)
-//       const criteria = await CriteriaMaster.findOne({
-//           where: {
-//             sub_sub_criterion_id: '020603',
-//             sub_criterion_id: '0206',
-//             criterion_id: '02'
-//           }
-//         });
-    
-//         if (!criteria) {
-//           throw new apiError(404, "Criteria not found");
-//         }
-    
-//         // Validate required fields
-//         const {session,year,programme_name,programme_code,number_of_students_appeared_in_the_final_year_examination,number_of_students_passed_in_the_final_year_examination } = req.body;
-//         if (!session || !year || !programme_name || !programme_code || !number_of_students_appeared_in_the_final_year_examination || !number_of_students_passed_in_the_final_year_examination) {
-//           throw new apiError(400, "Missing required fields");
-//         }
-
-//         if (year < 1990 || year > new Date().getFullYear()) {
-//           throw new apiError(400, "Year must be between 1990 and current year");
-//         }
-
-//         // Create proper Date objects for session
-//         const sessionDate = new Date(session, 0, 1); // Jan 1st of the given year
-//         console.log(criteria.criteria_code)
-//         // Insert into response_2_6_3_data
-//         const entry = await Criteria263.create({
-//           id: criteria.id,
-//           criteria_code: criteria.criteria_code,
-//           session: sessionDate,  // Store as Date object
-//           year,
-//           programme_name,
-//           programme_code,
-//           number_of_students_appeared_in_the_final_year_examination,
-//           number_of_students_passed_in_the_final_year_examination
-//         });
-    
-//         res.status(201).json(
-//           new apiResponse(201, entry, "Response created successfully")
-//         );
-
-// });
-// /**
-// * @route GET /api/response/2.6.3/:criteriaCode
-// * @description Get all responses for a specific criteria code
-// * @access Public
-// */
-// const getResponsesByCriteriaCode263 = async (req, res, next) => {
-//   try {
-//       const { criteriaCode } = req.params;
-      
-//       const responses = await db.response_2_6_3.findAll({
-//           where: { criteria_code: criteriaCode },
-//           include: [{
-//               model: db.criteria_master,
-//               as: 'criteria',
-//               attributes: ['criterion_id', 'sub_criterion_id', 'sub_sub_criterion_id']
-//           }],
-//           order: [['submitted_at', 'DESC']]
-//       });
-
-//       return res.status(200).json(
-//           new apiResponse(200, responses, 'Responses retrieved successfully')
-//       );
-
-//   } catch (error) {
-//       next(error);
-//   }
-// };
-// //score 263
-// const score263 = asyncHandler(async (req, res) => {
-//   /*
-//   1. get the user input from the req body
-//   2. query the criteria_master table to get the id and criteria_code 
-//   3. validate the user input
-//   4. create a new response
-//   5. return the response
-//   */
-//   const criteria_code = convertToPaddedFormat("2.1.1");
-//   console.log(criteria_code)
-//   console.log(CriteriaMaster)
-//   const criteria = await CriteriaMaster.findOne({
-//     where: { 
-//       sub_sub_criterion_id: criteria_code
-//     }
-//   });
-//   const responses = await Criteria263.findAll({
-//     attributes: ['number_of_students_appeared_in_the_final_year_examination', 'number_of_students_passed_in_the_final_year_examination'],  // Only get the option_selected field
-//     where: {
-//         criteria_code:criteria.criteria_code  
-//     }
-// });
-
-// const total_appeared = responses.reduce((total, response) => total + (response.number_of_students_appeared_in_the_final_year_examination || 0), 0);
-// const total_passed = responses.reduce((total, response) => total + (response.number_of_students_passed_in_the_final_year_examination || 0), 0);
-
-// let score = 0;
-// if (total_appeared > 0) {
-//   score = (total_passed / total_appeared) * 100;
-// }
-// //array of scores of 5 years
-// let scores = [];
-// if (total_appeared > 0) {
-//   score = (total_passed / total_appeared) * 100;
-// }
-// for (let i = 0; i < 5; i++) {
-//   scores.push(score);
-// }
-// let average = 0;
-// let years=scores.length;
-// average = scores.reduce((sum, value) => sum + value, 0) / years;
-
-// console.log("Average:", average);
-
-// const currentYear = new Date().getFullYear();
-// const sessionDate = new Date(currentYear, 0, 1); 
-// const entry = await Score.create(
-//   {
-//     criteria_code: criteria.criteria_code,
-//     criteria_id: criteria.criterion_id,
-//     sub_criteria_id: criteria.sub_criterion_id,
-//     sub_sub_criteria_id: criteria.sub_sub_criterion_id,
-//     score_criteria: 0,
-//     score_sub_criteria: 0,
-//     score_sub_sub_criteria: average,
-//     session: sessionDate,
-//     year: currentYear,
-//     cycle_year: 1
-//   }
-// );
-
-// res.status(200).json(
-//   new apiResponse(200, entry, "Response created successfully")
-// )
-// });
-
-
-
-// const getAllCriteria271 = asyncHandler(async (req, res) => {
-//   const criteria = await Criteria271.findAll();
-//   if (!criteria) {
-//       throw new apiError(404, "Criteria not found");
-//   }
-  
-//   res.status(200).json(
-//       new apiResponse(200, criteria, "Criteria found")
-//   );
-// });
-
-// /**
-// * @route POST /api/response/2.7.1
-// * @description Create a new response for criteria 2.7.1
-// * @access Private/Admin
-// */
-// const createResponse271 = asyncHandler(async (req, res) => {
-//       console.log(CriteriaMaster)
-//       const criteria = await CriteriaMaster.findOne({
-//           where: {
-//             sub_sub_criterion_id: '020701',
-//             sub_criterion_id: '0207',
-//             criterion_id: '02'
-//           }
-//         });
-    
-//         if (!criteria) {
-//           throw new apiError(404, "Criteria not found");
-//         }
-    
-//         // Validate required fields
-//     const {session,name_of_the_student,gender,category,state_of_domicile,nationality_if_other_than_indian,email_id,programme_name,unique_enrolment_id_college_id,mobile_number,year_of_joining } = req.body;
-//         if (!session || !name_of_the_student || !gender || !category || !state_of_domicile || !programme_name || !unique_enrolment_id_college_id || !mobile_number || !year_of_joining) {
-//           throw new apiError(400, "Missing required fields");
-//         }
-
-//         if (year < 1990 || year > new Date().getFullYear()) {
-//           throw new apiError(400, "Year must be between 1990 and current year");
-//         }
-
-//         // Create proper Date objects for session
-//         const sessionDate = new Date(session, 0, 1); // Jan 1st of the given year
-//         console.log(criteria.criteria_code)
-//         // Insert into response_2_7_1_data
-//         const entry = await Criteria271.create({
-//           id: criteria.id,
-//           criteria_code: criteria.criteria_code,
-//           session: sessionDate,  // Store as Date object
-//           name_of_the_student,
-//           gender,
-//           category,
-//           state_of_domicile,
-//           nationality_if_other_than_indian,
-//           email_id,
-//           programme_name,
-//           unique_enrolment_id_college_id,
-//           mobile_number,
-//           year_of_joining
-//         });
-    
-//         res.status(201).json(
-//           new apiResponse(201, entry, "Response created successfully")
-//         );
-
-// });
-// /**
-// * @route GET /api/response/2.7.1/:criteriaCode
-// * @description Get all responses for a specific criteria code
-// * @access Public
-// */
-// const getResponsesByCriteriaCode271 = async (req, res, next) => {
-//   try {
-//       const { criteriaCode } = req.params;
-      
-//       const responses = await db.response_2_7_1.findAll({
-//           where: { criteria_code: criteriaCode },
-//           include: [{
-//               model: db.criteria_master,
-//               as: 'criteria',
-//               attributes: ['criterion_id', 'sub_criterion_id', 'sub_sub_criterion_id']
-//           }],
-//           order: [['submitted_at', 'DESC']]
-//       });
-
-//       return res.status(200).json(
-//           new apiResponse(200, responses, 'Responses retrieved successfully')
-//       );
-
-//   } catch (error) {
-//       next(error);
-//   }
-// };
-// //score 271
 
 export { 
   // getAllCriteria211,
@@ -2789,6 +2562,7 @@ export {
   createResponse263,
   updateResponse263,
   deleteResponse263,
+  createResponse271,
   // getResponsesByCriteriaCode212,
   score212,
   score222,
@@ -2797,6 +2571,7 @@ export {
   score263,
   score241,
   score233,
+  score271,
   getResponsesByCriteriaCode,
   // getAllCriteria241243222233 ,
   // createResponse241243222233,

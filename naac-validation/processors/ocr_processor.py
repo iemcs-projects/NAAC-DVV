@@ -62,13 +62,13 @@ class UnifiedOCRProcessor:
         
         if self.mistral_api_key:
             self.ocr_methods.append("mistral")
-            logger.info("✅ Mistral OCR configured as primary method")
+            logger.info("[SUCCESS] Mistral OCR configured as primary method")
         
         if EASYOCR_AVAILABLE:
             self.ocr_methods.append("easyocr")
             logger.info("✅ EasyOCR available as fallback")
             
-        logger.info(f"🔧 OCR methods available: {', '.join(self.ocr_methods)}")
+        logger.info(f"[TOOLS] OCR methods available: {', '.join(self.ocr_methods)}")
 
     def extract_text(self, file_path: Union[str, Path], use_ocr: bool = True) -> Dict[str, Any]:
         """
@@ -126,7 +126,7 @@ class UnifiedOCRProcessor:
         if self._is_meaningful_text(text_content):
             result["text"] = text_content
             result["pages_processed"] = "all"
-            logger.info("✅ PDF text extracted without OCR")
+            logger.info("[SUCCESS] PDF text extracted without OCR")
             return result
         
         # PDF appears to be scanned - use OCR if enabled

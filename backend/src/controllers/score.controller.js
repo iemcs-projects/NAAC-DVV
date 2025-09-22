@@ -3557,7 +3557,9 @@ const radarGrade = asyncHandler(async (req, res) => {
 
 
 export { score21, score22, score23, score24, score26, score2, 
-  score11, score12, score13, score14, score1,score6, score62,
-   score63, score64, score65,score31,score32, score33, score34,
-    score3,score41,score42,score43,score44,score4,score51,score52,
-    score53,score54,score5,score71,score7,scoreTotal, getCollegeSummary, radarGrade };
+  score11, score12, score13, score14, score1,
+  score6, score62,score63, score64, score65,
+  score31,score32, score33, score34,score3,
+  score41,score42,score43,score44,score4,
+  score51,score52,score53,score54,score5,
+  score71,score7,scoreTotal, getCollegeSummary, radarGrade };

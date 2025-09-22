@@ -1,10 +1,41 @@
 import os
 import json
+import logging
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging for Windows Unicode support
+def setup_logging():
+    """Setup logging configuration with Windows Unicode support"""
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    log_file = os.getenv("LOG_FILE", "naac_validation.log")
+    
+    # Create formatter without emojis for Windows compatibility
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # File handler with UTF-8 encoding
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    
+    # Console handler with safe encoding
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        handlers=[file_handler, console_handler],
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+# Setup logging
+setup_logging()
 
 class Settings:
     """Configuration settings for NAAC validation system"""
@@ -12,6 +43,7 @@ class Settings:
     
     # API Keys
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+    MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
     
     # File validation settings
     MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", 5))
@@ -52,6 +84,9 @@ class Settings:
         
         if not cls.GROQ_API_KEY:
             errors.append("GROQ_API_KEY is not set in environment variables")
+        
+        if not cls.MISTRAL_API_KEY:
+            errors.append("MISTRAL_API_KEY is not set in environment variables")
         
         if cls.MAX_FILE_SIZE_MB <= 0:
             errors.append("MAX_FILE_SIZE_MB must be positive")
