@@ -76,16 +76,6 @@ const UserDropdown = ({ user, className = '' }) => {
           {/* Menu Options */}
           <div className="py-1">
             <button 
-              className="w-full !bg-white px-4 py-2.5 text-left text-sm !text-gray-700 hover:bg-gray-50 flex items-center transition-colors duration-150"
-              onClick={() => {
-                setShowDropdown(false);
-                // Handle profile navigation
-              }}
-            >
-              <FaUser className="mr-3 text-gray-500 w-4 h-4" />
-              View Profile
-            </button>
-            <button 
               className="w-full !bg-white px-4 py-2.5 text-left text-sm !text-red-600 hover:bg-red-50 flex items-center transition-colors duration-150"
               onClick={() => {
                 setShowDropdown(false);

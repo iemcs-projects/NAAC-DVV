@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
-import LandingNavbar from "../../components/landing-navbar";
+import DataEntryNavbar from "../../components/DataEntryNavbar";
+import UserDropdown from "../../components/UserDropdown";
+import { useAuth } from "../../auth/authProvider";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 
 const Criteria1_1_1 = () => {
@@ -10,6 +12,7 @@ const Criteria1_1_1 = () => {
   const [useupload, setUseupload] = useState(false);
   const [currentYear, setCurrentYear] = useState("");
   const [error, setError] = useState(null);
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     supportLinks: [],
   })
@@ -156,17 +159,32 @@ const Criteria1_1_1 = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex">
-      <Sidebar onCollapse={setIsSidebarCollapsed} />
-      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
-          {/* Page Title and Date */}
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Criteria 1: Curricular Aspects</h2>
-            <div className="text-sm text-gray-600">
-              <span className="text-gray-600 mr-6">1.1-Curricular Planning and Implementation </span>
-              <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+      <div className="flex flex-1 overflow-hidden pt-8">
+        <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+          <Sidebar onCollapse={setIsSidebarCollapsed} />
+        </div>
+        <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
+          {/* Page Header with Title and User Dropdown */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+              <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+                <i className="fas fa-arrow-left"></i>
+              </a>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">Criteria 1-Curricular Planning and Implementation</p>
+                <p className="text-gray-600 text-sm">1.1 Curriculum Design and Review</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <UserDropdown user={user} className="ml-2 mr-4 " />
             </div>
           </div>
+
+
+
+          
+            
 
           {/* Information Card */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -243,12 +261,14 @@ planned and documented process </p>
             ))}
           </div>
 
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+
           <div className="mb-6">
       <label className="block text-gray-700 font-medium mb-2">
         Upload Documents
       </label>
       <div className="flex items-center gap-4 mb-2">
-        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
           <i className="fas fa-upload mr-2"></i> Choose Files
           <input
             type="file"
@@ -298,50 +318,44 @@ planned and documented process </p>
         {uploading && <span className="text-gray-600">Uploading...</span>}
         {error && <span className="text-red-600">{error}</span>}
       </div>
-    
+      <div className="text-sm text-gray-500 flex items-center">
+        <i className="fas fa-sync-alt fa-spin mr-2"></i>
+        Changes will be auto-saved
+      </div>
+      {formData.supportLinks.length > 0 && (
+        <ul className="list-disc pl-5 text-gray-700">
+          {formData.supportLinks.map((link, index) => (
+            <li key={index} className="flex justify-between items-center mb-1">
+              <a
+                href={`http://localhost:3000${link}`} // prefix with backend base URL
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                {link.split("/").pop()}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  // Remove from local formData
+                  setFormData(prev => ({
+                    ...prev,
+                    supportLinks: prev.supportLinks.filter(l => l !== link)
+                  }));
+                  // Also remove from context
+                  removeFile("1.1.1", link);
+                }}
+                className="text-red-600 ml-2"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
 
-
-  {formData.supportLinks.length > 0 && (
-    <ul className="list-disc pl-5 text-gray-700">
-      {formData.supportLinks.map((link, index) => (
-        <li key={index} className="flex justify-between items-center mb-1">
-          <a
-            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {link.split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              // Remove from local formData
-              setFormData(prev => ({
-                ...prev,
-                supportLinks: prev.supportLinks.filter(l => l !== link)
-              }));
-              // Also remove from context
-removeFile("1.1.1", link);
-            }}
-            className="text-red-600 ml-2"
-          >
-            Remove
-          </button>
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
-          {/* Footer Buttons */}
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {autoSaveTimestamp ? (
-                <span><i className="fas fa-save mr-1"></i> Auto-saved at {autoSaveTimestamp}</span>
-              ) : (
-                <span>Changes will be auto-saved</span>
-              )}
-            </div>
+          
            
 
            
@@ -351,11 +365,11 @@ removeFile("1.1.1", link);
             
           </div>
           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-  <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
-</div>
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+          </div>
         </div>
       </div>
-   
+    </div>
   );
 };
 

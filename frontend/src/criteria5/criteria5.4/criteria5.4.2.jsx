@@ -6,8 +6,11 @@ import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import axios from "axios";
+import UserDropdown from "../../components/UserDropdown";
+import { useAuth } from "../../auth/authProvider";
 
 const Criteria5_4_2 = () => {
+  const { user } = useAuth();
   const  [isSidebarCollapsed,setIsSidebarCollapsed]=useState(false);
   const { sessions: availableSessions } = useContext(SessionContext);
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);
@@ -158,19 +161,25 @@ const Criteria5_4_2 = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex">
-    <Sidebar onCollapse={setIsSidebarCollapsed} />
-    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
-
-        <div className="flex-1 flex flex-col p-2 mt-[20px]">
-          {/* Page Title and Score */}
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-medium text-gray-800">
-              Criteria 5: Student Support and Progression
-            </h2>
-            <div className="text-sm">
-              <span className="text-gray-600">5.4 Alumni Engagement</span>
-              <i className="fas fa-chevron-down ml-2 text-gray-500"></i>
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+      <div className="flex flex-1 overflow-hidden pt-8">
+        <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+          <Sidebar onCollapse={setIsSidebarCollapsed} />
+        </div>
+        <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
+          {/* Page Header with Title and User Dropdown */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+              <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+                <i className="fas fa-arrow-left"></i>
+              </a>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">Criteria 5 - Student Support and Progression</p>
+                <p className="text-gray-600 text-sm">5.4 Alumni Engagement</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <UserDropdown user={user} className="ml-2 mr-4 " />
             </div>
           </div>
 

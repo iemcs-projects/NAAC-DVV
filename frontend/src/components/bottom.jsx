@@ -8,7 +8,7 @@ const Bottom = ({ onNext, onPrevious, onExport, onSubmit }) => {
     <div className="flex justify-between mt-6">
       <button
         onClick={onPrevious}
-        className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
+        className="!bg-white !text-blue-600 !border-blue-600 px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
       >
         ← Previous
       </button>
@@ -30,7 +30,7 @@ const Bottom = ({ onNext, onPrevious, onExport, onSubmit }) => {
 
       <button
         onClick={onNext}
-        className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
+        className="!bg-white !text-blue-600 !border-blue-600 px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
       >
         Next →
       </button>

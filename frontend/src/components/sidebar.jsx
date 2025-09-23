@@ -233,7 +233,7 @@ const Sidebar = ({ onCollapse }) => {
       } !bg-gray-800 min-h-screen transition-all duration-300 fixed top-0 left-0 overflow-y-auto`}
       style={{ maxHeight: '100vh' }}
     >
-      <div className="flex justify-between !bg-gray-800 items-center p-2">
+      <div className="flex justify-between !bg-gray-800 items-center p-1">
         <span className="text-sm font-medium !bg-gray-800 text-gray-300">
           {!collapsed && "Criteria"}
         </span>
@@ -246,33 +246,35 @@ const Sidebar = ({ onCollapse }) => {
       </div>
 
       {!collapsed && (
-        <div className="text-gray-300 !bg-gray-800 pb-20">
+        <div className="text-gray-300 !bg-gray-900 pb-2 space-y-1 px-1">
           {fullCriteriaList.map((criteria) => (
-            <div className="relative text-gray-300 !bg-gray-800" key={criteria.id}>
+            <div className="relative text-gray-300 !bg-gray-900 mb-3 last:mb-0" key={criteria.id}>
               <button
-  className="w-full text-left p-4 pr-10 text-sm font-medium !text-gray-300 !bg-gray-800 cursor-pointer"
-  onClick={() => toggleCriteria(criteria.id)}
->
-  {criteria.title}
-</button>
+                className="w-full text-left p-2 pr-8 text-sm font-medium !text-gray-300 !bg-gray-900 cursor-pointer hover:bg-gray-700 rounded transition-colors"
+                onClick={() => toggleCriteria(criteria.id)}
+              >
+                {criteria.title}
+              </button>
               {expandedCriteria === criteria.id && (
-                <div className="pl-6 bg-gray-800 ml-4 mt-2">
+                <div className="pl-3 bg-gray-900 mt-0.5 space-y-1 py-0.5">
                   {criteria.subCriteria.map((sub) => (
-                    <div key={sub.id}>
+                    <div key={sub.id} className="space-y-1">
                       <div
-                        className="py-2 px-4 text-sm !text-gray-300 !bg-gray-800 font-medium cursor-pointer"
+                        className="py-1 px-3 text-sm !text-gray-300 !bg-gray-900 font-medium cursor-pointer hover:bg-gray-700 rounded"
                         onClick={() => toggleSubCriteria(sub.id)}
                       >
                         {sub.name}
                       </div>
-
                       {expandedSubCriteria === sub.id && (
-                        <div className="pl-6 !bg-gray-800 ml-4">
+                        <div className="pl-3 space-y-0.5">
                           {sub.subItems.map((item) => (
                             <div
                               key={item}
-                              onClick={() => navigate(`/criteria${item}`)}
-                              className="py-2 px-4 text-sm !text-gray-300 !bg-gray-800 hover:bg-gray-50 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/criteria${item}`);
+                              }}
+                              className="py-1 px-3 text-sm !text-gray-300 !bg-gray-700 hover:bg-gray-600 cursor-pointer rounded"
                             >
                               {item}
                             </div>
@@ -287,7 +289,17 @@ const Sidebar = ({ onCollapse }) => {
           ))}
         </div>
       )}
-    </div>
+        <div className="mt-auto pt-2 border-t border-gray-700 bg-gray-800">
+          <button
+            onClick={() => navigate('/iqac-dashboard')}
+            className="w-full flex items-center justify-between !bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 hover:bg-gray-700 rounded transition-colors"
+          >
+            <span>Go to Dashboard</span>
+            <FontAwesomeIcon icon={faAngleRight} className="text-gray-500" />
+          </button>
+        </div>
+        </div>
+      
   );
 };
 

@@ -8,11 +8,14 @@ import axios from "axios";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import LandingNavbar from "../../components/landing-navbar";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+import UserDropdown from "../../components/UserDropdown";
+import { useAuth } from "../../auth/authProvider";
 
 const Criteria2_3_3 = () => {
 
    const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const [useupload, setUseupload] = useState(false);
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const { sessions: sessionYears, isLoading: isLoadingSessions, error: sessionError } = useContext(SessionContext);
   const [selectedYear, setSelectedYear] = useState("");
@@ -147,14 +150,29 @@ const Criteria2_3_3 = () => {
   };
 
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex">
-    <Sidebar onCollapse={setIsSidebarCollapsed} />
-    <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 pt-4`}>
-        <div className="flex-1 mt-6 flex flex-col p-4">
-          <h2 className="text-2xl font-bold text-blue-900 mb-6">
-            2.3.3.1 Mentor to Student Ratio
-          </h2>
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+    <div className="flex flex-1 overflow-hidden pt-8">
+      <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+        <Sidebar onCollapse={setIsSidebarCollapsed} />
+      </div>
+      <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
+        {/* Page Header with Title and User Dropdown */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+            <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+              <i className="fas fa-arrow-left"></i>
+            </a>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">Criteria 2-Teaching-Learning and Evaluation</p>
+              <p className="text-gray-600 text-sm">2.3 Teaching-Learning Process</p>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <UserDropdown user={user} className="ml-2 mr-4 " />
+          </div>
+        </div>
 
+          
           {/* Session Year Dropdown */}
           <div className="mb-6">
             <label className="block font-medium mb-1">Select Session Year:</label>
