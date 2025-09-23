@@ -1,4 +1,3 @@
-
 import path from "path";
 import fs from "fs";
 import multer from "multer";
@@ -92,3 +91,90 @@ export const uploadFile = asyncHandler(async (req, res) => {
     }
   });
   
+// New: GET uploads by criteria code (optional session, with pagination)
+export const getUploadsByCriteriaCode = asyncHandler(async (req, res) => {
+  const { criteriaCode } = req.params;
+  const { session, page = 1, limit = 50 } = req.query;
+
+  if (!criteriaCode) {
+    throw new apiError(400, "Missing criteriaCode");
+  }
+
+  // Lookup criteria_master by padded sub_sub_criterion_id
+  const padded = convertToPaddedFormat(criteriaCode);
+  const criteriaMaster = await db.criteria_master.findOne({
+    where: { sub_sub_criterion_id: padded },
+  });
+
+  if (!criteriaMaster) {
+    throw new apiError(404, `Criteria not found for code: ${criteriaCode}`);
+  }
+
+  const where = {
+    criteria_code: criteriaMaster.criteria_code,
+    ...(session ? { session: Number(session) } : {}),
+  };
+
+  const pageNum = Math.max(1, Number(page) || 1);
+  const pageSize = Math.max(1, Math.min(200, Number(limit) || 50));
+  const offset = (pageNum - 1) * pageSize;
+
+  const { rows, count } = await db.file_uploads.findAndCountAll({
+    where,
+    order: [["uploaded_at", "DESC"]],
+    limit: pageSize,
+    offset,
+  });
+
+  return res.status(200).json(
+    new apiResponse(200, {
+      items: rows,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: pageSize,
+        pages: Math.ceil(count / pageSize) || 1,
+      },
+      meta: {
+        criteria_code: criteriaMaster.criteria_code,
+        criteria_master_id: criteriaMaster.id,
+        sub_sub_criterion_id: criteriaMaster.sub_sub_criterion_id,
+      }
+    }, "Uploads retrieved successfully")
+  );
+});
+
+// New: DELETE upload by id
+export const deleteUploadByCriteriaCode = asyncHandler(async (req, res) => {
+  const { criteriaCode } = req.params;
+
+  if (!criteriaCode) {
+    throw new apiError(400, "Missing upload id");
+  }
+
+  const record = await db.file_uploads.findOne({ where: { criteria_code: criteriaCode } });
+  if (!record) {
+    throw new apiError(404, "Upload not found");
+  }
+
+  // Attempt to remove file from disk
+  try {
+    if (record.file_url) {
+      // file_url like '/uploads/<filename>'
+      const filename = path.basename(record.file_url);
+      const filePath = path.join(process.cwd(), "uploads", filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to delete physical file:", err);
+    // Continue even if file removal fails
+  }
+
+  await db.file_uploads.destroy({ where: { criteria_code: criteriaCode } });
+
+  return res.status(200).json(
+    new apiResponse(200, { criteriaCode }, "Upload deleted successfully")
+  );
+});
