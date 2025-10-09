@@ -8,17 +8,19 @@ import LandingNavbar from "../../components/landing-navbar";
 import api from "../../api";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 import { SessionContext } from "../../contextprovider/sessioncontext";
+import { FaTrash, FaEdit } from 'react-icons/fa';
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
 
 const Criteria3_3_3 = () => {
-    const { user } = useAuth();
+  const { user } = useAuth();
   const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
   const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);  
   const [editKey, setEditKey] = useState(null);
+  const [editingId, setEditingId] = useState(null); // ADDED: Missing state variable
   const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +41,23 @@ const Criteria3_3_3 = () => {
 
   const [submittedData, setSubmittedData] = useState([]);
   const navigate = useNavigate();
+
+  // ADDED: Missing resetForm function (exactly like 3.1.1)
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      activity_name: "",
+      collaborating_agency: "",
+      scheme_name: "",
+      year: "",
+      student_count: "",
+      supportLinks: []
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError(null);
+  };
 
   const convertToPaddedFormat = (code) => {
     return '030303030303';
@@ -79,8 +98,9 @@ const Criteria3_3_3 = () => {
       
       // Store the SL numbers in localStorage for each entry
       data.forEach(item => {
-        if (item.slNo) {
-          localStorage.setItem(`criteria3.3.3_slNo_${item.id}`, item.slNo);
+        if (item.sl_no) {
+          const activity = item.activity_name || item.name;
+          localStorage.setItem(`criteria333_${activity}_${yearToSend}`, item.sl_no);
         }
       });
       
@@ -131,106 +151,220 @@ const Criteria3_3_3 = () => {
     }
   };
 
-  // Handle create new entry
-  const handleCreate = async (formDataToSubmit) => {
+  // REPLACED: New unified handleSubmit function (following 3.1.1 pattern)
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
     setSubmitting(true);
     setError(null);
-    
+
+    // Basic validation
+    if (!formData.activity_name || !formData.collaborating_agency || 
+        !formData.scheme_name || !formData.student_count) {
+      setError('Please fill in all required fields');
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
-      const payload = {
-        activity_name: formDataToSubmit.activity_name,
-        collaborating_agency: formDataToSubmit.collaborating_agency,
-        scheme_name: formDataToSubmit.scheme_name,
-        year: formDataToSubmit.year,
-        student_count: parseInt(formDataToSubmit.student_count),
-        session: parseInt(yearToSend),
-      };
+      // Get year - use the form's year or current year as fallback
+      const yearToSend = formData.year || currentYear;
+      const sessionYear = yearToSend.split("-")[0];
+      const sessionYearNum = parseInt(sessionYear, 10);
       
-      console.log('Sending request with payload:', payload);
-      const response = await api.post('/criteria3/createResponse333', payload);
-      console.log('Response received:', response);
-      
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
-        
-        alert('Data submitted successfully!');
-        
-        if (response.data?.data?.sl_no) {
-          localStorage.setItem(
-            `criteria333_${formDataToSubmit.activity_name}_${yearToSend}`, 
-            response.data.data.sl_no
-          );
-        }
-        
-        const updatedData = await fetchResponseData(currentYear);
-        
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        
-        setSubmittedData(prev => [
-          ...prev,
-          {
-            ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
-            year: currentYear
-          }
-        ]);
-        
-        // Reset form
-        setFormData({
-          slNo: '',
-          activity_name: "",
-          collaborating_agency: "",
-          scheme_name: "",
-          year: "",
-          student_count: "",
-          supportLinks: []
-        });
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+      if (isNaN(sessionYearNum)) {
+        throw new Error('Please enter a valid year');
       }
+
+      // Check if we're in edit mode
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Form data:', formData);
+      
+      let response;
+      
+      if (isUpdating && recordId) {
+        try {
+          // Get the original record to preserve its session
+          const originalRecord = submittedData.find(item => (item.sl_no || item.slNo) === recordId);
+          const originalSession = originalRecord?.session || sessionYearNum;
+          
+          // Prepare the payload for update
+          const updatePayload = {
+            session: originalSession, // Use the original session from the record
+            year: originalSession, 
+            activity_name: formData.activity_name.trim(),
+            collaborating_agency: formData.collaborating_agency.trim(),
+            scheme_name: formData.scheme_name.trim(),
+            student_count: parseInt(formData.student_count) || 0
+          };
+          
+          // Convert recordId to a number to ensure proper type matching with the backend
+          const recordIdNum = parseInt(recordId, 10);
+          if (isNaN(recordIdNum)) {
+            throw new Error('Invalid record ID');
+          }
+          const endpoint = `/criteria3/updateResponse333/${recordIdNum}`;
+          console.log('Update endpoint:', endpoint);
+          console.log('Update payload:', updatePayload);
+          
+          // Validate required fields
+          if (!updatePayload.activity_name || !updatePayload.collaborating_agency || 
+              !updatePayload.scheme_name) {
+            throw new Error('Missing required fields for update');
+          }
+          
+          // Make the API call
+          response = await api.put(endpoint, updatePayload);
+          
+          console.log('Update response:', response.data);
+          
+          if (response.status >= 200 && response.status < 300) {
+            // Refresh the data after successful update
+            const updatedData = await fetchResponseData(currentYear);
+            setYearData(prev => ({
+              ...prev,
+              [currentYear]: updatedData
+            }));
+            setSubmittedData(updatedData);
+            
+            // Reset form and edit mode
+            resetForm();
+            setSuccess('Record updated successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+          }
+          
+        } catch (error) {
+          console.error('Error updating record:', error);
+          
+          // Handle specific error cases from your backend
+          if (error.response?.status === 404) {
+            setError('Record not found. It may have been deleted.');
+          } else if (error.response?.status === 400) {
+            const errorMessage = error.response.data?.message || 'Bad request';
+            if (errorMessage.includes('Session/year mismatch')) {
+              setError('Cannot update: Session/year mismatch with original record');
+            } else if (errorMessage.includes('Session must be between')) {
+              setError(`Session year must be within the valid IIQA range: ${errorMessage}`);
+            } else {
+              setError(errorMessage);
+            }
+          } else {
+            setError(error.response?.data?.message || 'Failed to update record');
+          }
+          
+          // Don't proceed with refresh if update failed
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        // For new entries, use the create endpoint
+        const createPayload = {
+          activity_name: formData.activity_name.trim(),
+          collaborating_agency: formData.collaborating_agency.trim(),
+          scheme_name: formData.scheme_name.trim(),
+          year: yearToSend,
+          student_count: parseInt(formData.student_count) || 0,
+          session: sessionYearNum,
+          support_document: formData.supportLinks?.join(',') || ''
+        };
+        
+        console.log('Create payload:', createPayload);
+        
+        const endpoint = '/criteria3/createResponse333';
+        response = await api.post(endpoint, createPayload);
+        
+        console.log('Create response:', response.data);
+        
+        if (response.status >= 200 && response.status < 300) {
+          alert('Data submitted successfully!');
+          
+          // Store the SL number in localStorage if available
+          if (response.data?.data?.sl_no) {
+            localStorage.setItem(
+              `criteria333_${formData.activity_name}_${sessionYear}`, 
+              response.data.data.sl_no
+            );
+          }
+        }
+      }
+      
+      // Refresh the data after successful operation
+      const updatedData = await fetchResponseData(currentYear);
+      setSubmittedData(updatedData);
+      
+      // Update yearData as well
+      setYearData(prev => ({
+        ...prev,
+        [currentYear]: updatedData
+      }));
+      
+      // Reset form
+      resetForm();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
     } catch (err) {
-      console.error("Error creating entry:", err);
-      setError(err.response?.data?.message || "Failed to create entry");
+      console.error("Error in handleSubmit:", err);
+      
+      // More specific error handling
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('Missing required fields')) {
+        setError('All fields are required. Please check your input.');
+      } else if (err.response?.status === 404) {
+        setError('Resource not found. Please refresh and try again.');
+      } else {
+        setError(err.response?.data?.message || err.message || "Operation failed");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Handle change
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   // Handle delete entry
-  const handleDelete = async (id) => {
-    if (!id) {
-      setError('No ID provided for deletion');
+  const handleDelete = async (slNo, year) => {
+    if (!slNo) {
+      console.error('No SL number provided for deletion');
+      setError('Error: No entry selected for deletion');
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this entry?')) {
       return;
     }
 
     try {
-      setLoading(true);
-      // Convert ID to string to match backend expectations
-      const response = await api.delete(`/criteria3/deleteResponse333/${String(id)}`);
+      setSubmitting(true);
+      const response = await api.delete(`/criteria3/deleteResponse333/${slNo}`);
       
-      if (response.data) {
-        // Update the UI by removing the deleted entry
-        setSubmittedData(prev => prev.filter(item => (item.id !== id && item.sl_no !== id && item.slNo !== id)));
+      if (response.status === 200) {
+        // Update the local state to remove the deleted entry
+        setYearData(prev => ({
+          ...prev,
+          [year]: (prev[year] || []).filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        }));
         
-        // Update yearData to reflect the deletion
-        if (currentYear) {
-          setYearData(prev => ({
-            ...prev,
-            [currentYear]: (prev[currentYear] || []).filter(item => 
-              (item.id !== id && item.sl_no !== id && item.slNo !== id)
-            )
-          }));
-        }
+        // Also update the submittedData state
+        setSubmittedData(prev => 
+          prev.filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        );
         
+        // Show success message
         setSuccess('Entry deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -239,144 +373,7 @@ const Criteria3_3_3 = () => {
       setError(error.response?.data?.message || 'Failed to delete entry. Please try again.');
       setTimeout(() => setError(''), 3000);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle update entry
-  const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.sl_no && !formDataToSubmit.slNo) {
-      setError("No entry selected for update");
-      return;
-    }
-    
-    setSubmitting(true);
-    setError(null);
-    
-    try {
-      // Ensure sl_no is a number
-      const sl_no = parseInt(formDataToSubmit.sl_no || formDataToSubmit.slNo, 10);
-      if (isNaN(sl_no)) {
-        throw new Error('Invalid entry ID');
-      }
-      
-      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
-      
-      console.log('Update payload:', {
-        sl_no,
-        yearToSend,
-        formDataToSubmit
-      });
-      
-      const payload = {
-        activity_name: formDataToSubmit.activity_name,
-        collaborating_agency: formDataToSubmit.collaborating_agency,
-        scheme_name: formDataToSubmit.scheme_name,
-        year: formDataToSubmit.year,
-        student_count: parseInt(formDataToSubmit.student_count) || 0,
-        session: parseInt(yearToSend),
-      };
-      
-      console.log('Sending update request to:', `/criteria3/updateResponse333/${sl_no}`, 'with payload:', payload);
-      const response = await api.put(`/criteria3/updateResponse333/${sl_no}`, payload);
-      
-      if (response.data.success) {
-        const updatedData = await fetchResponseData(currentYear);
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      console.error("Error updating entry:", err);
-      setError(err.response?.data?.message || "Failed to update entry");
-    } finally {
       setSubmitting(false);
-    }
-  };
-
-  // Validate form data
-  const validateFormData = (dataToSubmit) => {
-    const yearInput = dataToSubmit.year || currentYear;
-    const yearToSend = yearInput.split("-")[0];
-    const session = parseInt(yearToSend);
-    const currentYearNum = new Date().getFullYear();
-
-    if (!dataToSubmit.activity_name || !dataToSubmit.collaborating_agency || 
-        !dataToSubmit.scheme_name || !dataToSubmit.student_count || !dataToSubmit.year) {
-      throw new Error("Please fill in all required fields.");
-    }
-    
-    if (isNaN(session) || session < 1990 || session > currentYearNum) {
-      throw new Error(`Year must be between 1990 and ${currentYearNum}.`);
-    }
-
-    if (isNaN(parseInt(dataToSubmit.student_count)) || parseInt(dataToSubmit.student_count) <= 0) {
-      throw new Error("Student count must be a positive number.");
-    }
-
-    return true;
-  };
-
-  // Handle edit
-  const handleEdit = (entry) => {
-    setFormData({
-      ...entry,
-      id: entry.id,
-      year: currentYear
-    });
-    setIsEditMode(true);
-    setEditKey(entry.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Handle submit
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const formDataWithYear = { ...formData, year: currentYear };
-      validateFormData(formDataWithYear);
-      
-      if (isEditMode && (formData.slNo || formData.sl_no)) {
-        console.log('Updating entry:', formDataWithYear);
-        await handleUpdate(formDataWithYear);
-      } else {
-        console.log('Creating new entry:', formDataWithYear);
-        await handleCreate(formDataWithYear);
-      }
-      
-      // Reset form and edit mode
-      setIsEditMode(false);
-      setEditKey(null);
-      setFormData({
-        slNo: '',
-        activity_name: "",
-        collaborating_agency: "",
-        scheme_name: "",
-        year: "",
-        student_count: "",
-        supportLinks: []
-      });
-      
-      // Refresh data
-      const data = await fetchResponseData(currentYear);
-      setYearData(prev => ({
-        ...prev,
-        [currentYear]: data || []
-      }));
-      setSubmittedData(data || []);
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      setError(error.message || 'Failed to submit form. Please try again.');
-      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -434,18 +431,10 @@ const Criteria3_3_3 = () => {
     setFormData(prev => ({ ...prev, year: selectedYear }));
     setIsEditMode(false);
     setEditKey(null);
+    setEditingId(null); // ADDED: Reset editingId on year change
   };
 
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...(formData.supportLinks || [])];
-      updatedLinks[index] = value;
-      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
-  };
-
+  // Navigation functions
   const goToNextPage = () => {
     navigate("/criteria3.3.4");
   };
@@ -454,9 +443,14 @@ const Criteria3_3_3 = () => {
     navigate("/criteria3.3.2");
   };
 
-  const handleExport = () => {
+  // Handle export to CSV
+  const handleExport = async () => {
+    if (!submittedData || submittedData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
     const headers = [
-      'SL No',
       'Activity Name',
       'Collaborating Agency',
       'Scheme Name',
@@ -557,6 +551,9 @@ const Criteria3_3_3 = () => {
                 <p className="text-lg font-semibold text-green-800">
                   Provisional Score (3.3.3): {provisionalScore.data.score_sub_sub_criteria || provisionalScore.data.score || 0}
                 </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore.data.sub_sub_cr_grade || provisionalScore.data.grade || 'N/A'}
+                </p>
               </div>
             ) : (
               <p className="text-gray-600">No score data available.</p>
@@ -614,12 +611,13 @@ const Criteria3_3_3 = () => {
                     </td>
                     <td className="px-2 py-2 border">
                       <input
-                        type="text"
+                        type="number"
+                        min="2000"
+                        max={new Date().getFullYear()}
                         value={formData.year}
                         onChange={(e) => handleChange("year", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Year"
-                        required
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -638,26 +636,15 @@ const Criteria3_3_3 = () => {
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 !bg-blue-600 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Add')}
                         </button>
                         {isEditMode && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setIsEditMode(false);
-                              setFormData({
-                                slNo: '',
-                                activity_name: "",
-                                collaborating_agency: "",
-                                scheme_name: "",
-                                year: "",
-                                student_count: "",
-                                supportLinks: []
-                              });
-                            }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            onClick={resetForm}
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-gray-600"
                           >
                             Cancel
                           </button>
@@ -739,6 +726,9 @@ const Criteria3_3_3 = () => {
             )}
           </div>
 
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
           
           {/* Year-wise Data Display */}
           {availableSessions?.map((session) => (
@@ -769,50 +759,42 @@ const Criteria3_3_3 = () => {
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              type="button"
+                              className="p-2 !bg-white text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
+                                const recordId = entry.sl_no || entry.slNo || entry.id;
+                                console.log('Editing entry with ID:', recordId);
+                                
                                 setFormData({
-                                  slNo: entry.sl_no || entry.slNo,
-                                  activity_name: entry.activity_name,
-                                  collaborating_agency: entry.collaborating_agency,
-                                  scheme_name: entry.scheme_name,
-                                  year: entry.year,
-                                  student_count: entry.student_count,
+                                  slNo: recordId,
+                                  activity_name: entry.activity_name || '',
+                                  collaborating_agency: entry.collaborating_agency || '',
+                                  scheme_name: entry.scheme_name || '',
+                                  year: entry.year || '',
+                                  student_count: entry.student_count || '',
                                   supportLinks: [],
                                 });
-                                setEditKey({ 
-                                  slNo: entry.sl_no || entry.slNo, 
-                                  year: entry.year 
-                                });
+                                
+                                // CRITICAL: Set the editingId
+                                setEditingId(recordId);
+                                setEditKey({ slNo: recordId, year: entry.year });
                                 setIsEditMode(true);
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                
+                                console.log('Edit mode activated for record:', recordId);
                               }}
-                              className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors"
                               title="Edit entry"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
+                             <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              type="button"
-                              onClick={async (e) => {
+                              className="p-2 !bg-white text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                const entryId = entry.sl_no || entry.slNo || entry.id;
-                                if (entryId) {
-                                  await handleDelete(entryId);
-                                } else {
-                                  setError('Cannot delete: Missing entry ID');
-                                  setTimeout(() => setError(''), 3000);
-                                }
+                                handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
                               }}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+                              disabled={submitting}
                               title="Delete entry"
-                              disabled={loading}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>
@@ -857,8 +839,8 @@ const Criteria3_3_3 = () => {
           )}
 
           {/* Bottom Navigation */}
-          <div className="bg-white border-t border-gray-200 shadow-inner py-4 px-6">
-            <Bottom onPrevious={goToPreviousPage} onNext={goToNextPage} />
+          <div className="mt-6 mb-6">
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
           </div>
         </div>
       </div>
@@ -867,4 +849,3 @@ const Criteria3_3_3 = () => {
 };
 
 export default Criteria3_3_3;
-

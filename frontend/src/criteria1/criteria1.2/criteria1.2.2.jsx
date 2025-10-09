@@ -31,6 +31,7 @@ const Criteria1_2_2 = () => {
   const [error, setError] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     slNo: '',
     program_name: "",
@@ -137,13 +138,32 @@ const Criteria1_2_2 = () => {
     }
   };
 
+  // Reset form and edit state
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      program_name: "",
+      course_code: "",
+      year_of_offering: "",
+      no_of_times_offered: "",
+      duration: "",
+      no_of_students_enrolled: "",
+      no_of_students_completed: "",
+      supportLinks: []
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError(null);
+  };
+
   // Handle create new entry
   const handleCreate = async (formDataToSubmit) => {
     setSubmitting(true);
     setError(null);
     
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const yearToSend = formDataToSubmit.year ? formDataToSubmit.year.split("-")[0] : currentYear.split("-")[0];
       const payload = {
         program_name: formDataToSubmit.program_name,
         course_code: formDataToSubmit.course_code,
@@ -155,22 +175,25 @@ const Criteria1_2_2 = () => {
         session: parseInt(yearToSend),
       };
       
-      console.log('Sending request with payload:', payload);
-      const response = await api.post('/criteria1/createResponse122', payload);
-      console.log('Response received:', response);
+      console.log('Sending create request with payload:', payload);
+      const response = await api.post('/criteria1/createResponse122_123', payload);
+      console.log('Create API response:', response.data);
       
       if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
+        console.log('Request was successful');
         
-        alert('Data submitted successfully!');
+        const responseData = response.data?.data || {};
+        const sl_no = responseData.sl_no || responseData.slNo;
         
-        if (response.data?.data?.sl_no) {
+        if (sl_no) {
+          console.log('Storing SL number in localStorage:', sl_no);
           localStorage.setItem(
             `criteria122_${formDataToSubmit.program_name}_${yearToSend}`, 
-            response.data.data.sl_no
+            sl_no
           );
         }
         
+        // Refresh the data to ensure we have the latest from the server
         const updatedData = await fetchResponseData(currentYear);
         
         setYearData(prev => ({
@@ -178,14 +201,18 @@ const Criteria1_2_2 = () => {
           [currentYear]: updatedData
         }));
         
+        // Update submitted data with the server response
         setSubmittedData(prev => [
           ...prev,
           {
             ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
+            sl_no: sl_no || Date.now(),
+            slNo: sl_no || Date.now(), // Keep both for backward compatibility
             year: currentYear
           }
         ]);
+        
+        alert('Data submitted successfully!');
         
         // Reset form
         setFormData({
@@ -213,40 +240,56 @@ const Criteria1_2_2 = () => {
 
   // Handle update entry
   const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.slNo) {
+    const recordId = editingId || formDataToSubmit.slNo || formDataToSubmit.sl_no;
+    
+    if (!recordId) {
       setError("No entry selected for update");
-      return;
+      return false;
     }
+    
+    console.log('Updating record ID:', recordId);
     
     setSubmitting(true);
     setError(null);
     
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const yearToSend = formDataToSubmit.year ? formDataToSubmit.year.split("-")[0] : currentYear.split("-")[0];
       const payload = {
-        program_name: formDataToSubmit.program_name,
-        course_code: formDataToSubmit.course_code,
-        year_of_offering: formDataToSubmit.year_of_offering,
-        no_of_times_offered: formDataToSubmit.no_of_times_offered,
-        duration: formDataToSubmit.duration,
-        no_of_students_enrolled: formDataToSubmit.no_of_students_enrolled,
-        no_of_students_completed: formDataToSubmit.no_of_students_completed,
+        program_name: formDataToSubmit.program_name || '',
+        course_code: formDataToSubmit.course_code || '',
+        year_of_offering: formDataToSubmit.year_of_offering || '',
+        no_of_times_offered: formDataToSubmit.no_of_times_offered || '',
+        duration: formDataToSubmit.duration || '',
+        no_of_students_enrolled: formDataToSubmit.no_of_students_enrolled || '',
+        no_of_students_completed: formDataToSubmit.no_of_students_completed || '',
         session: parseInt(yearToSend),
       };
       
-      console.log('Sending update request with payload:', payload);
-      const response = await api.put(`/criteria1/updateResponse122_123/${formDataToSubmit.slNo}`, payload);
+      console.log('Update payload:', payload);
+      
+      console.log('Sending update request for record ID:', recordId, 'with payload:', payload);
+      const response = await api.put(`/criteria1/updateResponse122_123/${recordId}`, payload);
       console.log('Update API response:', response);
       
-      if (response.data && response.data.success) {
-        // Get the updated data from the response
-        const updatedEntry = response.data.data.criteria122;
+      // The backend returns multiple responses, we'll use the first one (criteria122)
+      const responseData = Array.isArray(response.data) ? response.data[0] : response.data;
+      
+      // Check for successful response
+      if (responseData && (responseData.success === true || responseData.message === "Row updated successfully")) {
+        // Get the updated data from the response or use the original form data if not available
+        const updatedEntry = responseData.data || {
+          ...formDataToSubmit,
+          sl_no: recordId,
+          slNo: recordId
+        };
+        
+        console.log('Successfully updated entry:', updatedEntry);
         
         // Update the state with the updated entry
         setYearData(prev => {
           const currentYearData = prev[currentYear] || [];
           const updatedYearData = currentYearData.map(item => 
-            item.slNo === formDataToSubmit.slNo ? updatedEntry : item
+            (item.slNo === recordId || item.sl_no === recordId) ? { ...updatedEntry, slNo: updatedEntry.sl_no || updatedEntry.slNo } : item
           );
           return {
             ...prev,
@@ -255,29 +298,28 @@ const Criteria1_2_2 = () => {
         });
         
         // Also update the submittedData state
-        setSubmittedData(prev => 
-          prev.map(item => 
-            item.slNo === formDataToSubmit.slNo ? updatedEntry : item
-          )
-        );
-        
-        // Reset the form
-        setFormData({
-          slNo: '',
-          program_name: "",
-          course_code: "",
-          year_of_offering: "",
-          no_of_times_offered: "",
-          duration: "",
-          no_of_students_enrolled: "",
-          no_of_students_completed: "",
-          supportLinks: []
+        setSubmittedData(prev => {
+          const updatedData = prev.map(item => 
+            (item.slNo === recordId || item.sl_no === recordId) 
+              ? { ...updatedEntry, slNo: updatedEntry.sl_no || updatedEntry.slNo }
+              : item
+          );
+          return updatedData;
         });
         
-        setIsEditMode(false);
-        setEditKey(null);
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        setSuccess('Entry updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+        return true;
+      } else if (response.data && typeof response.data.success === 'string' && response.data.success.includes('successfully')) {
+        // Handle case where success is a success message string
+        setSuccess(response.data.success);
+        setTimeout(() => setSuccess(''), 3000);
+        return true;
+      } else {
+        // Only throw error if we don't have a success condition
+        const errorMsg = response.data?.message || 
+                        (typeof response.data?.success === 'string' ? response.data.success : 'Failed to update entry');
+        throw new Error(errorMsg);
       }
     } catch (err) {
       console.error("Error updating entry:", err);
@@ -289,11 +331,15 @@ const Criteria1_2_2 = () => {
 
   // Handle delete entry
   const handleDelete = async (slNo, year) => {
-    if (!slNo) {
+    const sl_no = slNo || (typeof slNo === 'object' ? slNo.slNo || slNo.sl_no : null);
+    
+    if (!sl_no) {
       console.error('No SL number provided for deletion');
       setError('Error: No entry selected for deletion');
       return;
     }
+    
+    console.log('Deleting entry with SL number:', sl_no);
 
     if (!window.confirm('Are you sure you want to delete this entry?')) {
       return;
@@ -348,9 +394,12 @@ const Criteria1_2_2 = () => {
 
   // Handle edit
   const handleEdit = (entry) => {
+    const recordId = entry.sl_no || entry.slNo || entry.id;
+    
     setFormData({
       ...entry,
-      id: entry.id,
+      slNo: recordId, // Ensure slNo is set consistently
+      id: recordId,
       year: currentYear
     });
     setIsEditMode(true);
@@ -366,33 +415,41 @@ const Criteria1_2_2 = () => {
       const formDataWithYear = { ...formData, year: currentYear };
       validateFormData(formDataWithYear);
       
-      if (isEditMode && formData.id) {
-        console.log('Updating entry:', formDataWithYear);
-        await handleUpdate(formDataWithYear);
+      // Check if we're updating an existing record
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Edit state:', { isEditMode, editingId, formDataSlNo: formData.slNo });
+      
+      let response;
+      if (isUpdating && recordId) {
+        console.log('Updating entry with ID:', recordId);
+        response = await handleUpdate(formDataWithYear);
       } else {
-        console.log('Creating new entry:', formDataWithYear);
-        await handleCreate(formDataWithYear);
+        console.log('Creating new entry');
+        response = await handleCreate(formDataWithYear);
       }
       
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-      // Reset form and edit mode
-      setIsEditMode(false);
-      setFormData({
-        program_name: '',
-        course_code: '',
-        year_of_offering: '',
-        no_of_times_offered: '',
-        duration: '',
-        no_of_students_enrolled: '',
-        no_of_students_completed: '',
-        supportLinks: []
-      });
-      
-      // Refresh data
-      const data = await fetchResponseData(currentYear);
-      setSubmittedData(data || []);
+      if (response) {
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+        
+        // Reset form and edit mode
+        resetForm();
+        
+        // Refresh data
+        const data = await fetchResponseData(currentYear);
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: data || []
+        }));
+        setSubmittedData(prev => {
+          const newData = data || [];
+          return newData;
+        });
+      }
       
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -682,9 +739,9 @@ const Criteria1_2_2 = () => {
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 text-white !bg-blue-600 rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : '!bg-blue-600 !hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Save')}
                         </button>
                         {isEditMode && (
                           <button
@@ -702,7 +759,7 @@ const Criteria1_2_2 = () => {
                                 supportLinks: []
                               });
                             }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700"
                           >
                             Cancel
                           </button>
@@ -716,160 +773,124 @@ const Criteria1_2_2 = () => {
           </div>
 
           {/* Upload Documents Section */}
+           <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+                            
+                                      <div className="mb-6">
+                                  <label className="block text-gray-700 font-medium mb-2">
+                                    Upload Documents
+                                  </label>
+                                  <div className="flex items-center gap-4 mb-2">
+                                    <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                                      <i className="fas fa-upload mr-2"></i> Choose Files
+                                      <input
+                                        type="file"
+                                        className="hidden"
+                                        multiple
+                                        onChange={async (e) => {
+                                          const filesArray = Array.from(e.target.files);
+                                          for (const file of filesArray) {
+                                            try {
+                                              console.log('Uploading file:', file.name);
+                                              const yearToUse = currentYear || new Date().getFullYear().toString();
+                                              console.log('Using year:', yearToUse);
+                                              
+                                              const uploaded = await uploadFile(
+                                                "1.2.2",  // Metric ID
+                                                file,
+                                                "1.2.2",  // Criteria code
+                                                yearToUse,
+                                                user?.session
+                                              );
+                            
+                                              // Add the uploaded file info to the form data
+                                              setFormData(prev => ({
+                                                ...prev,
+                                                supportLinks: [
+                                                  ...prev.supportLinks, 
+                                                  {
+                                                    id: uploaded.id,
+                                                    url: uploaded.fileUrl,
+                                                    name: file.name
+                                                  }
+                                                ]
+                                              }));
+                                            } catch (err) {
+                                              console.error('Upload error:', err);
+                                              console.error('Error details:', {
+                                                message: err.message,
+                                                response: err.response?.data,
+                                                status: err.response?.status
+                                              });
+                                              setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                                            }
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                            
+                                    {/* Status Messages */}
+                                    {uploading && <span className="text-gray-600">Uploading...</span>}
+                                    {error && <span className="text-red-600">{error}</span>}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center">
+                                    <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                                    Changes will be auto-saved
+                                  </div>
+                                  {formData.supportLinks.length > 0 && (
+                                    <ul className="list-disc pl-5 text-gray-700">
+                                      {formData.supportLinks.map((link, index) => (
+                                        <li key={index} className="flex justify-between items-center mb-1">
+                                          <a
+                                            href={`http://localhost:3000${link.url}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 underline"
+                                          >
+                                            {link.name || link.url.split("/").pop()}
+                                          </a>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              // Remove from local formData
+                                              setFormData(prev => {
+                                                const newLinks = prev.supportLinks.filter(l => l.id !== link.id);
+                                                // Show success message
+                                                if (newLinks.length < prev.supportLinks.length) {
+                                                  alert('File deleted successfully!');
+                                                }
+                                                return {
+                                                  ...prev,
+                                                  supportLinks: newLinks
+                                                };
+                                              });
+                                              // Also remove from context
+                                              removeFile("1.2.2", link.id);
+                                            }}
+                                            className="text-red-600 hover:text-red-800 !bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                                            title="Remove file"
+                                          >
+                                            <FaTrash size={16} className="text-red-600" />
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                            </div>
+         
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents
-            </label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                <i className="fas fa-upload mr-2"></i> Choose Files
-                <input
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const filesArray = Array.from(e.target.files);
-                    for (const file of filesArray) {
-                      try {
-                        const uploaded = await uploadFile(
-                          "criteria1_2_2",
-                          file,
-                          "1.2.2",
-                          currentYear
-                        );
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
-                        }));
-                      } catch (err) {
-                        console.error("Upload error:", err);
-                        alert(err.message || "Upload failed");
-                      }
-                    }
-                  }}
-                />
-              </label>
-              {uploading && <span className="text-gray-600">Uploading...</span>}
-              {uploadError && <span className="text-red-600">{uploadError}</span>}
-            </div>
-            
-            {formData.supportLinks && formData.supportLinks.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-700">
-                {formData.supportLinks.map((link, index) => (
-                  <li key={index} className="flex justify-between items-center mb-1">
-                    <a
-                      href={`http://localhost:3000${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      {link.split("/").pop()}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: prev.supportLinks.filter(l => l !== link)
-                        }));
-                        removeFile("criteria1_2_2", link);
-                      }}
-                      className="text-red-600 ml-2"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
           </div>
 
           {/* Submitted Data Table */}
-          {submittedData.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-4">Submitted Entries</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full bg-white border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="px-4 py-2 border">SL No</th>
-                      <th className="px-4 py-2 border">Program Name</th>
-                      <th className="px-4 py-2 border">Course Code</th>
-                      <th className="px-4 py-2 border">Year of Offering</th>
-                      <th className="px-4 py-2 border">Times Offered</th>
-                      <th className="px-4 py-2 border">Duration</th>
-                      <th className="px-4 py-2 border">Students Enrolled</th>
-                      <th className="px-4 py-2 border">Students Completed</th>
-                      <th className="px-4 py-2 border">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {submittedData.map((entry, index) => (
-                      <tr key={entry.id || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 border text-center">{index + 1}</td>
-                        <td className="px-4 py-2 border">{entry.program_name || '-'}</td>
-                        <td className="px-4 py-2 border">{entry.course_code || '-'}</td>
-                        <td className="px-4 py-2 border text-center">{entry.year_of_offering || '-'}</td>
-                        <td className="px-4 py-2 border text-center">{entry.no_of_times_offered || '-'}</td>
-                        <td className="px-4 py-2 border text-center">{entry.duration || '-'}</td>
-                        <td className="px-4 py-2 border text-center">{entry.no_of_students_enrolled || '-'}</td>
-                        <td className="px-4 py-2 border text-center">{entry.no_of_students_completed || '-'}</td>
-                        <td className="px-4 py-2 border text-center">
-                          <div className="flex justify-center space-x-2">
-                            <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
-                              onClick={() => {
-                                setFormData({
-                                  slNo: entry.sl_no || entry.slNo,
-                                  program_name: entry.program_name,
-                                  course_code: entry.course_code,
-                                  year_of_offering: entry.year_of_offering,
-                                  no_of_times_offered: entry.no_of_times_offered,
-                                  duration: entry.duration,
-                                  no_of_students_enrolled: entry.no_of_students_enrolled,
-                                  no_of_students_completed: entry.no_of_students_completed,
-                                  supportLinks: [],
-                                });
-                                setEditKey({ 
-                                  slNo: entry.sl_no || entry.slNo, 
-                                  year: entry.year 
-                                });
-                                setIsEditMode(true);
-                              }}
-                              title="Edit entry"
-                            >
-                              <FaEdit className="w-4 h-4" />
-                            </button>
-                            <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm('Are you sure you want to delete this entry?')) {
-                                  handleDelete(entry.sl_no || entry.slNo, entry.year || session);
-                                }
-                              }}
-                              disabled={submitting}
-                              title="Delete entry"
-                            >
-                              <FaTrash className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
+          
           {/* Year-wise Data Display */}
           {availableSessions?.map((session) => (
             <div key={session} className="mb-8 border rounded">
               <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
               {yearData[session] && yearData[session].length > 0 ? (
                 <table className="w-full text-sm border border-black">
-                  <thead className="bg-gray-200">
+                  <thead className="bg-blue-200">
                     <tr>
                       <th className="border border-black px-4 py-2 text-gray-800">#</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Program Name</th>
@@ -896,7 +917,7 @@ const Criteria1_2_2 = () => {
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              className="p-2 !bg-white text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
                                 setFormData({
                                   slNo: entry.sl_no || entry.slNo,
@@ -917,10 +938,10 @@ const Criteria1_2_2 = () => {
                               }}
                               title="Edit entry"
                             >
-                              <FaEdit className="w-4 h-4" />
+                               <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              className="p-2 text-red-600 !bg-white hover:bg-red-100 rounded-full transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (window.confirm('Are you sure you want to delete this entry?')) {
@@ -930,7 +951,7 @@ const Criteria1_2_2 = () => {
                               disabled={submitting}
                               title="Delete entry"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>

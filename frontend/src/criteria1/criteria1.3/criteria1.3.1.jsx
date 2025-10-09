@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import Header from "../../components/header";
-import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+import { FaTrash } from "react-icons/fa";
 
 const Criteria1_3_1 = () => {
   const { user } = useAuth();
@@ -30,12 +29,14 @@ const Criteria1_3_1 = () => {
       lastSaved: null
     }
   ]);
+  
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [autoSaveTimestamp, setAutoSaveTimestamp] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const textareaRefs = useRef({});
   const autoSaveTimerRef = useRef(null);
+  
 
   useEffect(() => {
     // Set current year in YYYY-YYYY format (e.g., 2023-2024)
@@ -150,39 +151,42 @@ const Criteria1_3_1 = () => {
     navigate('/criteria1.2.3'); 
   };
 
+ 
+
   return (
     <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-    <div className="flex flex-1 overflow-hidden pt-8">
-      <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
-        <Sidebar onCollapse={setIsSidebarCollapsed} />
-      </div>
-      <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
-        {/* Page Header with Title and User Dropdown */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
-            <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
-              <i className="fas fa-arrow-left"></i>
-            </a>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">Criteria 1-Curricular Planning and Implementation</p>
-              <p className="text-gray-600 text-sm">1.3 Curriculum Enrichment</p>
+      <div className="flex flex-1 overflow-hidden pt-8">
+        <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+          <Sidebar onCollapse={setIsSidebarCollapsed} />
+        </div>
+        <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
+          {/* Page Header with Title and User Dropdown */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+              <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+                <i className="fas fa-arrow-left"></i>
+              </a>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">Criteria 1 - Curricular Planning and Implementation</p>
+                <p className="text-gray-600 text-sm">1.3 Curriculum Enrichment</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <UserDropdown user={user} className="ml-2 mr-4" />
             </div>
           </div>
-          <div className="flex items-center">
-            <UserDropdown user={user} className="ml-2 mr-4 " />
-          </div>
-        </div>
 
           {/* Information Card */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-2">1.3.1 Metric Information</h3>
-            <p className="text-sm text-gray-700 mb-4">
-              Institution integrates crosscutting issues relevant to Professional Ethics, Gender, Human Values, Environment and Sustainability into the Curriculum.
+          <div className="bg-white p-6 rounded shadow mb-6">
+            <h3 className="text-blue-600 font-semibold mb-2">1.3.1 Metric Information</h3>
+            <p className="text-sm text-gray-700 mb-2">
+              Number of value-added courses for imparting transferable and life skills offered during the year
             </p>
-            <h4 className="text-blue-600 font-medium mb-2">Requirements:</h4>
-            <ul className="list-disc pl-6 text-sm text-gray-700 space-y-1">
-              <li>Upload a description in maximum of 500 words </li>
-              
+            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              <li className="mb-1">e-copies of award letters and certificates</li>
+              <li className="mb-1">Number of awards/medals for outstanding performance in sports/cultural activities</li>
+              <li className="mb-1">Any additional information</li>
             </ul>
           </div>
 
@@ -244,13 +248,14 @@ const Criteria1_3_1 = () => {
               </div>
             ))}
           </div>
-          
-             <div className="mb-6">
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+
+          <div className="mb-6">
       <label className="block text-gray-700 font-medium mb-2">
         Upload Documents
       </label>
       <div className="flex items-center gap-4 mb-2">
-        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
+        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
           <i className="fas fa-upload mr-2"></i> Choose Files
           <input
             type="file"
@@ -265,22 +270,24 @@ const Criteria1_3_1 = () => {
                   console.log('Using year:', yearToUse);
                   
                   const uploaded = await uploadFile(
-                    "1.1.1",  // Metric ID
+                    "1.3.1",  // Metric ID
                     file,
-                    "1.1.1",  // Criteria code
-                    yearToUse
+                    "1.3.1",  // Criteria code
+                    yearToUse,
+                    user?.session
                   );
-                  
-                  console.log('Upload successful:', uploaded);
-                  
-                  const fileUrl = uploaded.path || uploaded.file_url || (uploaded.data && uploaded.data.path);
-                  if (!fileUrl) {
-                    throw new Error('No file URL returned from server');
-                  }
-                  
-                  setFormData((prev) => ({
+
+                  // Add the uploaded file info to the form data
+                  setFormData(prev => ({
                     ...prev,
-                    supportLinks: [...prev.supportLinks, fileUrl],
+                    supportLinks: [
+                      ...prev.supportLinks, 
+                      {
+                        id: uploaded.id,
+                        url: uploaded.fileUrl,
+                        name: file.name
+                      }
+                    ]
                   }));
                 } catch (err) {
                   console.error('Upload error:', err);
@@ -300,155 +307,53 @@ const Criteria1_3_1 = () => {
         {uploading && <span className="text-gray-600">Uploading...</span>}
         {error && <span className="text-red-600">{error}</span>}
       </div>
-    
-
-
-  {formData.supportLinks.length > 0 && (
-    <ul className="list-disc pl-5 text-gray-700">
-      {formData.supportLinks.map((link, index) => (
-        <li key={index} className="flex justify-between items-center mb-1">
-          <a
-            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {link.split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              // Remove from local formData
-              setFormData(prev => ({
-                ...prev,
-                supportLinks: prev.supportLinks.filter(l => l !== link)
-              }));
-              // Also remove from context
-removeFile("1.1.1", link);
-            }}
-            className="text-red-600 ml-2"
-          >
-            Remove
-          </button>
-        </li>
-      ))}
-    </ul>
-  )}
-</div>
-          {/* Footer Buttons */}
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {autoSaveTimestamp ? (
-                <span><i className="fas fa-save mr-1"></i> Auto-saved at {autoSaveTimestamp}</span>
-              ) : (
-                <span>Changes will be auto-saved</span>
-              )}
-            </div>
-           </div>
-           <div className="mb-6">
-      <label className="block text-gray-700 font-medium mb-2">
-        Upload Documents
-      </label>
-      <div className="flex items-center gap-4 mb-2">
-        <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-          <i className="fas fa-upload mr-2"></i> Choose Files
-          <input
-            type="file"
-            className="hidden"
-            multiple
-            onChange={async (e) => {
-              const filesArray = Array.from(e.target.files);
-              for (const file of filesArray) {
-                try {
-                  console.log('Uploading file:', file.name);
-                  const yearToUse = currentYear || new Date().getFullYear().toString();
-                  console.log('Using year:', yearToUse);
-                  
-                  const uploaded = await uploadFile(
-                    "1.1.1",  // Metric ID
-                    file,
-                    "1.1.1",  // Criteria code
-                    yearToUse
-                  );
-                  
-                  console.log('Upload successful:', uploaded);
-                  
-                  const fileUrl = uploaded.path || uploaded.file_url || (uploaded.data && uploaded.data.path);
-                  if (!fileUrl) {
-                    throw new Error('No file URL returned from server');
-                  }
-                  
-                  setFormData((prev) => ({
-                    ...prev,
-                    supportLinks: [...prev.supportLinks, fileUrl],
-                  }));
-                } catch (err) {
-                  console.error('Upload error:', err);
-                  console.error('Error details:', {
-                    message: err.message,
-                    response: err.response?.data,
-                    status: err.response?.status
-                  });
-                  setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
-                }
-              }
-            }}
-          />
-        </label>
-
-        {/* Status Messages */}
-        {uploading && <span className="text-gray-600">Uploading...</span>}
-        {error && <span className="text-red-600">{error}</span>}
+      <div className="text-sm text-gray-500 flex items-center">
+        <i className="fas fa-sync-alt fa-spin mr-2"></i>
+        Changes will be auto-saved
       </div>
-    
-
-
-  {formData.supportLinks.length > 0 && (
-    <ul className="list-disc pl-5 text-gray-700">
-      {formData.supportLinks.map((link, index) => (
-        <li key={index} className="flex justify-between items-center mb-1">
-          <a
-            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {link.split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              // Remove from local formData
-              setFormData(prev => ({
-                ...prev,
-                supportLinks: prev.supportLinks.filter(l => l !== link)
-              }));
-              // Also remove from context
-removeFile("1.1.1", link);
-            }}
-            className="text-red-600 ml-2"
-          >
-            Remove
-          </button>
-        </li>
-      ))}
-    </ul>
-  )}
+      {formData.supportLinks.length > 0 && (
+        <ul className="list-disc pl-5 text-gray-700">
+          {formData.supportLinks.map((link, index) => (
+            <li key={index} className="flex justify-between items-center mb-1">
+              <a
+                href={`http://localhost:3000${link.url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                {link.name || link.url.split("/").pop()}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  // Remove from local formData
+                  setFormData(prev => {
+                    const newLinks = prev.supportLinks.filter(l => l.id !== link.id);
+                    // Show success message
+                    if (newLinks.length < prev.supportLinks.length) {
+                      alert('File deleted successfully!');
+                    }
+                    return {
+                      ...prev,
+                      supportLinks: newLinks
+                    };
+                  });
+                  // Also remove from context
+                  removeFile("1.3.1", link.id);
+                }}
+                className="text-red-600 hover:text-red-800 !bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                title="Remove file"
+              >
+                <FaTrash size={16} className="text-red-600" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
 </div>
-          {/* Footer Buttons */}
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {autoSaveTimestamp ? (
-                <span><i className="fas fa-save mr-1"></i> Auto-saved at {autoSaveTimestamp}</span>
-              ) : (
-                <span>Changes will be auto-saved</span>
-              )}
-            </div>
-           </div>
-          
-
         
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+          <div className="mt-auto mb-6 bg-white border-t border-gray-200 shadow-inner py-4 px-6">
   <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
 </div>
         </div>

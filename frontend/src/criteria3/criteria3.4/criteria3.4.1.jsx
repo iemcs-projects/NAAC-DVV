@@ -37,6 +37,65 @@ const Criteria3_4_1 = () => {
 
   const navigate = useNavigate();
 
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+    
+    try {
+      setSubmitting(true);
+      setError(null);
+      
+      // Create a clean copy of form data
+      const formDataToSubmit = {
+        ...formData,
+        year: formData.year?.toString() || currentYear.split('-')[0],
+        title_of_activity: formData.title_of_activity?.toString().trim() || '',
+        collaborating_agency: formData.collaborating_agency?.toString().trim() || '',
+        participant_name: formData.participant_name?.toString().trim() || '',
+        year_of_collaboration: formData.year_of_collaboration?.toString().trim() || '',
+        duration: formData.duration?.toString().trim() || '',
+        document_link: formData.supportLinks?.filter(link => link?.trim()).join(', ') || ''
+      };
+      
+      // Validate required fields
+      const requiredFields = ['title_of_activity', 'collaborating_agency', 'participant_name', 'year_of_collaboration', 'duration'];
+      const missingFields = requiredFields.filter(field => !formDataToSubmit[field]);
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+      
+      if (isEditMode && formData.slNo) {
+        await handleUpdate(formDataToSubmit);
+      } else {
+        await handleCreate(formDataToSubmit);
+      }
+      
+      // Reset form after successful submission
+      setFormData({
+        slNo: '',
+        year: currentYear,
+        title_of_activity: '',
+        collaborating_agency: '',
+        participant_name: '',
+        year_of_collaboration: currentYear.split('-')[0],
+        duration: '',
+        supportLinks: []
+      });
+      
+      setIsEditMode(false);
+      setEditKey(null);
+      
+    } catch (err) {
+      console.error('Error submitting form:', err);
+      setError(err.message || 'Failed to submit form. Please try again.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Load data when component mounts or when currentYear changes
   useEffect(() => {
     const loadData = async () => {
@@ -68,11 +127,12 @@ const Criteria3_4_1 = () => {
         "/criteria2/getResponse/3.4.1", 
         { 
           params: { 
-            session: yearToSend,
-            criteriaCode: '030401040101'
+            session: yearToSend
           }
         }
       );
+      
+      console.log('API Response for 3.4.1:', response.data);
       
       console.log('Full API Response:', response);
       console.log('Response data:', response.data);
@@ -302,14 +362,37 @@ const Criteria3_4_1 = () => {
         yearToSend = formDataToSubmit.year?.toString() || new Date().getFullYear().toString();
       }
       
+      // Validate required fields
+      const requiredFields = [
+        'title_of_activity',
+        'collaborating_agency',
+        'participant_name',
+        'year_of_collaboration',
+        'duration'
+      ];
+      
+      const missingFields = requiredFields.filter(
+        field => !formDataToSubmit[field]?.toString().trim()
+      );
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+      
       const payload = {
-        title_of_activity: formDataToSubmit.title_of_activity?.toString().trim() || '',
-        collaborating_agency: formDataToSubmit.collaborating_agency?.toString().trim() || '',
-        participant_name: formDataToSubmit.participant_name?.toString().trim() || '',
-        year_of_collaboration: formDataToSubmit.year_of_collaboration?.toString().trim() || '',
-        duration: formDataToSubmit.duration?.toString().trim() || '',
-        document_link: formDataToSubmit.supportLinks?.filter(link => link?.trim()).join(', ') || ''
+        title_of_activity: formDataToSubmit.title_of_activity.toString().trim(),
+        collaborating_agency: formDataToSubmit.collaborating_agency.toString().trim(),
+        participant_name: formDataToSubmit.participant_name.toString().trim(),
+        year_of_collaboration: formDataToSubmit.year_of_collaboration.toString().trim(),
+        duration: formDataToSubmit.duration.toString().trim(),
+        document_link: formDataToSubmit.document_link || (formDataToSubmit.supportLinks?.filter(link => link?.trim()).join(', ') || ''),
+        session: parseInt(yearToSend, 10) || new Date().getFullYear(),
+        year: parseInt(yearToSend, 10) || new Date().getFullYear()
       };
+      
+      console.log('Update payload with document_link:', payload);
+      
+      console.log('Update payload:', payload);
 
       console.log('Updating entry with ID:', formDataToSubmit.slNo);
       console.log('Update payload:', payload);
@@ -393,56 +476,24 @@ const Criteria3_4_1 = () => {
       setLoading(false);
     }
   };
-
-  // Handle form submission (create or update)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      // Create a clean copy of form data with proper values
-      const formDataToSubmit = {
-        ...formData,
-        year: formData.year?.toString() || currentYear.split('-')[0],
-        title_of_activity: formData.title_of_activity?.toString() || '',
-        collaborating_agency: formData.collaborating_agency?.toString() || '',
-        participant_name: formData.participant_name?.toString() || '',
-        year_of_collaboration: formData.year_of_collaboration?.toString() || currentYear.split('-')[0],
-        duration: formData.duration?.toString() || ''
-      };
-      
-      validateFormData(formDataToSubmit);
-      
-      if (isEditMode && formData.slNo) {
-        console.log('Updating entry:', formDataToSubmit);
-        await handleUpdate(formDataToSubmit);
-      } else {
-        console.log('Creating new entry:', formDataToSubmit);
-        await handleCreate(formDataToSubmit);
-      }
-      
-    } catch (err) {
-      console.error('Error in handleSubmit:', err);
-      setError(err.message || 'Failed to save data');
-      setTimeout(() => setError(null), 3000);
-    }
-  };
-
-  // Fetch data when currentYear changes
+  
+  // Load data when component mounts or when currentYear/availableSessions change
   useEffect(() => {
     const loadData = async () => {
+      if (!availableSessions || availableSessions.length === 0) return;
+      
       setLoading(true);
       try {
-        // Fetch data for all available years
-        const promises = availableSessions.map(year => fetchResponseData(year));
-        const data = await Promise.all(promises);
+        // Fetch data for the current year
+        const data = await fetchResponseData(currentYear);
         
-        // Create yearData object with all years' data
-        const newYearData = {};
-        availableSessions.forEach((year, index) => {
-          newYearData[year] = data[index];
-        });
+        // Update yearData with the new data for the current year
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: data
+        }));
         
-        setYearData(newYearData);
+        setSubmittedData(data);
       } catch (err) {
         console.error("Error loading data:", err);
         setError("Failed to load data");
@@ -451,16 +502,32 @@ const Criteria3_4_1 = () => {
       }
     };
     
-    if (availableSessions && availableSessions.length > 0) {
+    // Set initial year if not set
+    if (availableSessions && availableSessions.length > 0 && !currentYear) {
+      const firstYear = availableSessions[0];
+      setCurrentYear(firstYear);
+      setFormData(prev => ({
+        ...prev,
+        year: firstYear.split('-')[0],
+        year_of_collaboration: firstYear.split('-')[0]
+      }));
+      return;
+    }
+    
+    // Load data when currentYear changes
+    if (currentYear) {
       loadData();
     }
   }, [currentYear, availableSessions]);
 
   // Fetch score when currentYear changes
   useEffect(() => {
-    if (currentYear) {
-      fetchScore();
-    }
+    const fetchScoreForYear = async () => {
+      if (currentYear) {
+        await fetchScore();
+      }
+    };
+    fetchScoreForYear();
   }, [currentYear]);
 
   // Set default current year when sessions load

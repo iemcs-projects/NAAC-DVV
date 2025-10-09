@@ -162,10 +162,8 @@ const validScore = getValidScore(score);
 <li>Paste link to funding agency website</li>
             </ul>
 
-            <div className="bg-white text-black p-4 border border-green-300 rounded shadow">
-  <h3 className="text-green-700 text-lg font-semibold mb-2">
-    Calculated Score:
-  </h3>
+            
+  <div className='pt-8'>
   <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
     {loading ? (
       <p className="text-gray-600">Loading score...</p>
@@ -177,7 +175,7 @@ const validScore = getValidScore(score);
       <p className="text-gray-600">No score data available.</p>
     )}
   </div>
-</div>
+    </div>
 
 
 

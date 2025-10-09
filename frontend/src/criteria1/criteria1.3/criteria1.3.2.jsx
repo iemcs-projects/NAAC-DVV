@@ -26,11 +26,12 @@ const Criteria1_3_2 = () => {
   const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState('');
   const [yearData, setYearData] = useState({});
   const [provisionalScore, setProvisionalScore] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   const [formData, setFormData] = useState({
     slNo: '',
@@ -211,41 +212,62 @@ const Criteria1_3_2 = () => {
 
   // Handle update entry
   const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.slNo) {
+    const recordId = editingId || formDataToSubmit.slNo;
+    
+    if (!recordId) {
       setError("No entry selected for update");
-      return;
+      return false;
     }
     
     setSubmitting(true);
     setError(null);
     
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const yearToSend = formDataToSubmit.year ? formDataToSubmit.year.split("-")[0] : currentYear.split("-")[0];
       const payload = {
-        program_name: formDataToSubmit.program_name,
-        program_code: formDataToSubmit.program_code,
-        course_name: formDataToSubmit.course_name,
-        course_code: formDataToSubmit.course_code,
-        year_of_offering: formDataToSubmit.year_of_offering,
-        student_name: formDataToSubmit.student_name,
+        program_name: formDataToSubmit.program_name || '',
+        program_code: formDataToSubmit.program_code || '',
+        course_name: formDataToSubmit.course_name || '',
+        course_code: formDataToSubmit.course_code || '',
+        year_of_offering: formDataToSubmit.year_of_offering || '',
+        student_name: formDataToSubmit.student_name || '',
+        no_of_times_offered: formDataToSubmit.no_of_times_offered || '',
+        duration: formDataToSubmit.duration || '',
+        no_of_students_enrolled: formDataToSubmit.no_of_students_enrolled || '',
+        no_of_students_completed: formDataToSubmit.no_of_students_completed || '',
         session: parseInt(yearToSend),
       };
       
-      const response = await api.put(`/criteria1/updateResponse132/${formDataToSubmit.slNo}`, payload);
+      console.log('Updating record ID:', recordId);
+      console.log('Update payload:', payload);
       
-      if (response.data.success) {
+      const response = await api.put(`/criteria1/updateResponse132/${recordId}`, payload, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Update API response:', response.data);
+      
+      if (response.status >= 200 && response.status < 300) {
+        // Refresh the data
         const updatedData = await fetchResponseData(currentYear);
         setYearData(prev => ({
           ...prev,
           [currentYear]: updatedData
         }));
         
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        // Also update submittedData
+        setSubmittedData(updatedData || []);
+        
+        return true;
       }
+      
+      return false;
     } catch (err) {
       console.error("Error updating entry:", err);
       setError(err.response?.data?.message || "Failed to update entry");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -269,16 +291,91 @@ const Criteria1_3_2 = () => {
     return true;
   };
 
+  // Reset form and edit state
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      program_name: '',
+      program_code: '',
+      course_name: '',
+      course_code: '',
+      year_of_offering: '',
+      student_name: '',
+      no_of_times_offered: '',
+      duration: '',
+      no_of_students_enrolled: '',
+      no_of_students_completed: '',
+      supportLinks: []
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError('');
+  };
+
   // Handle edit
   const handleEdit = (entry) => {
+    const recordId = entry.sl_no || entry.slNo || entry.id;
+    
     setFormData({
-      ...entry,
-      id: entry.id,
-      year: currentYear
+      slNo: recordId, // Use slNo consistently
+      program_name: entry.program_name || '',
+      program_code: entry.program_code || '',
+      course_name: entry.course_name || '',
+      course_code: entry.course_code || '',
+      year_of_offering: entry.year_of_offering || '',
+      student_name: entry.student_name || '',
+      supportLinks: entry.supportLinks || []
     });
+    
+    // CRITICAL: Set the editingId
+    setEditingId(recordId);
     setIsEditMode(true);
-    setEditKey(entry.id);
+    setEditKey(recordId);
+    
+    console.log('Edit mode activated for record:', recordId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const formDataWithYear = { ...formData, year: currentYear };
+      validateFormData(formDataWithYear);
+      
+      // FIXED: Proper update detection using editingId
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Edit state:', { isEditMode, editingId, formDataSlNo: formData.slNo });
+      
+      if (isUpdating && recordId) {
+        console.log('Updating entry with ID:', recordId);
+        await handleUpdate(formDataWithYear);
+      } else {
+        console.log('Creating new entry:', formDataWithYear);
+        await handleCreate(formDataWithYear);
+      }
+      
+      setSuccess('Entry saved successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      // Reset form and edit mode
+      resetForm();
+      
+      // Refresh data
+      const data = await fetchResponseData(currentYear);
+      setSubmittedData(data || []);
+      
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setError(error.message || 'Failed to submit form. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    }
   };
 
   // Handle delete
@@ -327,48 +424,6 @@ const Criteria1_3_2 = () => {
       setTimeout(() => setError(''), 3000);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // Handle submit
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const formDataWithYear = { ...formData, year: currentYear };
-      validateFormData(formDataWithYear);
-      
-      if (isEditMode && formData.id) {
-        console.log('Updating entry:', formDataWithYear);
-        await handleUpdate(formDataWithYear);
-      } else {
-        console.log('Creating new entry:', formDataWithYear);
-        await handleCreate(formDataWithYear);
-      }
-      
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
-      // Reset form and edit mode
-      setIsEditMode(false);
-      setFormData({
-        program_name: '',
-        program_code: '',
-        course_name: '',
-        course_code: '',
-        year_of_offering: '',
-        student_name: '',
-        supportLinks: []
-      });
-      
-      // Refresh data
-      const data = await fetchResponseData(currentYear);
-      setSubmittedData(data || []);
-      
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      setError(error.message || 'Failed to submit form. Please try again.');
-      setTimeout(() => setError(null), 3000);
     }
   };
 
@@ -639,9 +694,9 @@ const Criteria1_3_2 = () => {
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 !bg-blue-600 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Save')}
                         </button>
                         {isEditMode && (
                           <button
@@ -658,7 +713,7 @@ const Criteria1_3_2 = () => {
                                 supportLinks: []
                               });
                             }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-600"
                           >
                             Cancel
                           </button>
@@ -672,75 +727,114 @@ const Criteria1_3_2 = () => {
           </div>
 
           {/* Upload Documents Section */}
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents
-            </label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                <i className="fas fa-upload mr-2"></i> Choose Files
-                <input
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const filesArray = Array.from(e.target.files);
-                    for (const file of filesArray) {
-                      try {
-                        const uploaded = await uploadFile(
-                          "criteria1_3_2",
-                          file,
-                          "1.3.2",
-                          currentYear
-                        );
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
-                        }));
-                      } catch (err) {
-                        console.error("Upload error:", err);
-                        alert(err.message || "Upload failed");
-                      }
-                    }
-                  }}
-                />
-              </label>
-              {uploading && <span className="text-gray-600">Uploading...</span>}
-              {uploadError && <span className="text-red-600">{uploadError}</span>}
-            </div>
-            
-            {formData.supportLinks && formData.supportLinks.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-700">
-                {formData.supportLinks.map((link, index) => (
-                  <li key={index} className="flex justify-between items-center mb-1">
-                    <a
-                      href={`http://localhost:3000${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      {link.split("/").pop()}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: prev.supportLinks.filter(l => l !== link)
-                        }));
-                        removeFile("criteria1_3_2", link);
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+          
+                    <div className="mb-6">
+                <label className="block text-gray-700 font-medium mb-2">
+                  Upload Documents
+                </label>
+                <div className="flex items-center gap-4 mb-2">
+                  <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                    <i className="fas fa-upload mr-2"></i> Choose Files
+                    <input
+                      type="file"
+                      className="hidden"
+                      multiple
+                      onChange={async (e) => {
+                        const filesArray = Array.from(e.target.files);
+                        for (const file of filesArray) {
+                          try {
+                            console.log('Uploading file:', file.name);
+                            const yearToUse = currentYear || new Date().getFullYear().toString();
+                            console.log('Using year:', yearToUse);
+                            
+                            const uploaded = await uploadFile(
+                              "1.3.2",  // Metric ID
+                              file,
+                              "1.3.2",  // Criteria code
+                              yearToUse,
+                              user?.session
+                            );
+          
+                            // Add the uploaded file info to the form data
+                            setFormData(prev => ({
+                              ...prev,
+                              supportLinks: [
+                                ...prev.supportLinks, 
+                                {
+                                  id: uploaded.id,
+                                  url: uploaded.fileUrl,
+                                  name: file.name
+                                }
+                              ]
+                            }));
+                          } catch (err) {
+                            console.error('Upload error:', err);
+                            console.error('Error details:', {
+                              message: err.message,
+                              response: err.response?.data,
+                              status: err.response?.status
+                            });
+                            setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                          }
+                        }
                       }}
-                      className="text-red-600 ml-2"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    />
+                  </label>
+          
+                  {/* Status Messages */}
+                  {uploading && <span className="text-gray-600">Uploading...</span>}
+                  {error && <span className="text-red-600">{error}</span>}
+                </div>
+                <div className="text-sm text-gray-500 flex items-center">
+                  <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                  Changes will be auto-saved
+                </div>
+                {formData.supportLinks.length > 0 && (
+                  <ul className="list-disc pl-5 text-gray-700">
+                    {formData.supportLinks.map((link, index) => (
+                      <li key={index} className="flex justify-between items-center mb-1">
+                        <a
+                          href={`http://localhost:3000${link.url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline"
+                        >
+                          {link.name || link.url.split("/").pop()}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Remove from local formData
+                            setFormData(prev => {
+                              const newLinks = prev.supportLinks.filter(l => l.id !== link.id);
+                              // Show success message
+                              if (newLinks.length < prev.supportLinks.length) {
+                                alert('File deleted successfully!');
+                              }
+                              return {
+                                ...prev,
+                                supportLinks: newLinks
+                              };
+                            });
+                            // Also remove from context
+                            removeFile("1.3.2", link.id);
+                          }}
+                          className="text-red-600 hover:text-red-800 !bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                          title="Remove file"
+                        >
+                          <FaTrash size={16} className="text-red-600" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
           </div>
-
           {/* Submitted Data Table */}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
           
           {/* Year-wise Data Display */}
           {availableSessions?.map((session) => (
@@ -748,7 +842,7 @@ const Criteria1_3_2 = () => {
               <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
               {yearData[session] && yearData[session].length > 0 ? (
                 <table className="w-full text-sm border border-black">
-                  <thead className="bg-gray-200">
+                  <thead className="bg-blue-100">
                     <tr>
                       <th className="border border-black px-4 py-2 text-gray-800">#</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Program Name</th>
@@ -773,7 +867,7 @@ const Criteria1_3_2 = () => {
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              className="p-2 text-blue-600 !bg-white hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
                                 setFormData({
                                   slNo: entry.sl_no || entry.slNo,
@@ -793,10 +887,10 @@ const Criteria1_3_2 = () => {
                               }}
                               title="Edit entry"
                             >
-                              <FaEdit className="w-4 h-4" />
+                             <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              className="p-2 text-red-600 !bg-white hover:bg-red-100 rounded-full transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
@@ -804,7 +898,7 @@ const Criteria1_3_2 = () => {
                               disabled={submitting}
                               title="Delete entry"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>

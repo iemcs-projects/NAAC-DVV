@@ -13,14 +13,14 @@ import { FaTrash, FaEdit } from 'react-icons/fa';
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
 
-
 const Criteria3_2_1 = () => {
-    const { user } = useAuth();
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [useupload, setUseupload] = useState(false);
   const { sessions: availableSessions, isLoading: isLoadingSessions } = useContext(SessionContext);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(null);
+  const [editingId, setEditingId] = useState(null); // ADDED: Missing state variable
   const [currentYear, setCurrentYear] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -45,20 +45,27 @@ const Criteria3_2_1 = () => {
   });
 
   const [submittedData, setSubmittedData] = useState([]);
-
   const navigate = useNavigate();
 
-  // Load data when component mounts or when currentYear changes
-  useEffect(() => {
-    const loadData = async () => {
-      if (currentYear) {
-        const data = await fetchResponseData(currentYear);
-        setSubmittedData(data);
-      }
-    };
-    
-    loadData();
-  }, [currentYear]);
+  // ADDED: Missing resetForm function (exactly like 3.1.1)
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      year: currentYear,
+      proj: '',           
+      name: '',           
+      dept: '',           
+      journal: '',        
+      yearPub: '',        
+      issn: '',           
+      indexation: 'Yes',  
+      supportLinks: []
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError(null);
+  };
 
   const fetchResponseData = async (year) => {
     console.log('Fetching data for year:', year);
@@ -118,6 +125,15 @@ const Criteria3_2_1 = () => {
       }));
       
       console.log('Formatted data:', formattedData);
+      
+      // Store the SL numbers in localStorage for each entry
+      formattedData.forEach(item => {
+        if (item.sl_no) {
+          const paper = item.paper_title || item.proj;
+          localStorage.setItem(`criteria321_${paper}_${yearToSend}`, item.sl_no);
+        }
+      });
+      
       return formattedData;
     } catch (error) {
       console.error('Error fetching response data:', error);
@@ -170,210 +186,195 @@ const Criteria3_2_1 = () => {
     }
   };
 
-  // Validate form data
-  const validateFormData = (dataToSubmit) => {
-    const proj = dataToSubmit.proj?.toString()?.trim();
-    const name = dataToSubmit.name?.toString()?.trim();
-    const dept = dataToSubmit.dept?.toString()?.trim();
-    const journal = dataToSubmit.journal?.toString()?.trim();
-    const yearPub = dataToSubmit.yearPub;
-    const issn = dataToSubmit.issn?.toString()?.trim();
-    
-    // Handle year input - ensure it's a string and get the first part if it's in range format
-    let yearToSend;
-    if (typeof dataToSubmit.year === 'string') {
-      yearToSend = dataToSubmit.year.split('-')[0];
-    } else if (dataToSubmit.year) {
-      yearToSend = dataToSubmit.year.toString();
-    } else {
-      yearToSend = currentYear.toString();
-    }
-    
-    const session = parseInt(yearToSend, 10);
-    const currentYearNum = new Date().getFullYear();
-
-    if (!proj || !name || !dept || !journal || yearPub === undefined || yearPub === '' || !issn) {
-      throw new Error("Please fill in all required fields: Paper Title, Author Names, Department, Journal Name, Year of Publication, and ISSN Number.");
-    }
-    
-    // Ensure yearPub is a number
-    const yearPubNum = Number(yearPub);
-    if (isNaN(yearPubNum) || yearPubNum < 1990 || yearPubNum > currentYearNum) {
-      throw new Error(`Year of Publication must be a valid year between 1990 and ${currentYearNum}.`);
-    }
-    
-    if (isNaN(session) || session < 1990 || session > currentYearNum) {
-      throw new Error(`Session year must be between 1990 and ${currentYearNum}.`);
-    }
-
-    return true;
-  };
-
-  // Handle create new entry
-  const handleCreate = async (formDataToSubmit) => {
+  // REPLACED: New unified handleSubmit function (following 3.1.1 pattern)
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
     setSubmitting(true);
     setError(null);
-    
-    try {
-      // Handle year input consistently
-      let yearToSend;
-      if (typeof formDataToSubmit.year === 'string') {
-        yearToSend = formDataToSubmit.year.split('-')[0];
-      } else {
-        yearToSend = formDataToSubmit.year?.toString() || new Date().getFullYear().toString();
-      }
-      
-      const payload = {
-        paper_title: formDataToSubmit.proj?.toString().trim() || '',
-        author_names: formDataToSubmit.name?.toString().trim() || '',
-        department: formDataToSubmit.dept?.toString().trim() || '',
-        journal_name: formDataToSubmit.journal?.toString().trim() || '',
-        year_of_publication: formDataToSubmit.yearPub?.toString().trim() || '',
-        issn_number: formDataToSubmit.issn?.toString().trim() || '',
-        indexation_status: formDataToSubmit.indexation?.toString().trim() || '',
-        session: parseInt(yearToSend, 10) || new Date().getFullYear(),
-        year: parseInt(yearToSend, 10) || new Date().getFullYear()
-      };
-      
-      console.log('Sending request with payload:', payload);
-      const response = await api.post('/criteria3/createResponse321', payload);
-      console.log('Response received:', response);
-      
-      // Show success if we get any response (status 200-299)
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
-        
-        // Show success alert
-        alert('Research paper data submitted successfully!');
-        
-        // Store the SL number in localStorage if available
-        if (response.data?.data?.sl_no) {
-          localStorage.setItem(
-            `criteria321_${formDataToSubmit.proj}_${yearToSend}`, 
-            response.data.data.sl_no
-          );
-        }
-        
-        // Force refresh the data by fetching it again
-        const updatedData = await fetchResponseData(currentYear);
-        
-        // Update the state with the new data
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        
-        // Also update the submittedData state
-        setSubmittedData(prev => [
-          ...prev,
-          {
-            ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
-            year: currentYear
-          }
-        ]);
-        
-        // Reset form
-        setFormData({
-          slNo: '',
-          year: currentYear,
-          proj: '',
-          name: '',
-          dept: '',
-          journal: '',
-          yearPub: '',
-          issn: '',
-          indexation: '',
-          supportLinks: []
-        });
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      console.error("Error creating entry:", err);
-      setError(err.response?.data?.message || "Failed to create entry");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
-  // Handle update entry
-  const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.slNo) {
-      setError("No entry selected for update");
+    // Basic validation
+    if (!formData.proj || !formData.name || !formData.dept || 
+        !formData.journal || !formData.yearPub || !formData.issn) {
+      setError('Please fill in all required fields');
+      setSubmitting(false);
       return;
     }
-    
-    setSubmitting(true);
-    setError(null);
-    
-    try {
-      // Handle year input consistently
-      let yearToSend;
-      if (typeof formDataToSubmit.year === 'string') {
-        yearToSend = formDataToSubmit.year.split('-')[0];
-      } else {
-        yearToSend = formDataToSubmit.year?.toString() || new Date().getFullYear().toString();
-      }
-      
-      const payload = {
-        paper_title: formDataToSubmit.proj?.toString().trim() || '',
-        author_names: formDataToSubmit.name?.toString().trim() || '',
-        department: formDataToSubmit.dept?.toString().trim() || '',
-        journal_name: formDataToSubmit.journal?.toString().trim() || '',
-        year_of_publication: formDataToSubmit.yearPub?.toString().trim() || '',
-        issn_number: formDataToSubmit.issn?.toString().trim() || '',
-        indexation_status: formDataToSubmit.indexation?.toString().trim() || ''
-      };
 
-      console.log('Updating entry with ID:', formDataToSubmit.slNo);
-      console.log('Update payload:', payload);
+    try {
+      // Get year - use the form's year or current year as fallback
+      const yearToSend = formData.year || currentYear;
+      const sessionYear = yearToSend.split("-")[0];
+      const sessionYearNum = parseInt(sessionYear, 10);
       
-      const response = await api.put(`/criteria3/updateResponse321/${formDataToSubmit.slNo}`, payload);
-      
-      if (response.status >= 200 && response.status < 300) {
-        alert('Research paper data updated successfully!');
-        
-        // Refresh data
-        const updatedData = await fetchResponseData(currentYear);
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        setSubmittedData(updatedData);
-        
-        // Reset form and edit mode
-        setFormData({
-          slNo: '',
-          year: currentYear,
-          proj: '',
-          name: '',
-          dept: '',
-          journal: '',
-          yearPub: '',
-          issn: '',
-          indexation: '',
-          supportLinks: []
-        });
-        setIsEditMode(false);
-        setEditKey(null);
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+      if (isNaN(sessionYearNum)) {
+        throw new Error('Please enter a valid year');
       }
+
+      // Check if we're in edit mode
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Form data:', formData);
+      
+      let response;
+      
+      if (isUpdating && recordId) {
+        try {
+          // Get the original record to preserve its session
+          const originalRecord = submittedData.find(item => (item.sl_no || item.slNo) === recordId);
+          const originalSession = originalRecord?.session || sessionYearNum;
+          
+          // Prepare the payload for update
+          const updatePayload = {
+            paper_title: formData.proj?.toString().trim() || '',
+            author_names: formData.name?.toString().trim() || '',
+            department: formData.dept?.toString().trim() || '',
+            journal_name: formData.journal?.toString().trim() || '',
+            year_of_publication: formData.yearPub?.toString().trim() || '',
+            issn_number: formData.issn?.toString().trim() || '',
+            indexation_status: formData.indexation?.toString().trim() || ''
+          };
+          
+          // Convert recordId to a number to ensure proper type matching with the backend
+          const recordIdNum = parseInt(recordId, 10);
+          if (isNaN(recordIdNum)) {
+            throw new Error('Invalid record ID');
+          }
+          const endpoint = `/criteria3/updateResponse321/${recordIdNum}`;
+          console.log('Update endpoint:', endpoint);
+          console.log('Update payload:', updatePayload);
+          
+          // Validate required fields
+          if (!updatePayload.paper_title || !updatePayload.author_names || 
+              !updatePayload.department || !updatePayload.journal_name || 
+              !updatePayload.year_of_publication || !updatePayload.issn_number) {
+            throw new Error('Missing required fields for update');
+          }
+          
+          // Make the API call
+          response = await api.put(endpoint, updatePayload);
+          
+          console.log('Update response:', response.data);
+          
+          if (response.status >= 200 && response.status < 300) {
+            // Refresh the data after successful update
+            const updatedData = await fetchResponseData(currentYear);
+            setYearData(prev => ({
+              ...prev,
+              [currentYear]: updatedData
+            }));
+            setSubmittedData(updatedData);
+            
+            // Reset form and edit mode
+            resetForm();
+            setSuccess('Record updated successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+          }
+          
+        } catch (error) {
+          console.error('Error updating record:', error);
+          
+          // Handle specific error cases from your backend
+          if (error.response?.status === 404) {
+            setError('Record not found. It may have been deleted.');
+          } else if (error.response?.status === 400) {
+            const errorMessage = error.response.data?.message || 'Bad request';
+            if (errorMessage.includes('Session/year mismatch')) {
+              setError('Cannot update: Session/year mismatch with original record');
+            } else if (errorMessage.includes('Session must be between')) {
+              setError(`Session year must be within the valid IIQA range: ${errorMessage}`);
+            } else {
+              setError(errorMessage);
+            }
+          } else {
+            setError(error.response?.data?.message || 'Failed to update record');
+          }
+          
+          // Don't proceed with refresh if update failed
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        // For new entries, use the create endpoint
+        const createPayload = {
+          paper_title: formData.proj?.toString().trim() || '',
+          author_names: formData.name?.toString().trim() || '',
+          department: formData.dept?.toString().trim() || '',
+          journal_name: formData.journal?.toString().trim() || '',
+          year_of_publication: formData.yearPub?.toString().trim() || '',
+          issn_number: formData.issn?.toString().trim() || '',
+          indexation_status: formData.indexation === 'Yes' ? 'Yes' : 'No',
+          session: sessionYearNum || new Date().getFullYear(),
+          year: sessionYearNum || new Date().getFullYear(),
+          support_document: formData.supportLinks?.join(',') || ''
+        };
+        
+        console.log('Create payload:', createPayload);
+        
+        const endpoint = '/criteria3/createResponse321';
+        response = await api.post(endpoint, createPayload);
+        
+        console.log('Create response:', response.data);
+        
+        if (response.status >= 200 && response.status < 300) {
+          alert('Data submitted successfully!');
+          
+          // Store the SL number in localStorage if available
+          if (response.data?.data?.sl_no) {
+            localStorage.setItem(
+              `criteria321_${formData.proj}_${sessionYear}`, 
+              response.data.data.sl_no
+            );
+          }
+        }
+      }
+      
+      // Refresh the data after successful operation
+      const updatedData = await fetchResponseData(currentYear);
+      setSubmittedData(updatedData);
+      
+      // Update yearData as well
+      setYearData(prev => ({
+        ...prev,
+        [currentYear]: updatedData
+      }));
+      
+      // Reset form
+      resetForm();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
     } catch (err) {
-      console.error("Error updating entry:", err);
-      setError(err.response?.data?.message || "Failed to update entry");
+      console.error("Error in handleSubmit:", err);
+      
+      // More specific error handling
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('Missing required fields')) {
+        setError('All fields are required. Please check your input.');
+      } else if (err.response?.status === 404) {
+        setError('Resource not found. Please refresh and try again.');
+      } else {
+        setError(err.response?.data?.message || err.message || "Operation failed");
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Handle change
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   // Handle delete entry
-  const handleDelete = async (id) => {
-    if (!id) {
-      setError('No ID provided for deletion');
+  const handleDelete = async (slNo, year) => {
+    if (!slNo) {
+      console.error('No SL number provided for deletion');
+      setError('Error: No entry selected for deletion');
       return;
     }
 
@@ -382,24 +383,28 @@ const Criteria3_2_1 = () => {
     }
 
     try {
-      setLoading(true);
-      // Convert ID to string to match backend expectations
-      const response = await api.delete(`/criteria3/deleteResponse321/${String(id)}`);
+      setSubmitting(true);
+      const response = await api.delete(`/criteria3/deleteResponse321/${slNo}`);
       
-      if (response.data) {
-        // Update the UI by removing the deleted entry
-        setSubmittedData(prev => prev.filter(item => (item.id !== id && item.sl_no !== id && item.slNo !== id)));
+      if (response.status === 200) {
+        // Update the local state to remove the deleted entry
+        setYearData(prev => ({
+          ...prev,
+          [year]: (prev[year] || []).filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        }));
         
-        // Update yearData to reflect the deletion
-        if (currentYear) {
-          setYearData(prev => ({
-            ...prev,
-            [currentYear]: (prev[currentYear] || []).filter(item => 
-              (item.id !== id && item.sl_no !== id && item.slNo !== id)
-            )
-          }));
-        }
+        // Also update the submittedData state
+        setSubmittedData(prev => 
+          prev.filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        );
         
+        // Show success message
         setSuccess('Entry deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -408,43 +413,21 @@ const Criteria3_2_1 = () => {
       setError(error.response?.data?.message || 'Failed to delete entry. Please try again.');
       setTimeout(() => setError(''), 3000);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Handle form submission (create or update)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      // Create a clean copy of form data with proper values
-      const formDataToSubmit = {
-        ...formData,
-        yearPub: formData.yearPub?.toString() || '',
-        issn: formData.issn?.toString() || '',
-        proj: formData.proj?.toString() || '',
-        name: formData.name?.toString() || '',
-        dept: formData.dept?.toString() || '',
-        journal: formData.journal?.toString() || '',
-        year: formData.year?.toString() || currentYear.toString()
-      };
-      
-      validateFormData(formDataToSubmit);
-      
-      if (isEditMode && formData.slNo) {
-        console.log('Updating entry:', formDataToSubmit);
-        await handleUpdate(formDataToSubmit);
-      } else {
-        console.log('Creating new entry:', formDataToSubmit);
-        await handleCreate(formDataToSubmit);
+  // Load data when component mounts or currentYear changes
+  useEffect(() => {
+    const loadData = async () => {
+      if (currentYear) {
+        const data = await fetchResponseData(currentYear);
+        setSubmittedData(data || []);
       }
-      
-    } catch (err) {
-      console.error('Error in handleSubmit:', err);
-      setError(err.message || 'Failed to save data');
-      setTimeout(() => setError(null), 3000);
-    }
-  };
+    };
+    
+    loadData();
+  }, [currentYear]);
 
   // Fetch data when currentYear changes
   useEffect(() => {
@@ -498,24 +481,62 @@ const Criteria3_2_1 = () => {
     setFormData(prev => ({ ...prev, year: selectedYear }));
     setIsEditMode(false);
     setEditKey(null);
+    setEditingId(null); // ADDED: Reset editingId on year change
   };
 
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...(formData.supportLinks || [])];
-      updatedLinks[index] = value;
-      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
-  };
-
+  // Navigation functions
   const goToNextPage = () => {
     navigate("/criteria3.2.2");
   };
 
   const goToPreviousPage = () => {
     navigate("/criteria3.1.3");
+  };
+
+  // Handle export to CSV
+  const handleExport = async () => {
+    if (!submittedData || submittedData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    const headers = [
+      'SL No',
+      'Paper Title',
+      'Author Names',
+      'Department',
+      'Journal Name',
+      'Year of Publication',
+      'ISSN Number',
+      'Indexation'
+    ];
+
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    
+    submittedData.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        `"${entry.paper_title || ''}"`,
+        `"${entry.author_names || ''}"`,
+        `"${entry.department || ''}"`,
+        `"${entry.journal_name || ''}"`,
+        entry.year_of_publication || '',
+        `"${entry.issn_number || ''}"`,
+        entry.indexation_status || ''
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `criteria_3.2.1_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -546,12 +567,14 @@ const Criteria3_2_1 = () => {
             <p className="text-sm text-gray-700 mb-2">
               3.2.1.1. Number of research papers in the Journals notified on UGC website during the last five years
             </p>
-            <h4 className="font-semibold mb-1">Requirements:</h4>
-            <ul className="list-disc pl-5 text-gray-700">
-              <li>Any additional information</li>
-              <li>List of research papers by title, author, department, name and year of publication (Data Template)</li>
+            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              <li className="mb-1">Any additional information</li>
+              <li className="mb-1">List of research papers by title, author, department, name and year of publication (Data Template)</li>
             </ul>
           </div>
+
+          <h2 className="text-xl font-bold text-gray-500 mb-4">Research Papers Entry</h2>
 
           <div className="mb-4">
             <label className="font-medium text-gray-700 mr-2">Select Year:</label>
@@ -574,9 +597,12 @@ const Criteria3_2_1 = () => {
                 <p className="text-lg font-semibold text-green-800">
                   Provisional Score (3.2.1): {provisionalScore.data.score || provisionalScore.data.score_sub_sub_criteria || 0}%
                 </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore.data.sub_sub_cr_grade || provisionalScore.data.grade || 'N/A'}
+                </p>
               </div>
             ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+              <p className="text-gray-600">No score data available.</p>
             )}
           </div>
 
@@ -586,7 +612,7 @@ const Criteria3_2_1 = () => {
             </h2>
             <form onSubmit={handleSubmit}>
               <table className="w-full border text-sm">
-                <thead className="bg-gray-50 text-black">
+                <thead className="bg-gray-100 font-semibold text-gray-950">
                   <tr>
                     <th className="px-4 py-2 border">Year</th>
                     <th className="px-4 py-2 border">Title of Paper</th>
@@ -685,38 +711,25 @@ const Criteria3_2_1 = () => {
                         <option value="No">No</option>
                       </select>
                     </td>
-                    <td className="px-2 py-2 border text-center">
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
-                      >
-                        {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
-                      </button>
-                      {isEditMode && (
+                    <td className="px-2 py-2 border">
+                      <div className="flex gap-2">
                         <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditMode(false);
-                            setEditKey(null);
-                            setFormData({
-                              slNo: '',
-                              year: currentYear,
-                              proj: '',
-                              name: '',
-                              dept: '',
-                              journal: '',
-                              yearPub: '',
-                              issn: '',
-                              indexation: '',
-                              supportLinks: []
-                            });
-                          }}
-                          className="ml-2 px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          type="submit"
+                          disabled={submitting}
+                          className={`px-3 py-1 !bg-blue-600 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          Cancel
+                          {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Add')}
                         </button>
-                      )}
+                        {isEditMode && (
+                          <button
+                            type="button"
+                            onClick={resetForm}
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -748,9 +761,10 @@ const Criteria3_2_1 = () => {
                         );
                         setFormData((prev) => ({
                           ...prev,
-                          supportLinks: [...prev.supportLinks, uploaded.file_url],
+                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
                         }));
                       } catch (err) {
+                        console.error("Upload error:", err);
                         alert(err.message || "Upload failed");
                       }
                     }
@@ -763,7 +777,7 @@ const Criteria3_2_1 = () => {
               {uploadError && <span className="text-red-600">{uploadError}</span>}
             </div>
 
-            {formData.supportLinks.length > 0 && (
+            {formData.supportLinks && formData.supportLinks.length > 0 && (
               <ul className="list-disc pl-5 text-gray-700">
                 {formData.supportLinks.map((link, index) => (
                   <li key={index} className="flex justify-between items-center mb-1">
@@ -796,10 +810,14 @@ const Criteria3_2_1 = () => {
             )}
           </div>
 
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
+
           {/* Display data by year */}
           {availableSessions && availableSessions.map((year) => (
             <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 !text-gray-800 px-4 py-2">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">
                 Year: {year}
               </h3>
               {yearData[year] && yearData[year].length > 0 ? (
@@ -829,11 +847,15 @@ const Criteria3_2_1 = () => {
                         <td className="border border-black text-black px-4 py-2">{entry.issn_number}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">{entry.indexation_status}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">
-                          <div className="flex items-center space-x-2">
+                          <div className="flex justify-center space-x-2">
                             <button
+                              className="p-2 !bg-white text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
+                                const recordId = entry.sl_no || entry.slNo || entry.id;
+                                console.log('Editing entry with ID:', recordId);
+                                
                                 setFormData({
-                                  slNo: entry.slNo || entry.id,
+                                  slNo: recordId,
                                   year: entry.session || currentYear,
                                   proj: entry.paper_title || '',
                                   name: entry.author_names || '',
@@ -842,39 +864,31 @@ const Criteria3_2_1 = () => {
                                   yearPub: entry.year_of_publication || '',
                                   issn: entry.issn_number || '',
                                   indexation: entry.indexation_status || '',
-                                  supportLinks: entry.supportLinks || []
+                                  supportLinks: []
                                 });
+                                
+                                // CRITICAL: Set the editingId
+                                setEditingId(recordId);
+                                setEditKey({ slNo: recordId, year: entry.year });
                                 setIsEditMode(true);
-                                setEditKey(entry.slNo || entry.id);
+                                
+                                console.log('Edit mode activated for record:', recordId);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
-                              className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors"
                               title="Edit entry"
                             >
-                              <FaEdit className="w-4 h-4" />
+                              <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              onClick={async (e) => {
+                              className="p-2 !bg-white text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (window.confirm('Are you sure you want to delete this entry? This action cannot be undone.')) {
-                                  try {
-                                    const entryId = entry.sl_no || entry.slNo || entry.id;
-                                    if (!entryId) {
-                                      throw new Error('No valid ID found for this entry');
-                                    }
-                                    await handleDelete(entryId);
-                                  } catch (error) {
-                                    console.error('Delete error:', error);
-                                    setError('Failed to delete entry. Please try again.');
-                                    setTimeout(() => setError(''), 3000);
-                                  }
-                                }
+                                handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
                               }}
-                              disabled={loading}
-                              className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors"
+                              disabled={submitting}
                               title="Delete entry"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>
@@ -918,8 +932,9 @@ const Criteria3_2_1 = () => {
             </div>
           )}
 
-          <div className="mt-6">
-            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
+          {/* Bottom Navigation */}
+          <div className="mt- mb-6">
+            <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
           </div>
         </div>
       </div>

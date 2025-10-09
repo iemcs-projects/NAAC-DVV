@@ -19,6 +19,7 @@ const Criteria4_1_3 = () => {
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(null);
+  const [editingId, setEditingId] = useState(null); // ADDED: Missing state variable
   const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,6 +39,21 @@ const Criteria4_1_3 = () => {
 
   const [submittedData, setSubmittedData] = useState([]);
   const navigate = useNavigate();
+
+  // ADDED: Missing resetForm function (exactly like other components)
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      room_identifier: "",
+      typeict_facility: "",
+      ict_facilities_count: "",
+      supportLinks: []
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError(null);
+  };
 
   const convertToPaddedFormat = (code) => {
     return '040103040103';
@@ -109,9 +125,12 @@ const Criteria4_1_3 = () => {
         const mappedItem = {
           id: item.id || item.sl_no,  // Use sl_no as fallback for id
           sl_no: item.sl_no || item.id,  // Use id as fallback for sl_no
+          slNo: item.sl_no || item.id,  // Additional mapping
           room_identifier: item.room_identifier || 'N/A',
           typeict_facility: item.typeict_facility || 'N/A',
+          ict_facilities_count: item.ict_facilities_count || 0,
           year: item.year || year,
+          session: item.session || yearToSend,
           // Map any other fields that might be needed
           ...item
         };
@@ -122,12 +141,11 @@ const Criteria4_1_3 = () => {
       
       console.log('Final mapped data:', mappedData);
       
-      console.log('Mapped data:', mappedData);
-      
       // Store the SL numbers in localStorage for each entry
       mappedData.forEach(item => {
         if (item.sl_no) {
-          localStorage.setItem(`criteria4.1.3_slNo_${item.id || item.sl_no}`, item.sl_no);
+          const room = item.room_identifier || item.name;
+          localStorage.setItem(`criteria413_${room}_${yearToSend}`, item.sl_no);
         }
       });
       
@@ -178,176 +196,176 @@ const Criteria4_1_3 = () => {
     }
   };
 
-  // Handle create new entry
-  const handleCreate = async (formDataToSubmit) => {
+  // REPLACED: New unified handleSubmit function (following other components pattern)
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
     setSubmitting(true);
     setError(null);
-    
-    try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
-      const payload = {
-        room_identifier: formDataToSubmit.room_identifier,
-        typeict_facility: formDataToSubmit.typeict_facility,
-        ict_facilities_count: parseInt(formDataToSubmit.ict_facilities_count) || 0,
-        session: parseInt(yearToSend),
-      };
-      
-      console.log('Sending request with payload:', payload);
-      const response = await api.post('/criteria4/createResponse413', payload);
-      console.log('Response received:', response);
-      
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
-        
-        alert('ICT facility data submitted successfully!');
-        
-        if (response.data?.data?.sl_no) {
-          localStorage.setItem(
-            `criteria413_${formDataToSubmit.room_identifier}_${yearToSend}`, 
-            response.data.data.sl_no
-          );
-        }
-        
-        const updatedData = await fetchResponseData(currentYear);
-        
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        
-        setSubmittedData(prev => [
-          ...prev,
-          {
-            ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
-            year: currentYear
-          }
-        ]);
-        
-        // Reset form
-        setFormData({
-          slNo: '',
-          room_identifier: "",
-          typeict_facility: "",
-          ict_facilities_count: "",
-          supportLinks: []
-        });
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      console.error("Error creating entry:", err);
-      setError(err.response?.data?.message || "Failed to create entry");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
-  // Handle update entry
-  const handleUpdate = async (formDataToSubmit) => {
-    const entryId = formDataToSubmit.id || formDataToSubmit.slNo;
-    if (!entryId) {
-      const errorMsg = "No entry selected for update";
-      setError(errorMsg);
-      throw new Error(errorMsg);
+    // Basic validation
+    if (!formData.room_identifier || !formData.typeict_facility || 
+        !formData.ict_facilities_count) {
+      setError('Please fill in all required fields');
+      setSubmitting(false);
+      return;
     }
-    
-    setSubmitting(true);
-    setError(null);
-    
+
     try {
-      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
-      const payload = {
-        sl_no: entryId,
-        room_identifier: formDataToSubmit.room_identifier,
-        typeict_facility: formDataToSubmit.typeict_facility,
-        ict_facilities_count: parseInt(formDataToSubmit.ict_facilities_count) || 0,
-        session: parseInt(yearToSend),
-        year: yearToSend,
-      };
+      // Get year - use the current year as fallback
+      const yearToSend = currentYear.split("-")[0];
+      const sessionYearNum = parseInt(yearToSend, 10);
       
-      console.log('Sending update payload:', payload);
-      const response = await api.put(`/criteria4/updateResponse413/${entryId}`, payload);
+      if (isNaN(sessionYearNum)) {
+        throw new Error('Please enter a valid year');
+      }
+
+      // Check if we're in edit mode
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
       
-      if (!response.data || !response.data.success) {
-        const errorMsg = response.data?.message || "Failed to update entry";
-        throw new Error(errorMsg);
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Form data:', formData);
+      
+      let response;
+      
+      if (isUpdating && recordId) {
+        try {
+          // Get the original record to preserve its session
+          const originalRecord = submittedData.find(item => (item.sl_no || item.slNo) === recordId);
+          const originalSession = originalRecord?.session || sessionYearNum;
+          
+          // Prepare the payload for update
+          const updatePayload = {
+            session: originalSession, // Use the original session from the record
+            room_identifier: formData.room_identifier.trim(),
+            typeict_facility: formData.typeict_facility.trim(),
+            ict_facilities_count: parseInt(formData.ict_facilities_count) || 0
+          };
+          
+          // Convert recordId to a number to ensure proper type matching with the backend
+          const recordIdNum = parseInt(recordId, 10);
+          if (isNaN(recordIdNum)) {
+            throw new Error('Invalid record ID');
+          }
+          const endpoint = `/criteria4/updateResponse413/${recordIdNum}`;
+          console.log('Update endpoint:', endpoint);
+          console.log('Update payload:', updatePayload);
+          
+          // Validate required fields
+          if (!updatePayload.room_identifier || !updatePayload.typeict_facility) {
+            throw new Error('Missing required fields for update');
+          }
+          
+          // Make the API call
+          response = await api.put(endpoint, updatePayload);
+          
+          console.log('Update response:', response.data);
+          
+          if (response.status >= 200 && response.status < 300) {
+            // Refresh the data after successful update
+            const updatedData = await fetchResponseData(currentYear);
+            setYearData(prev => ({
+              ...prev,
+              [currentYear]: updatedData
+            }));
+            setSubmittedData(updatedData);
+            
+            // Reset form and edit mode
+            resetForm();
+            setSuccess('Record updated successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+          }
+          
+        } catch (error) {
+          console.error('Error updating record:', error);
+          
+          // Handle specific error cases from your backend
+          if (error.response?.status === 404) {
+            setError('Record not found. It may have been deleted.');
+          } else if (error.response?.status === 400) {
+            const errorMessage = error.response.data?.message || 'Bad request';
+            if (errorMessage.includes('Session/year mismatch')) {
+              setError('Cannot update: Session/year mismatch with original record');
+            } else if (errorMessage.includes('Session must be between')) {
+              setError(`Session year must be within the valid IIQA range: ${errorMessage}`);
+            } else {
+              setError(errorMessage);
+            }
+          } else {
+            setError(error.response?.data?.message || 'Failed to update record');
+          }
+          
+          // Don't proceed with refresh if update failed
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        // For new entries, use the create endpoint
+        const createPayload = {
+          room_identifier: formData.room_identifier.trim(),
+          typeict_facility: formData.typeict_facility.trim(),
+          ict_facilities_count: parseInt(formData.ict_facilities_count) || 0,
+          session: sessionYearNum
+        };
+        
+        console.log('Create payload:', createPayload);
+        
+        const endpoint = '/criteria4/createResponse413';
+        response = await api.post(endpoint, createPayload);
+        
+        console.log('Create response:', response.data);
+        
+        if (response.status >= 200 && response.status < 300) {
+          alert('Data submitted successfully!');
+          
+          // Store the SL number in localStorage if available
+          if (response.data?.data?.sl_no) {
+            localStorage.setItem(
+              `criteria413_${formData.room_identifier}_${yearToSend}`, 
+              response.data.data.sl_no
+            );
+          }
+        }
       }
       
+      // Refresh the data after successful operation
       const updatedData = await fetchResponseData(currentYear);
+      setSubmittedData(updatedData);
       
+      // Update yearData as well
       setYearData(prev => ({
         ...prev,
         [currentYear]: updatedData
       }));
-      setSubmittedData(updatedData);
       
-      setSuccess('Entry updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
+      // Reset form
+      resetForm();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
       
-      return true;
     } catch (err) {
-      console.error("Error updating entry:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Failed to update entry";
-      setError(errorMsg);
-      throw err;
+      console.error("Error in handleSubmit:", err);
+      
+      // More specific error handling
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('Missing required fields')) {
+        setError('All fields are required. Please check your input.');
+      } else if (err.response?.status === 404) {
+        setError('Resource not found. Please refresh and try again.');
+      } else {
+        setError(err.response?.data?.message || err.message || "Operation failed");
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Validate form data
-  const validateFormData = (dataToSubmit) => {
-    const yearInput = dataToSubmit.year || currentYear;
-    const yearToSend = yearInput.split("-")[0];
-    const session = parseInt(yearToSend);
-    const currentYearNum = new Date().getFullYear();
-    const missingFields = [];
-
-    // Helper function to check string fields
-    const checkStringField = (value, fieldName) => {
-      if (typeof value === 'string') return value.trim();
-      if (value === null || value === undefined) return '';
-      return String(value);
-    };
-
-    // Check each required field
-    if (!checkStringField(dataToSubmit.room_identifier)) missingFields.push("Room Identifier");
-    if (!checkStringField(dataToSubmit.typeict_facility)) missingFields.push("ICT Facility Type");
-    if (!dataToSubmit.ict_facilities_count || isNaN(parseInt(dataToSubmit.ict_facilities_count))) missingFields.push("Valid ICT Facilities Count");
-    
-    if (missingFields.length > 0) {
-      throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`);
-    }
-    
-    if (isNaN(session) || session < 1990 || session > currentYearNum) {
-      throw new Error(`Year must be between 1990 and ${currentYearNum}.`);
-    }
-
-    return true;
-  };
-
-  // Handle edit
-  const handleEdit = (entry) => {
-    const formData = {
-      slNo: '',
-      room_identifier: '',
-      typeict_facility: '',
-      ict_facilities_count: '',
-      supportLinks: [],
-      year: currentYear,
-      // Override with entry data
-      ...entry,
-      // Ensure these fields are set from the entry or use defaults
-      id: entry.id || entry.slNo,
-      year: entry.year || currentYear
-    };
-    
-    setFormData(formData);
-    setIsEditMode(true);
-    setEditKey(entry.id || entry.slNo);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Handle change
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   // Handle delete entry
@@ -367,6 +385,7 @@ const Criteria4_1_3 = () => {
       const response = await api.delete(`/criteria4/deleteResponse413/${slNo}`);
       
       if (response.status === 200) {
+        // Update the local state to remove the deleted entry
         setYearData(prev => ({
           ...prev,
           [year]: (prev[year] || []).filter(entry => 
@@ -375,6 +394,7 @@ const Criteria4_1_3 = () => {
           )
         }));
         
+        // Also update the submittedData state
         setSubmittedData(prev => 
           prev.filter(entry => 
             (entry.sl_no !== slNo && entry.slNo !== slNo) || 
@@ -382,6 +402,7 @@ const Criteria4_1_3 = () => {
           )
         );
         
+        // Show success message
         setSuccess('Entry deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -391,56 +412,6 @@ const Criteria4_1_3 = () => {
       setTimeout(() => setError(''), 3000);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // Handle submit
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const formDataWithYear = { 
-        ...formData,
-        year: formData.year?.toString() || currentYear.toString(),
-        ict_facilities_count: formData.ict_facilities_count ? 
-          parseInt(formData.ict_facilities_count) : 0
-      };
-      
-      console.log('Submitting form data:', formDataWithYear);
-      
-      validateFormData(formDataWithYear);
-      
-      if (isEditMode && (formData.id || formData.slNo)) {
-        console.log('Updating entry:', formDataWithYear);
-        await handleUpdate(formDataWithYear);
-        setIsEditMode(false);
-      } else {
-        console.log('Creating new entry:', formDataWithYear);
-        await handleCreate(formDataWithYear);
-      }
-      
-      // Reset form after successful operation
-      setFormData({
-        slNo: '',
-        room_identifier: "",
-        typeict_facility: "",
-        ict_facilities_count: "",
-        supportLinks: [],
-        year: currentYear
-      });
-      
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      setTimeout(() => setError(null), 5000);
-      return;
-    }
-    
-    try {
-      const data = await fetchResponseData(currentYear);
-      console.log('Setting submitted data:', data);
-      setSubmittedData(Array.isArray(data) ? data : (data ? [data] : []));
-    } catch (error) {
-      console.error('Error refreshing data:', error);
     }
   };
 
@@ -505,16 +476,7 @@ const Criteria4_1_3 = () => {
     setFormData(prev => ({ ...prev, year: selectedYear }));
     setIsEditMode(false);
     setEditKey(null);
-  };
-
-  const handleChange = (field, value, index = null) => {
-    if (field === "supportLinks") {
-      const updatedLinks = [...(formData.supportLinks || [])];
-      updatedLinks[index] = value;
-      setFormData(prev => ({ ...prev, supportLinks: updatedLinks }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
+    setEditingId(null); // ADDED: Reset editingId on year change
   };
 
   // Navigation functions
@@ -586,6 +548,7 @@ const Criteria4_1_3 = () => {
             <UserDropdown user={user} className="ml-2 mr-4 " />
           </div>
         </div>
+
           <div className="bg-white p-6 rounded shadow mb-6">
             <h3 className="text-blue-600 font-semibold mb-2">4.1.3 Metric Information</h3>
             <p className="text-sm text-gray-700 mb-2">
@@ -641,29 +604,28 @@ const Criteria4_1_3 = () => {
             )}
           </div>
 
+          {/* ICT Facilities Count Input */}
+          <div className="mb-4 p-4 bg-gray-50 border rounded">
+            <div className="flex items-center gap-4">
+              <label className="font-medium text-gray-700">
+                No. of classrooms with ICT facilities:
+              </label>
+              <input
+                type="number"
+                className="border border-gray-300 rounded px-3 py-2 w-32 text-gray-950"
+                placeholder="Enter count"
+                min="0"
+                value={formData.ict_facilities_count}
+                onChange={(e) => handleChange("ict_facilities_count", e.target.value)}
+              />
+            </div>
+          </div>
+
           {/* Input Table */}
           <div className="overflow-auto border rounded mb-6">
             <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
               ICT Enabled Facilities - {isEditMode ? 'Edit Mode' : 'Add New'}
             </h2>
-            
-            {/* ICT Facilities Count Input */}
-            <div className="px-4 py-3 bg-gray-50 border-b">
-              <div className="flex items-center gap-4">
-                <label className="font-medium text-gray-700">
-                  No. of classrooms with ICT facilities:
-                </label>
-                <input
-                  type="number"
-                  className="border border-gray-300 rounded px-3 py-2 w-32 text-gray-950"
-                  placeholder="Enter count"
-                  min="0"
-                  value={formData.ict_facilities_count}
-                  onChange={(e) => handleChange("ict_facilities_count", e.target.value)}
-                />
-              </div>
-            </div>
-
             <form onSubmit={handleSubmit}>
               <table className="min-w-full border text-sm text-left">
                 <thead className="bg-gray-100 font-semibold text-gray-950">
@@ -700,24 +662,15 @@ const Criteria4_1_3 = () => {
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 !bg-blue-600 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Add')}
                         </button>
                         {isEditMode && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setIsEditMode(false);
-                              setFormData({
-                                slNo: '',
-                                room_identifier: "",
-                                typeict_facility: "",
-                                ict_facilities_count: "",
-                                supportLinks: []
-                              });
-                            }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            onClick={resetForm}
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-gray-600"
                           >
                             Cancel
                           </button>
@@ -733,7 +686,7 @@ const Criteria4_1_3 = () => {
           {/* Upload Documents Section */}
           <div className="mb-6">
             <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents (Geo-tagged Photos | Facility Records)
+              Upload Documents
             </label>
             <div className="flex items-center gap-4 mb-2">
               <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
@@ -799,13 +752,17 @@ const Criteria4_1_3 = () => {
             )}
           </div>
 
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
+
           {/* Year-wise Data Display */}
           {availableSessions?.map((session) => {
             const sessionData = yearData[session];
             console.log(`Rendering session ${session} with data:`, sessionData);
             return (
             <div key={session} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session} (Entries: {sessionData?.length || 0})</h3>
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
               {sessionData && sessionData.length > 0 ? (
                 <table className="w-full text-sm border border-black">
                   <thead className="bg-gray-200">
@@ -825,27 +782,32 @@ const Criteria4_1_3 = () => {
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              className="p-2 !bg-white text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
+                                const recordId = entry.sl_no || entry.slNo || entry.id;
+                                console.log('Editing entry with ID:', recordId);
+                                
                                 setFormData({
-                                  slNo: entry.sl_no || entry.slNo,
-                                  room_identifier: entry.room_identifier,
-                                  typeict_facility: entry.typeict_facility,
-                                  ict_facilities_count: entry.ict_facilities_count,
+                                  slNo: recordId,
+                                  room_identifier: entry.room_identifier || '',
+                                  typeict_facility: entry.typeict_facility || '',
+                                  ict_facilities_count: entry.ict_facilities_count || '',
                                   supportLinks: [],
                                 });
-                                setEditKey({ 
-                                  slNo: entry.sl_no || entry.slNo, 
-                                  year: entry.year 
-                                });
+                                
+                                // CRITICAL: Set the editingId
+                                setEditingId(recordId);
+                                setEditKey({ slNo: recordId, year: entry.year });
                                 setIsEditMode(true);
+                                
+                                console.log('Edit mode activated for record:', recordId);
                               }}
                               title="Edit entry"
                             >
-                              <FaEdit className="w-4 h-4" />
+                             <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              className="p-2 !bg-white text-red-600 hover:bg-red-100 rounded-full transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
@@ -853,7 +815,7 @@ const Criteria4_1_3 = () => {
                               disabled={submitting}
                               title="Delete entry"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>
@@ -862,7 +824,7 @@ const Criteria4_1_3 = () => {
                   </tbody>
                 </table>
               ) : (
-                <p className="px-4 py-2 text-gray-500">No ICT facilities submitted for {session}. Data: {JSON.stringify(sessionData)}</p>
+                <p className="px-4 py-2 text-gray-500">No data submitted for this year.</p>
               )}
             </div>
           )})}
@@ -898,7 +860,7 @@ const Criteria4_1_3 = () => {
           )}
 
           {/* Bottom Navigation */}
-          <div className="mt-6">
+          <div className="mt-6 mb-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
           </div>
         </div>

@@ -6,6 +6,7 @@ import Bottom from "../../components/bottom";
 import { useNavigate } from 'react-router-dom';
 import UserDropdown from '../../components/UserDropdown';
 import { useAuth } from "../../auth/authProvider";
+import { FaTrash } from "react-icons/fa";
 
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 const Criteria1_1_2 = () => {
@@ -149,7 +150,7 @@ const navigate = useNavigate();
 
 
   return (
-     <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+     <div className="min-h-screen w-screen bg-gray-50 flex flex-col overflow-x-hidden">
           <div className="flex flex-1 overflow-hidden pt-8">
             <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
               <Sidebar onCollapse={setIsSidebarCollapsed} />
@@ -243,103 +244,117 @@ const navigate = useNavigate();
               </div>
             ))}
     
-            <div className="mb-6">
-              <label className="block text-gray-700 font-medium mb-2">
-                Upload Documents
-              </label>
-              <div className="flex items-center gap-4 mb-2">
-                <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                  <i className="fas fa-upload mr-2"></i> Choose Files
-                  <input
-                    type="file"
-                    className="hidden"
-                    multiple
-                    onChange={async (e) => {
-                      const filesArray = Array.from(e.target.files);
-                      for (const file of filesArray) {
-                        try {
-                          console.log('Uploading file:', file.name);
-                          if (!currentYear) {
-                            throw new Error('Academic year is not set');
-                          }
-                          
-                          const uploaded = await uploadFile(
-                            "1.1.2",  // Metric ID
-                            file,
-                            "1.1.2",  // Criteria code
-                            currentYear
-                          );
-                          
-                          console.log('Upload response:', uploaded);
-                          
-                          const fileUrl = uploaded.path || uploaded.file_url || (uploaded.data && uploaded.data.path);
-                          if (!fileUrl) {
-                            throw new Error('No file URL returned from server');
-                          }
-                          
-                          setFormData(prev => ({
-                            ...prev,
-                            supportLinks: [...prev.supportLinks, fileUrl],
-                          }));
-                        } catch (err) {
-                          console.error('Upload error:', err);
-                          console.error('Error details:', {
-                            message: err.message,
-                            response: err.response?.data,
-                            status: err.response?.status
-                          });
-                          setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
-                        }
-                      }
-                    }}
-                  />
-                </label>
-
-                {/* Status Messages */}
-                {uploading && <span className="text-gray-600">Uploading...</span>}
-                {error && <span className="text-red-600">{error}</span>}
-              </div>
-        
-
-              {formData.supportLinks.length > 0 && (
-                <ul className="list-disc pl-5 text-gray-700">
-                  {formData.supportLinks.map((link, index) => (
-                    <li key={index} className="flex justify-between items-center mb-1">
-                      <a
-                        href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 underline"
-                      >
-                        {link.split("/").pop()}
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Remove from local formData
-                          setFormData(prev => ({
-                            ...prev,
-                            supportLinks: prev.supportLinks.filter(l => l !== link)
-                          }));
-                          // Also remove from context
-                          removeFile("1.1.2", link);
-                        }}
-                        className="text-red-600 ml-2"
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+            <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+           
+                     <div className="mb-6">
+                 <label className="block text-gray-700 font-medium mb-2">
+                   Upload Documents
+                 </label>
+                 <div className="flex items-center gap-4 mb-2">
+                   <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                     <i className="fas fa-upload mr-2"></i> Choose Files
+                     <input
+                       type="file"
+                       className="hidden"
+                       multiple
+                       onChange={async (e) => {
+                         const filesArray = Array.from(e.target.files);
+                         for (const file of filesArray) {
+                           try {
+                             console.log('Uploading file:', file.name);
+                             const yearToUse = currentYear || new Date().getFullYear().toString();
+                             console.log('Using year:', yearToUse);
+                             
+                             const uploaded = await uploadFile(
+                               "1.1.2",  // Metric ID
+                               file,
+                               "1.1.2",  // Criteria code
+                               yearToUse,
+                               user?.session
+                             );
+           
+                             // Add the uploaded file info to the form data
+                             setFormData(prev => ({
+                               ...prev,
+                               supportLinks: [
+                                 ...prev.supportLinks, 
+                                 {
+                                   id: uploaded.id,
+                                   url: uploaded.fileUrl,
+                                   name: file.name
+                                 }
+                               ]
+                             }));
+                           } catch (err) {
+                             console.error('Upload error:', err);
+                             console.error('Error details:', {
+                               message: err.message,
+                               response: err.response?.data,
+                               status: err.response?.status
+                             });
+                             setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                           }
+                         }
+                       }}
+                     />
+                   </label>
+           
+                   {/* Status Messages */}
+                   {uploading && <span className="text-gray-600">Uploading...</span>}
+                   {error && <span className="text-red-600">{error}</span>}
+                 </div>
+                 <div className="text-sm text-gray-500 flex items-center">
+                   <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                   Changes will be auto-saved
+                 </div>
+                 {formData.supportLinks.length > 0 && (
+                   <ul className="list-disc pl-5 text-gray-700">
+                     {formData.supportLinks.map((link, index) => (
+                       <li key={index} className="flex justify-between items-center mb-1">
+                         <a
+                           href={`http://localhost:3000${link.url}`}
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           className="text-blue-600 underline"
+                         >
+                           {link.name || link.url.split("/").pop()}
+                         </a>
+                         <button
+                           type="button"
+                           onClick={() => {
+                             // Remove from local formData
+                             setFormData(prev => {
+                               const newLinks = prev.supportLinks.filter(l => l.id !== link.id);
+                               // Show success message
+                               if (newLinks.length < prev.supportLinks.length) {
+                                 alert('File deleted successfully!');
+                               }
+                               return {
+                                 ...prev,
+                                 supportLinks: newLinks
+                               };
+                             });
+                             // Also remove from context
+                             removeFile("1.1.2", link.id);
+                           }}
+                           className="text-red-600 hover:text-red-800 !bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                           title="Remove file"
+                         >
+                           <FaTrash size={16} className="text-red-600" />
+                         </button>
+                       </li>
+                     ))}
+                   </ul>
+                 )}
+               </div>
+           </div>
           
-          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+          <div className="mt-auto mb-6 bg-white border-t border-gray-200 shadow-inner py-4 px-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

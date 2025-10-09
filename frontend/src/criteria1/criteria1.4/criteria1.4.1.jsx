@@ -327,10 +327,10 @@ institution from the following  stakeholders
             </div>
           </div>
 
-         <div className="px-2 py-2 border">
+         <div className="px-2 py-2 border flex justify-end">
                     <button
                       onClick={handleSubmit}
-                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-blue-700"
                     >
                       Add
                     </button>
@@ -339,87 +339,115 @@ institution from the following  stakeholders
 
 
           {/* File Upload */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="bg-blue-50 p-4 rounded-md mb-6">
-            <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-              <li>URL for stakeholder feedback report 
-</li>
-              <li>Action taken report of the Institution on feedback report as stated in the 
-minutes of the Governing Council, Syndicate, Board of Management 
-(Upload)</li>
-<li>Any additional information (Upload) </li>
-            </ul>
-          </div>
-
-          <div className="mb-6">
-      <label className="block text-gray-700 font-medium mb-2">
-        Upload Documents
-      </label>
-      <div className="flex items-center gap-4 mb-2">
-      <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-  <i className="fas fa-upload mr-2"></i> Choose Files
-  <input
-    type="file"
-    className="hidden"
-    multiple
-    onChange={async (e) => {
-      const filesArray = Array.from(e.target.files);
-      for (const file of filesArray) {
-        try {
-          const uploaded = await uploadFile(
-            "criteria1_2_2",
-            file,
-            "1.2.2",
-            currentYear
-          );
-          setFormData((prev) => ({
-            ...prev,
-            supportLinks: [...prev.supportLinks, uploaded.file_url],
-          }));
-        } catch (err) {
-          alert(err.message || "Upload failed");
-        }
-      }
-    }}
-  />
-</label>
-        {/* Status Messages */}
-        {uploading && <span className="text-gray-600">Uploading...</span>}
-{error && <span className="text-red-600">{error}</span>}
-      </div>
-      </div>
-      {formData.supportLinks.length > 0 && (
-    <ul className="list-disc pl-5 text-gray-700">
-      {formData.supportLinks.map((link, index) => (
-        <li key={index} className="flex justify-between items-center mb-1">
-          <a
-            href={`http://localhost:3000${link}`} // ✅ prefix with backend base URL
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline"
-          >
-            {link.split("/").pop()}
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              // Remove from local formData
-              setFormData(prev => ({
-                ...prev,
-                supportLinks: prev.supportLinks.filter(l => l !== link)
-              }));
-              // Also remove from context
-              removeFile("criteria1_1_3", link);
-            }}
-            className="text-red-600 ml-2"
-          >
-            Remove
-          </button>
-        </li>
-      ))}
-    </ul>
-  )}
-          
+         <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+                     <div className="mb-6">
+                       <label className="block text-gray-700 font-medium mb-2">
+                         Upload Documents
+                       </label>
+                       <div className="flex items-center gap-4 mb-2">
+                         <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                           <i className="fas fa-upload mr-2"></i> Choose Files
+                           <input
+                             type="file"
+                             className="hidden"
+                             multiple
+                             onChange={async (e) => {
+                               const filesArray = Array.from(e.target.files);
+                               for (const file of filesArray) {
+                                 try {
+                                   console.log('Uploading file:', file.name);
+                                   const yearToUse = currentYear || new Date().getFullYear().toString();
+                                   console.log('Using year:', yearToUse);
+                                   
+                                   const uploaded = await uploadFile(
+                                     "1.4.1",  // Metric ID
+                                     file,
+                                     "1.4.1",  // Criteria code
+                                     yearToUse,
+                                     user?.session
+                                   );
+                   
+                                   // Add the uploaded file info to the form data
+                                   setFormData(prev => ({
+                                     ...prev,
+                                     supportLinks: [
+                                       ...(prev.supportLinks || []), 
+                                       {
+                                         id: uploaded.id,
+                                         url: uploaded.fileUrl || uploaded.file_url,
+                                         name: file.name
+                                       }
+                                     ]
+                                   }));
+                                 } catch (err) {
+                                   console.error('Upload error:', err);
+                                   console.error('Error details:', {
+                                     message: err.message,
+                                     response: err.response?.data,
+                                     status: err.response?.status
+                                   });
+                                   setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                                 }
+                               }
+                             }}
+                           />
+                         </label>
+                         {uploading && <span className="text-gray-600">Uploading...</span>}
+                         {error && <span className="text-red-600">{error}</span>}
+                       </div>
+                       <div className="text-sm text-gray-500 flex items-center">
+                         <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                         Changes will be auto-saved
+                       </div>
+                       {formData.supportLinks && formData.supportLinks.length > 0 && (
+                         <ul className="list-disc pl-5 text-gray-700 mt-2">
+                           {formData.supportLinks.map((link, index) => (
+                             <li key={index} className="flex justify-between items-center mb-1">
+                               <a
+                                 href={`http://localhost:3000${link.url || link}`}
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 className="text-blue-600 hover:underline"
+                               >
+                                 {link.name || (typeof link === 'string' ? link.split("/").pop() : link.url?.split("/").pop())}
+                               </a>
+                               <button
+                                 type="button"
+                                 onClick={() => {
+                                   // Remove from local formData
+                                   setFormData(prev => {
+                                     const newLinks = prev.supportLinks.filter(l => 
+                                       typeof link === 'string' 
+                                         ? l !== link 
+                                         : l.id !== link.id
+                                     );
+                                     // Show success message
+                                     if (newLinks.length < prev.supportLinks.length) {
+                                       console.log('File removed successfully');
+                                     }
+                                     return {
+                                       ...prev,
+                                       supportLinks: newLinks
+                                     };
+                                   });
+                                   // Also remove from context
+                                   if (typeof link === 'object' && link.id) {
+                                     removeFile("1.4.1", link.id);
+                                   } else if (typeof link === 'string') {
+                                     removeFile("1.4.1", link);
+                                   }
+                                 }}
+                                 className="text-red-600 hover:text-red-800 bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                                 title="Remove file"
+                               >
+                                 <FaTrash size={16} className="text-red-600" />
+                               </button>
+                             </li>
+                           ))}
+                         </ul>
+                       )}
+                     </div>
+                   </div>
           {/* Bottom Navigation */}
           <div className="mt-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} />
@@ -427,7 +455,7 @@ minutes of the Governing Council, Syndicate, Board of Management
         </div>
       </div>
     </div>
-    </div>
+
 
  
   );

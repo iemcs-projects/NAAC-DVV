@@ -6,14 +6,14 @@ import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import api from "../../api";
+import { FaTrash, FaEdit } from 'react-icons/fa';
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
-
 
 const Criteria3_4_2 = () => {
   const { user } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { sessions: availableSessions, isLoading: isLoadingSessions } = useContext(SessionContext);
+  const { sessions: availableSessions, isLoading: sessionLoading } = useContext(SessionContext);
   const [currentYear, setCurrentYear] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -24,6 +24,7 @@ const Criteria3_4_2 = () => {
   const [submittedData, setSubmittedData] = useState([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(null);
+  const [editingId, setEditingId] = useState(null); // ADDED: Missing state variable
 
   const [formData, setFormData] = useState({
     slNo: '',
@@ -36,17 +37,21 @@ const Criteria3_4_2 = () => {
 
   const navigate = useNavigate();
 
-  // Load data when component mounts or when currentYear changes
-  useEffect(() => {
-    const loadData = async () => {
-      if (currentYear) {
-        const data = await fetchResponseData(currentYear);
-        setSubmittedData(data);
-      }
-    };
-    
-    loadData();
-  }, [currentYear]);
+  // ADDED: Missing resetForm function (exactly like other components)
+  const resetForm = () => {
+    setFormData({
+      slNo: '',
+      year: currentYear.split('-')[0],
+      institution_name: "",
+      year_of_mou: currentYear.split('-')[0],
+      duration: "",
+      activities_list: ""
+    });
+    setEditingId(null);
+    setIsEditMode(false);
+    setEditKey(null);
+    setError(null);
+  };
 
   const fetchResponseData = async (year) => {
     console.log('Fetching data for year:', year);
@@ -62,13 +67,12 @@ const Criteria3_4_2 = () => {
       const yearToSend = year.split("-")[0];
       console.log('Sending request with session:', yearToSend);
       
-      // Make the API call
       const response = await api.get(
         "/criteria2/getResponse/3.4.2", 
         { 
           params: { 
             session: yearToSend,
-            criteriaCode: '030401040201'
+            criteriaCode: '030402040201'
           }
         }
       );
@@ -103,6 +107,15 @@ const Criteria3_4_2 = () => {
       }));
       
       console.log('Formatted data:', formattedData);
+      
+      // Store the SL numbers in localStorage for each entry
+      formattedData.forEach(item => {
+        if (item.sl_no) {
+          const institution = item.institution_name || item.name;
+          localStorage.setItem(`criteria342_${institution}_${yearToSend}`, item.sl_no);
+        }
+      });
+      
       return formattedData;
     } catch (error) {
       console.error('Error fetching response data:', error);
@@ -155,200 +168,187 @@ const Criteria3_4_2 = () => {
     }
   };
 
-  // Validate form data
-  const validateFormData = (dataToSubmit) => {
-    const institution_name = dataToSubmit.institution_name?.toString()?.trim();
-    const year_of_mou = dataToSubmit.year_of_mou?.toString()?.trim();
-    const duration = dataToSubmit.duration;
-    const activities_list = dataToSubmit.activities_list?.toString()?.trim();
-    
-    // Handle year input - ensure it's a string and get the first part if it's in range format
-    let yearToSend;
-    if (typeof dataToSubmit.year === 'string') {
-      yearToSend = dataToSubmit.year.split('-')[0];
-    } else if (dataToSubmit.year) {
-      yearToSend = dataToSubmit.year.toString();
-    } else {
-      yearToSend = currentYear.toString();
-    }
-    
-    const session = parseInt(yearToSend, 10);
-    const currentYearNum = new Date().getFullYear();
-
-    if (!institution_name || !year_of_mou || duration === undefined || duration === '' || !activities_list) {
-      throw new Error("Please fill in all required fields: Institution Name, Year of MOU, Duration, and Activities List.");
-    }
-    
-    // Ensure year_of_mou is a valid year
-    const mouYear = parseInt(year_of_mou);
-    if (isNaN(mouYear) || mouYear < 1990 || mouYear > currentYearNum) {
-      throw new Error(`Year of MOU must be a valid year between 1990 and ${currentYearNum}.`);
-    }
-    
-    // Ensure duration is a valid number
-    const durationNum = parseInt(duration);
-    if (isNaN(durationNum) || durationNum <= 0) {
-      throw new Error(`Duration must be a valid positive number.`);
-    }
-    
-    if (isNaN(session) || session < 1990 || session > currentYearNum) {
-      throw new Error(`Session year must be between 1990 and ${currentYearNum}.`);
-    }
-
-    return true;
-  };
-
-  // Handle create new entry
-  const handleCreate = async (formDataToSubmit) => {
+  // REPLACED: New unified handleSubmit function (following other components pattern)
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
     setSubmitting(true);
     setError(null);
-    
-    try {
-      // Handle year input consistently
-      let yearToSend;
-      if (typeof formDataToSubmit.year === 'string') {
-        yearToSend = formDataToSubmit.year.split('-')[0];
-      } else {
-        yearToSend = formDataToSubmit.year?.toString() || new Date().getFullYear().toString();
-      }
-      
-      const payload = {
-        institution_name: formDataToSubmit.institution_name?.toString().trim() || '',
-        year_of_mou: formDataToSubmit.year_of_mou?.toString().trim() || '',
-        duration: parseInt(formDataToSubmit.duration) || 0,
-        activities_list: formDataToSubmit.activities_list?.toString().trim() || '',
-        session: parseInt(yearToSend, 10) || new Date().getFullYear(),
-        year: parseInt(yearToSend, 10) || new Date().getFullYear()
-      };
-      
-      console.log('Sending request with payload:', payload);
-      const response = await api.post('/criteria3/createResponse342', payload);
-      console.log('Response received:', response);
-      
-      // Show success if we get any response (status 200-299)
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
-        
-        // Show success alert
-        alert('Awards and recognition data submitted successfully!');
-        
-        // Store the SL number in localStorage if available
-        if (response.data?.data?.sl_no) {
-          localStorage.setItem(
-            `criteria342_${formDataToSubmit.institution_name}_${yearToSend}`, 
-            response.data.data.sl_no
-          );
-        }
-        
-        // Force refresh the data by fetching it again
-        const updatedData = await fetchResponseData(currentYear);
-        
-        // Update the state with the new data
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        
-        // Also update the submittedData state
-        setSubmittedData(prev => [
-          ...prev,
-          {
-            ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
-            year: currentYear
-          }
-        ]);
-        
-        // Reset form
-        setFormData({
-          slNo: '',
-          year: currentYear,
-          institution_name: '',
-          year_of_mou: currentYear.split('-')[0],
-          duration: '',
-          activities_list: ''
-        });
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
-      }
-    } catch (err) {
-      console.error("Error creating entry:", err);
-      setError(err.response?.data?.message || "Failed to create entry");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
-  // Handle update entry
-  const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.slNo) {
-      setError("No entry selected for update");
+    // Basic validation
+    if (!formData.institution_name || !formData.year_of_mou || 
+        !formData.duration || !formData.activities_list) {
+      setError('Please fill in all required fields');
+      setSubmitting(false);
       return;
     }
-    
-    setSubmitting(true);
-    setError(null);
-    
-    try {
-      // Handle year input consistently
-      let yearToSend;
-      if (typeof formDataToSubmit.year === 'string') {
-        yearToSend = formDataToSubmit.year.split('-')[0];
-      } else {
-        yearToSend = formDataToSubmit.year?.toString() || new Date().getFullYear().toString();
-      }
-      
-      const payload = {
-        institution_name: formDataToSubmit.institution_name?.toString().trim() || '',
-        year_of_mou: formDataToSubmit.year_of_mou?.toString().trim() || '',
-        duration: parseInt(formDataToSubmit.duration) || 0,
-        activities_list: formDataToSubmit.activities_list?.toString().trim() || ''
-      };
 
-      console.log('Updating entry with ID:', formDataToSubmit.slNo);
-      console.log('Update payload:', payload);
+    try {
+      // Get year - use the form's year or current year as fallback
+      const yearToSend = formData.year || currentYear.split('-')[0];
+      const sessionYearNum = parseInt(yearToSend, 10);
       
-      const response = await api.put(`/criteria3/updateResponse342/${formDataToSubmit.slNo}`, payload);
-      
-      if (response.status >= 200 && response.status < 300) {
-        alert('Awards and recognition data updated successfully!');
-        
-        // Refresh data
-        const updatedData = await fetchResponseData(currentYear);
-        setYearData(prev => ({
-          ...prev,
-          [currentYear]: updatedData
-        }));
-        setSubmittedData(updatedData);
-        
-        // Reset form and edit mode
-        setFormData({
-          slNo: '',
-          year: currentYear,
-          institution_name: '',
-          year_of_mou: currentYear.split('-')[0],
-          duration: '',
-          activities_list: ''
-        });
-        setIsEditMode(false);
-        setEditKey(null);
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+      if (isNaN(sessionYearNum)) {
+        throw new Error('Please enter a valid year');
       }
+
+      // Check if we're in edit mode
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Form data:', formData);
+      
+      let response;
+      
+      if (isUpdating && recordId) {
+        try {
+          // Get the original record to preserve its session
+          const originalRecord = submittedData.find(item => (item.sl_no || item.slNo) === recordId);
+          const originalSession = originalRecord?.session || sessionYearNum;
+          
+          // Prepare the payload for update
+          const updatePayload = {
+            session: originalSession, // Use the original session from the record
+            institution_name: formData.institution_name.trim(),
+            year_of_mou: formData.year_of_mou.toString().trim(),
+            duration: parseInt(formData.duration) || 0,
+            activities_list: formData.activities_list.trim()
+          };
+          
+          // Convert recordId to a number to ensure proper type matching with the backend
+          const recordIdNum = parseInt(recordId, 10);
+          if (isNaN(recordIdNum)) {
+            throw new Error('Invalid record ID');
+          }
+          const endpoint = `/criteria3/updateResponse342/${recordIdNum}`;
+          console.log('Update endpoint:', endpoint);
+          console.log('Update payload:', updatePayload);
+          
+          // Validate required fields
+          if (!updatePayload.institution_name || !updatePayload.year_of_mou || 
+              !updatePayload.activities_list) {
+            throw new Error('Missing required fields for update');
+          }
+          
+          // Make the API call
+          response = await api.put(endpoint, updatePayload);
+          
+          console.log('Update response:', response.data);
+          
+          if (response.status >= 200 && response.status < 300) {
+            // Refresh the data after successful update
+            const updatedData = await fetchResponseData(currentYear);
+            setYearData(prev => ({
+              ...prev,
+              [currentYear]: updatedData
+            }));
+            setSubmittedData(updatedData);
+            
+            // Reset form and edit mode
+            resetForm();
+            setSuccess('Record updated successfully!');
+            setTimeout(() => setSuccess(''), 3000);
+          }
+          
+        } catch (error) {
+          console.error('Error updating record:', error);
+          
+          // Handle specific error cases from your backend
+          if (error.response?.status === 404) {
+            setError('Record not found. It may have been deleted.');
+          } else if (error.response?.status === 400) {
+            const errorMessage = error.response.data?.message || 'Bad request';
+            if (errorMessage.includes('Session/year mismatch')) {
+              setError('Cannot update: Session/year mismatch with original record');
+            } else if (errorMessage.includes('Session must be between')) {
+              setError(`Session year must be within the valid IIQA range: ${errorMessage}`);
+            } else {
+              setError(errorMessage);
+            }
+          } else {
+            setError(error.response?.data?.message || 'Failed to update record');
+          }
+          
+          // Don't proceed with refresh if update failed
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        // For new entries, use the create endpoint
+        const createPayload = {
+          institution_name: formData.institution_name.trim(),
+          year_of_mou: formData.year_of_mou.toString().trim(),
+          duration: parseInt(formData.duration) || 0,
+          activities_list: formData.activities_list.trim(),
+          session: sessionYearNum,
+          year: sessionYearNum
+        };
+        
+        console.log('Create payload:', createPayload);
+        
+        const endpoint = '/criteria3/createResponse342';
+        response = await api.post(endpoint, createPayload);
+        
+        console.log('Create response:', response.data);
+        
+        if (response.status >= 200 && response.status < 300) {
+          alert('Data submitted successfully!');
+          
+          // Store the SL number in localStorage if available
+          if (response.data?.data?.sl_no) {
+            localStorage.setItem(
+              `criteria342_${formData.institution_name}_${yearToSend}`, 
+              response.data.data.sl_no
+            );
+          }
+        }
+      }
+      
+      // Refresh the data after successful operation
+      const updatedData = await fetchResponseData(currentYear);
+      setSubmittedData(updatedData);
+      
+      // Update yearData as well
+      setYearData(prev => ({
+        ...prev,
+        [currentYear]: updatedData
+      }));
+      
+      // Reset form
+      resetForm();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      
     } catch (err) {
-      console.error("Error updating entry:", err);
-      setError(err.response?.data?.message || "Failed to update entry");
+      console.error("Error in handleSubmit:", err);
+      
+      // More specific error handling
+      if (err.response?.status === 400 && err.response?.data?.message?.includes('Missing required fields')) {
+        setError('All fields are required. Please check your input.');
+      } else if (err.response?.status === 404) {
+        setError('Resource not found. Please refresh and try again.');
+      } else {
+        setError(err.response?.data?.message || err.message || "Operation failed");
+      }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Handle change
+  const handleChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   // Handle delete entry
-  const handleDelete = async (id) => {
-    if (!id) {
-      setError('No ID provided for deletion');
+  const handleDelete = async (slNo, year) => {
+    if (!slNo) {
+      console.error('No SL number provided for deletion');
+      setError('Error: No entry selected for deletion');
       return;
     }
 
@@ -357,24 +357,28 @@ const Criteria3_4_2 = () => {
     }
 
     try {
-      setLoading(true);
-      // Convert ID to string to match backend expectations
-      const response = await api.delete(`/criteria3/deleteResponse342/${String(id)}`);
+      setSubmitting(true);
+      const response = await api.delete(`/criteria3/deleteResponse342/${slNo}`);
       
-      if (response.data) {
-        // Update the UI by removing the deleted entry
-        setSubmittedData(prev => prev.filter(item => (item.id !== id && item.sl_no !== id && item.slNo !== id)));
+      if (response.status === 200) {
+        // Update the local state to remove the deleted entry
+        setYearData(prev => ({
+          ...prev,
+          [year]: (prev[year] || []).filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        }));
         
-        // Update yearData to reflect the deletion
-        if (currentYear) {
-          setYearData(prev => ({
-            ...prev,
-            [currentYear]: (prev[currentYear] || []).filter(item => 
-              (item.id !== id && item.sl_no !== id && item.slNo !== id)
-            )
-          }));
-        }
+        // Also update the submittedData state
+        setSubmittedData(prev => 
+          prev.filter(entry => 
+            (entry.sl_no !== slNo && entry.slNo !== slNo) || 
+            entry.year !== year
+          )
+        );
         
+        // Show success message
         setSuccess('Entry deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
@@ -383,70 +387,40 @@ const Criteria3_4_2 = () => {
       setError(error.response?.data?.message || 'Failed to delete entry. Please try again.');
       setTimeout(() => setError(''), 3000);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Handle form submission (create or update)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      // Create a clean copy of form data with proper values
-      const formDataToSubmit = {
-        ...formData,
-        year: formData.year?.toString() || currentYear.split('-')[0],
-        institution_name: formData.institution_name?.toString() || '',
-        year_of_mou: formData.year_of_mou?.toString() || currentYear.split('-')[0],
-        duration: formData.duration?.toString() || '',
-        activities_list: formData.activities_list?.toString() || ''
-      };
-      
-      validateFormData(formDataToSubmit);
-      
-      if (isEditMode && formData.slNo) {
-        console.log('Updating entry:', formDataToSubmit);
-        await handleUpdate(formDataToSubmit);
-      } else {
-        console.log('Creating new entry:', formDataToSubmit);
-        await handleCreate(formDataToSubmit);
-      }
-      
-    } catch (err) {
-      console.error('Error in handleSubmit:', err);
-      setError(err.message || 'Failed to save data');
-      setTimeout(() => setError(null), 3000);
-    }
-  };
-
-  // Fetch data when currentYear changes
+  // Load data when component mounts or currentYear changes
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-      try {
-        // Fetch data for all available years
+      if (currentYear) {
+        const data = await fetchResponseData(currentYear);
+        setSubmittedData(data || []);
+      }
+    };
+    
+    loadData();
+  }, [currentYear]);
+
+  // Load data for all sessions
+  useEffect(() => {
+    const loadData = async () => {
+      if (availableSessions && availableSessions.length > 0) {
         const promises = availableSessions.map(year => fetchResponseData(year));
         const data = await Promise.all(promises);
         
-        // Create yearData object with all years' data
         const newYearData = {};
         availableSessions.forEach((year, index) => {
           newYearData[year] = data[index];
         });
         
         setYearData(newYearData);
-      } catch (err) {
-        console.error("Error loading data:", err);
-        setError("Failed to load data");
-      } finally {
-        setLoading(false);
       }
     };
-    
-    if (availableSessions && availableSessions.length > 0) {
-      loadData();
-    }
-  }, [currentYear, availableSessions]);
+
+    loadData();
+  }, [availableSessions]);
 
   // Fetch score when currentYear changes
   useEffect(() => {
@@ -480,12 +454,10 @@ const Criteria3_4_2 = () => {
     }));
     setIsEditMode(false);
     setEditKey(null);
+    setEditingId(null); // ADDED: Reset editingId on year change
   };
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
+  // Navigation functions
   const goToNextPage = () => {
     navigate("/criteria3.4.3");
   };
@@ -494,55 +466,95 @@ const Criteria3_4_2 = () => {
     navigate("/criteria3.4.1");
   };
 
-  return (
-   <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-         <div className="flex flex-1 overflow-hidden pt-8">
-           <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
-             <Sidebar onCollapse={setIsSidebarCollapsed} />
-           </div>
-           <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
-             {/* Page Header with Title and User Dropdown */}
-             <div className="flex justify-between items-center mb-6">
-               <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
-                 <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
-                   <i className="fas fa-arrow-left"></i>
-                 </a>
-                 <div>
-                   <p className="text-2xl font-bold text-gray-800">Criteria 3-Research, Innovations and Extension</p>
-                   <p className="text-gray-600 text-sm">3.4 Collaboration</p>
-                 </div>
-               </div>
-               <div className="flex items-center">
-                 <UserDropdown user={user} className="ml-2 mr-4 " />
-               </div>
-             </div>
+  // Handle export to CSV
+  const handleExport = async () => {
+    if (!submittedData || submittedData.length === 0) {
+      alert('No data to export');
+      return;
+    }
 
-          {/* Metric Info */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h3 className="text-blue-600 font-medium mb-2">3.4.2 Metric Information</h3>
-            <p className="text-gray-700">
-              Number of awards and recognitions received for extension activities from government/recognised bodies during the last five years.
+    const headers = [
+      'Institution Name',
+      'Year of MOU',
+      'Duration',
+      'Activities List'
+    ];
+
+    const csvRows = [];
+    csvRows.push(headers.join(','));
+    
+    submittedData.forEach((entry, index) => {
+      const row = [
+        index + 1,
+        `"${entry.institution_name || ''}"`,
+        entry.year_of_mou || '',
+        entry.duration || '',
+        `"${entry.activities_list || ''}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `criteria_3.4.2_data_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
+      <div className="flex flex-1 overflow-hidden pt-8">
+        <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+          <Sidebar onCollapse={setIsSidebarCollapsed} />
+        </div>
+        <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
+          {/* Page Header with Title and User Dropdown */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+              <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+                <i className="fas fa-arrow-left"></i>
+              </a>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">Criteria 3-Research, Innovations and Extension</p>
+                <p className="text-gray-600 text-sm">3.4 Collaboration</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <UserDropdown user={user} className="ml-2 mr-4 " />
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded shadow mb-6">
+            <h3 className="text-blue-600 font-semibold mb-2">3.4.2 Metric Information</h3>
+            <p className="text-sm text-gray-700 mb-2">
+              Number of awards and recognitions received for extension activities from government/recognised bodies during the last five years
             </p>
-            <h3 className="text-blue-600 font-medium mt-4 mb-2">Supportive Documents:</h3>
-            <ul className="list-disc pl-5 text-gray-700">
-              <li>Award letters</li>
-              <li>Any additional relevant information</li>
+            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              <li className="mb-1">Award letters</li>
+              <li className="mb-1">Any additional relevant information</li>
             </ul>
           </div>
 
-          {/* Year Selector */}
+          <h2 className="text-xl font-bold text-gray-500 mb-4">Awards and Recognition Entry</h2>
+
+          {/* Year Dropdown */}
           <div className="mb-4">
             <label className="font-medium text-gray-700 mr-2">Select Year:</label>
             <select
+              className="border px-3 py-1 rounded text-black"
               value={currentYear}
               onChange={handleYearChange}
-              className="px-3 py-1 border border-gray-300 rounded text-gray-950"
-              disabled={isLoadingSessions}
+              disabled={sessionLoading}
             >
-              {isLoadingSessions ? (
+              {sessionLoading ? (
                 <option>Loading sessions...</option>
               ) : (
-                availableSessions && availableSessions.map((session) => (
+                availableSessions?.map((session) => (
                   <option key={session} value={session}>
                     {session}
                   </option>
@@ -551,111 +563,98 @@ const Criteria3_4_2 = () => {
             </select>
           </div>
 
-          {/* Provisional Score */}
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded">
             {loading ? (
               <p className="text-gray-600">Loading provisional score...</p>
             ) : provisionalScore?.data ? (
               <div>
                 <p className="text-lg font-semibold text-green-800">
-                  Provisional Score (3.4.2): {provisionalScore.data.score || provisionalScore.data.score_sub_sub_criteria || 0}%
+                  Provisional Score (3.4.2): {provisionalScore.data.score_sub_sub_criteria || provisionalScore.data.score || 0}
+                </p>
+                <p className="text-lg font-semibold text-green-800">
+                  Grade: {provisionalScore.data.sub_sub_cr_grade || provisionalScore.data.grade || 'N/A'}
                 </p>
               </div>
             ) : (
-              <p className="text-gray-600">No score data available. Submit data to see your score.</p>
+              <p className="text-gray-600">No score data available.</p>
             )}
           </div>
 
-          {/* Entry Form */}
-          <div className="border rounded mb-8">
-            <div className="flex justify-between items-center bg-blue-100 text-gray-800 px-4 py-2">
-              <h2 className="text-xl font-bold">Awards and Recognition - {isEditMode ? 'Edit Mode' : 'Add New'}</h2>
-              <div className="flex items-center">
-                <label className="mr-2 font-medium">Current Year: {currentYear}</label>
-              </div>
-            </div>
-
+          {/* Input Table */}
+          <div className="overflow-auto border rounded mb-6">
+            <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
+              Awards and Recognition - {isEditMode ? 'Edit Mode' : 'Add New'}
+            </h2>
             <form onSubmit={handleSubmit}>
-              <table className="w-full border text-sm border-black">
-                <thead className="bg-gray-100 text-gray-950">
+              <table className="min-w-full border text-sm text-left">
+                <thead className="bg-gray-100 font-semibold text-gray-950">
                   <tr>
-                    <th className="border px-2 py-2">Institution Name</th>
-                    <th className="border px-2 py-2">Year of MOU</th>
-                    <th className="border px-2 py-2">Duration</th>
-                    <th className="border px-2 py-2">Activities List</th>
-                    <th className="border px-2 py-2">Action</th>
+                    <th className="px-4 py-2 border">Institution Name</th>
+                    <th className="px-4 py-2 border">Year of MOU</th>
+                    <th className="px-4 py-2 border">Duration</th>
+                    <th className="px-4 py-2 border">Activities List</th>
+                    <th className="px-4 py-2 border">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border px-2 py-1">
+                    <td className="px-2 py-2 border">
                       <input
                         type="text"
                         value={formData.institution_name}
-                        onChange={(e) => handleChange('institution_name', e.target.value)}
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                        onChange={(e) => handleChange("institution_name", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Institution Name"
                         required
                       />
                     </td>
-                    <td className="border px-2 py-1">
+                    <td className="px-2 py-2 border">
                       <input
                         type="number"
                         min="1990"
                         max={new Date().getFullYear()}
                         value={formData.year_of_mou}
-                        onChange={(e) => handleChange('year_of_mou', e.target.value)}
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                        onChange={(e) => handleChange("year_of_mou", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Year"
                         required
                       />
                     </td>
-                    <td className="border px-2 py-1">
+                    <td className="px-2 py-2 border">
                       <input
                         type="number"
                         min="1"
                         value={formData.duration}
-                        onChange={(e) => handleChange('duration', e.target.value)}
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
-                        placeholder="Duration (months/years)"
+                        onChange={(e) => handleChange("duration", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="Duration (months)"
                         required
                       />
                     </td>
-                    <td className="border px-2 py-1">
+                    <td className="px-2 py-2 border">
                       <input
                         type="text"
                         value={formData.activities_list}
-                        onChange={(e) => handleChange('activities_list', e.target.value)}
-                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
+                        onChange={(e) => handleChange("activities_list", e.target.value)}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Activities List"
                         required
                       />
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="px-2 py-2 border">
                       <div className="flex gap-2">
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 !bg-blue-600 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Add')}
                         </button>
                         {isEditMode && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setIsEditMode(false);
-                              setEditKey(null);
-                              setFormData({
-                                slNo: '',
-                                year: currentYear.split('-')[0],
-                                institution_name: '',
-                                year_of_mou: currentYear.split('-')[0],
-                                duration: '',
-                                activities_list: ''
-                              });
-                            }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            onClick={resetForm}
+                            className="px-3 py-1 !bg-blue-600 text-white rounded hover:bg-gray-600"
                           >
                             Cancel
                           </button>
@@ -668,13 +667,15 @@ const Criteria3_4_2 = () => {
             </form>
           </div>
 
-          {/* Display data by year */}
-          {availableSessions && availableSessions.map((year) => (
-            <div key={year} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 !text-gray-800 px-4 py-2">
-                Year: {year}
-              </h3>
-              {yearData[year] && yearData[year].length > 0 ? (
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
+          
+          {/* Year-wise Data Display */}
+          {availableSessions?.map((session) => (
+            <div key={session} className="mb-8 border rounded">
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
+              {yearData[session] && yearData[session].length > 0 ? (
                 <table className="w-full text-sm border border-black">
                   <thead className="bg-gray-200">
                     <tr>
@@ -687,60 +688,60 @@ const Criteria3_4_2 = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {yearData[year].map((entry, index) => (
-                      <tr key={`${entry.id || entry.slNo}-${year}-${index}`} className="even:bg-gray-50">
+                    {yearData[session].map((entry, index) => (
+                      <tr key={`${entry.institution_name}-${entry.year}-${index}`}>
                         <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
                         <td className="border border-black text-black px-4 py-2">{entry.institution_name}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">{entry.year_of_mou}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">{entry.duration}</td>
                         <td className="border border-black text-black px-4 py-2">{entry.activities_list}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">
-                          <button
-                            onClick={() => {
-                              setFormData({
-                                slNo: entry.slNo || entry.id,
-                                year: entry.session || currentYear.split('-')[0],
-                                institution_name: entry.institution_name || '',
-                                year_of_mou: entry.year_of_mou || '',
-                                duration: entry.duration || '',
-                                activities_list: entry.activities_list || ''
-                              });
-                              setIsEditMode(true);
-                              setEditKey(entry.slNo || entry.id);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                const entryId = entry.sl_no || entry.slNo || entry.id;
-                                if (!entryId) {
-                                  throw new Error('No valid ID found for this entry');
-                                }
-                                await handleDelete(entryId);
-                              } catch (error) {
-                                console.error('Delete error:', error);
-                                setError('Failed to delete entry. Please try again.');
-                                setTimeout(() => setError(''), 3000);
-                              }
-                            }}
-                            disabled={loading}
-                            className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-                            title="Delete entry"
-                          >
-                            Delete
-                          </button>
+                          <div className="flex justify-center space-x-2">
+                            <button
+                              className="p-2 !bg-white text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              onClick={() => {
+                                const recordId = entry.sl_no || entry.slNo || entry.id;
+                                console.log('Editing entry with ID:', recordId);
+                                
+                                setFormData({
+                                  slNo: recordId,
+                                  year: entry.session || currentYear.split('-')[0],
+                                  institution_name: entry.institution_name || '',
+                                  year_of_mou: entry.year_of_mou || '',
+                                  duration: entry.duration || '',
+                                  activities_list: entry.activities_list || '',
+                                });
+                                
+                                // CRITICAL: Set the editingId
+                                setEditingId(recordId);
+                                setEditKey({ slNo: recordId, year: entry.year });
+                                setIsEditMode(true);
+                                
+                                console.log('Edit mode activated for record:', recordId);
+                              }}
+                              title="Edit entry"
+                            >
+                             <FaEdit className="text-blue-500" size={16} />
+                            </button>
+                            <button
+                              className="p-2 !bg-white text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
+                              }}
+                              disabled={submitting}
+                              title="Delete entry"
+                            >
+                              <FaTrash className="text-red-500" size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="px-4 py-2 text-gray-500">No awards and recognition data submitted for this year.</p>
+                <p className="px-4 py-2 text-gray-500">No data submitted for this year.</p>
               )}
             </div>
           ))}

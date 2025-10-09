@@ -307,7 +307,6 @@ const createResponse321 = asyncHandler(async (req, res) => {
     journal_name,
     year_of_publication,
     issn_number,
-    indexation_status   
    } = req.body;
 
    // Step 1: Field Validation
@@ -2002,7 +2001,8 @@ await Criteria341.update({
   collaborating_agency,
   participant_name,
   year_of_collaboration,
-  duration
+  duration,
+  document_link: req.body.document_link || ''
 }, {
   where: { sl_no }
 });
@@ -2599,7 +2599,7 @@ if(!session || !year || !name_of_principal_investigator || !department_of_princi
   throw new apiError(400, "Missing required fields");
 }
 
-const row = await Criteria311_312.findOne({where:{sl_no}});
+const row = await db.response_3_1_1.findOne({where:{sl_no}});
 
 if(!row){
   throw new apiError(404, "Row not found");
@@ -2625,7 +2625,7 @@ if(session < startYear || session > endYear){
   throw new apiError(400, `Session must be between ${startYear} and ${endYear}`);
 }
 
-await Criteria311_312.update({
+await db.response_3_1_1.update({
   year,
   name_of_principal_investigator,
   department_of_principal_investigator,
@@ -2639,7 +2639,7 @@ await Criteria311_312.update({
   where: { sl_no }
 });
 
-const updated = await Criteria311_312.findOne({ where: { sl_no } });
+const updated = await db.response_3_1_1.findOne({ where: { sl_no } });
 
 return res.status(200).json(
   new apiResponse(200, updated, "Row updated successfully")

@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useContext } from "react";
-import Header from "../../components/header";
-import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
 import { useNavigate } from "react-router-dom";
-import LandingNavbar from "../../components/landing-navbar";
 import api from "../../api";
-import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
+import { useUpload } from "../../contextprovider/uploadsContext";
 import { SessionContext } from "../../contextprovider/sessioncontext";
 import { FaTrash, FaEdit } from 'react-icons/fa';
 import UserDropdown from "../../components/UserDropdown";
@@ -37,7 +34,8 @@ const Criteria5_1_1 = () => {
     non_gov_amount: "",
     inst_students_count: "",
     inst_amount: "",
-    supportLinks: []
+    supportLinks: [],
+    year: ""
   });
 
   const [submittedData, setSubmittedData] = useState([]);
@@ -73,13 +71,14 @@ const Criteria5_1_1 = () => {
         return [];
       }
       
-      // Map the response data to match our form fields
       const data = response.data.data.map(item => ({
         id: item.id,
         slNo: item.sl_no || item.slNo,
         scheme_name: item.scheme_name || '',
         gov_students_count: item.gov_students_count || 0,
         gov_amount: item.gov_amount || 0,
+        non_gov_students_count: item.non_gov_students_count || 0,
+        non_gov_amount: item.non_gov_amount || 0,
         inst_students_count: item.inst_students_count || 0,
         inst_amount: item.inst_amount || 0,
         year: item.year || year,
@@ -88,7 +87,6 @@ const Criteria5_1_1 = () => {
       
       console.log('Mapped data:', data);
       
-      // Store the SL numbers in localStorage for each entry
       data.forEach(item => {
         if (item.slNo) {
           localStorage.setItem(`criteria5.1.1_slNo_${item.id}`, item.slNo);
@@ -105,7 +103,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Fetch score for the current year
   const fetchScore = async () => {
     if (!currentYear) return;
     
@@ -142,7 +139,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Handle create new entry
   const handleCreate = async (formDataToSubmit) => {
     setSubmitting(true);
     setError(null);
@@ -184,7 +180,6 @@ const Criteria5_1_1 = () => {
           );
         }
         
-        // Refresh the data from the server
         const updatedData = await fetchResponseData(currentYear);
         
         setYearData(prev => ({
@@ -194,7 +189,6 @@ const Criteria5_1_1 = () => {
         
         setSubmittedData(updatedData);
         
-        // Reset form
         setFormData({
           slNo: '',
           scheme_name: "",
@@ -205,7 +199,7 @@ const Criteria5_1_1 = () => {
           inst_students_count: "",
           inst_amount: "",
           supportLinks: [],
-          year: currentYear
+          year: ""
         });
         
         setSuccess(true);
@@ -219,7 +213,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Handle update entry
   const handleUpdate = async (formDataToSubmit) => {
     const entryId = formDataToSubmit.id || formDataToSubmit.slNo;
     if (!entryId) {
@@ -238,30 +231,40 @@ const Criteria5_1_1 = () => {
         (parseInt(formDataToSubmit.non_gov_students_count) || 0) + 
         (parseInt(formDataToSubmit.inst_students_count) || 0);
 
+      const currentRecord = await api.get(`/criteria2/getResponse/5.1.1`, {
+        params: { sl_no: entryId }
+      });
+      
+      if (!currentRecord.data || !currentRecord.data.data) {
+        throw new Error('Failed to fetch current record for update');
+      }
+      
+      const recordData = Array.isArray(currentRecord.data.data) 
+        ? currentRecord.data.data[0] 
+        : currentRecord.data.data;
+      
       const payload = {
-        sl_no: entryId,
-        scheme_name: formDataToSubmit.scheme_name,
+        scheme_name: formDataToSubmit.scheme_name || recordData.scheme_name,
         gov_students_count: parseInt(formDataToSubmit.gov_students_count) || 0,
         gov_amount: parseFloat(formDataToSubmit.gov_amount) || 0,
         non_gov_students_count: parseInt(formDataToSubmit.non_gov_students_count) || 0,
         non_gov_amount: parseFloat(formDataToSubmit.non_gov_amount) || 0,
         inst_students_count: parseInt(formDataToSubmit.inst_students_count) || 0,
         inst_amount: parseFloat(formDataToSubmit.inst_amount) || 0,
-        total_students_count,
-        session: parseInt(yearToSend),
-        year: parseInt(yearToSend),
-        support_links: formDataToSubmit.supportLinks || []
+        total_students_count: total_students_count || recordData.total_students_count || 0,
+        session: parseInt(yearToSend) || recordData.session,
+        year: parseInt(yearToSend) || recordData.year
       };
       
-      console.log('Sending update payload:', payload);
-      const response = await api.put(`/criteria5/updateResponse511/${entryId}`, payload);
+      console.log('Update payload:', JSON.stringify(payload, null, 2));
+      
+      const response = await api.put(`/criteria5/updateResponse511_512/${entryId}`, payload);
       
       if (!response.data || !response.data.success) {
         const errorMsg = response.data?.message || "Failed to update entry";
         throw new Error(errorMsg);
       }
       
-      // Refresh the data from the server
       const updatedData = await fetchResponseData(currentYear);
       
       setYearData(prev => ({
@@ -284,7 +287,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Validate form data
   const validateFormData = (dataToSubmit) => {
     const yearInput = dataToSubmit.year || currentYear;
     const yearToSend = yearInput.split("-")[0];
@@ -292,21 +294,18 @@ const Criteria5_1_1 = () => {
     const currentYearNum = new Date().getFullYear();
     const missingFields = [];
 
-    // Helper function to check string fields
     const checkStringField = (value, fieldName) => {
       if (typeof value === 'string') return value.trim();
       if (value === null || value === undefined) return '';
       return String(value);
     };
 
-    // Helper function to check numeric fields
     const checkNumericField = (value, fieldName) => {
       if (value === null || value === undefined || value === '') return false;
       const numValue = parseFloat(value);
       return !isNaN(numValue) && numValue >= 0;
     };
 
-    // Check each required field
     if (!checkStringField(dataToSubmit.scheme_name)) missingFields.push("Scheme Name");
     if (!checkNumericField(dataToSubmit.gov_students_count)) missingFields.push("Valid Government Students Count");
     if (!checkNumericField(dataToSubmit.gov_amount)) missingFields.push("Valid Government Amount");
@@ -322,7 +321,6 @@ const Criteria5_1_1 = () => {
     return true;
   };
 
-  // Handle edit
   const handleEdit = (entry) => {
     const formData = {
       slNo: '',
@@ -334,10 +332,8 @@ const Criteria5_1_1 = () => {
       inst_students_count: '',
       inst_amount: '',
       supportLinks: [],
-      year: currentYear,
-      // Override with entry data
+      year: "",
       ...entry,
-      // Ensure these fields are set from the entry or use defaults
       id: entry.id || entry.slNo,
       year: entry.year || currentYear
     };
@@ -348,7 +344,6 @@ const Criteria5_1_1 = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle delete entry
   const handleDelete = async (slNo, year) => {
     if (!slNo) {
       console.error('No SL number provided for deletion');
@@ -392,7 +387,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Handle submit
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -427,16 +421,17 @@ const Criteria5_1_1 = () => {
         await handleCreate(formDataWithYear);
       }
       
-      // Reset form after successful operation
       setFormData({
         slNo: '',
         scheme_name: "",
         gov_students_count: "",
         gov_amount: "",
+        non_gov_students_count: "",
+        non_gov_amount: "",
         inst_students_count: "",
         inst_amount: "",
         supportLinks: [],
-        year: currentYear
+        year: ""
       });
       
     } catch (error) {
@@ -453,7 +448,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Load data when component mounts or currentYear changes
   useEffect(() => {
     const loadData = async () => {
       if (currentYear) {
@@ -465,7 +459,6 @@ const Criteria5_1_1 = () => {
     loadData();
   }, [currentYear]);
 
-  // Load data for all sessions
   useEffect(() => {
     const loadData = async () => {
       if (availableSessions && availableSessions.length > 0) {
@@ -484,27 +477,22 @@ const Criteria5_1_1 = () => {
     loadData();
   }, [availableSessions]);
 
-  // Fetch score when currentYear changes
   useEffect(() => {
     if (currentYear) {
       fetchScore();
     }
   }, [currentYear]);
 
-  // Set default current year when sessions load
   useEffect(() => {
     if (availableSessions && availableSessions.length > 0 && !currentYear) {
       const firstYear = availableSessions[0];
       setCurrentYear(firstYear);
-      setFormData(prev => ({ ...prev, year: firstYear }));
     }
   }, [availableSessions, currentYear]);
 
-  // Handle year change
   const handleYearChange = (e) => {
     const selectedYear = e.target.value;
     setCurrentYear(selectedYear);
-    setFormData(prev => ({ ...prev, year: selectedYear }));
     setIsEditMode(false);
     setEditKey(null);
   };
@@ -519,7 +507,6 @@ const Criteria5_1_1 = () => {
     }
   };
 
-  // Navigation functions
   const goToNextPage = () => {
     navigate('/criteria5.1.2');
   };
@@ -528,7 +515,6 @@ const Criteria5_1_1 = () => {
     navigate('/criteria4.4.2');
   };
 
-  // Handle export to CSV
   const handleExport = async () => {
     if (!submittedData || submittedData.length === 0) {
       alert('No data to export');
@@ -570,29 +556,29 @@ const Criteria5_1_1 = () => {
     document.body.removeChild(link);
   };
 
-  // Main component render
   return (
-    <div className="min-h-screen w-screen bg-gray-50 flex flex-col">
-    <div className="flex flex-1 overflow-hidden pt-8">
-      <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
-        <Sidebar onCollapse={setIsSidebarCollapsed} />
-      </div>
-      <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6 `}>
-        {/* Page Header with Title and User Dropdown */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
-            <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
-              <i className="fas fa-arrow-left"></i>
-            </a>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">Criteria 5 - Student Support and Progression</p>
-              <p className="text-gray-600 text-sm">5.1 Student Support</p>
+    <div className="min-h-screen w-screen bg-gray-50 flex flex-col overflow-x-hidden">
+      <div className="flex flex-1 overflow-hidden pt-8">
+        <div className={`fixed top-8 left-0 bottom-0 z-40 ${isSidebarCollapsed ? 'w-16' : 'w-64'} transition-all duration-300 bg-white shadow-md`}>
+          <Sidebar onCollapse={setIsSidebarCollapsed} />
+        </div>
+        <div className={`flex-1 transition-all duration-300 overflow-y-auto ${isSidebarCollapsed ? 'ml-16' : 'ml-64'} pl-6 pr-6`}>
+          {/* Page Header with Title and User Dropdown */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center h-[70px] w-[700px] shadow border border-black/10 rounded-2xl hover:shadow-lg transition-shadow duration-300">
+              <a href="#" className="text-gray-500 hover:text-gray-700 mr-2 transition-colors duration-200 px-4">
+                <i className="fas fa-arrow-left"></i>
+              </a>
+              <div>
+                <p className="text-2xl font-bold text-gray-800">Criteria 5 - Student Support and Progression</p>
+                <p className="text-gray-600 text-sm">5.1 Student Support</p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <UserDropdown user={user} className="ml-2 mr-4" />
             </div>
           </div>
-          <div className="flex items-center">
-            <UserDropdown user={user} className="ml-2 mr-4 " />
-          </div>
-        </div>
+
           <div className="bg-white p-6 rounded shadow mb-6">
             <h3 className="text-blue-600 font-semibold mb-2">5.1.1 Metric Information</h3>
             <p className="text-sm text-gray-700 mb-2">
@@ -604,8 +590,6 @@ const Criteria5_1_1 = () => {
               <li className="mb-1">Average percentage of students benefited by scholarships and freeships provided by the Government during the last five years</li>
             </ul>
           </div>
-
-          <h2 className="text-xl font-bold text-gray-500 mb-4">Students benefited by scholarships and freeships</h2>
 
           {/* Year Dropdown */}
           <div className="mb-4">
@@ -636,34 +620,28 @@ const Criteria5_1_1 = () => {
                 <p className="text-lg font-semibold text-green-800">
                   Provisional Score (5.1.1): {provisionalScore.data.score_sub_sub_criteria || provisionalScore.data.score || 0}%
                 </p>
-                <p className="text-lg font-semibold text-green-800">
-                  Grade: {provisionalScore.data.sub_sub_cr_grade || provisionalScore.data.grade || 'N/A'}
-                </p>
               </div>
             ) : (
               <p className="text-gray-600">No score data available.</p>
             )}
           </div>
 
-          {/* Input Table */}
-          <div className="overflow-auto border rounded mb-6">
+          {/* Input Form Table */}
+          <div className="border rounded mb-8">
             <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
               Scholarship Entry - {isEditMode ? 'Edit Mode' : 'Add New'}
             </h2>
             <form onSubmit={handleSubmit}>
-              <table className="min-w-full border text-sm text-left">
-                <thead className="bg-gray-100 font-semibold text-gray-950">
+              <table className="w-full border text-sm">
+                <thead className="bg-gray-50 text-black">
                   <tr>
-                    <th rowSpan="2" className="px-4 py-2 border">Scheme Name</th>
-                    <th colSpan="2" className="px-4 py-2 border">Government Scheme</th>
-                    <th colSpan="2" className="px-4 py-2 border">Institution Scheme</th>
-                    <th rowSpan="2" className="px-4 py-2 border">Action</th>
-                  </tr>
-                  <tr>
-                    <th className="px-2 py-1 border">Students</th>
-                    <th className="px-2 py-1 border">Amount</th>
-                    <th className="px-2 py-1 border">Students</th>
-                    <th className="px-2 py-1 border">Amount</th>
+                    <th className="px-4 py-2 border">Year</th>
+                    <th className="px-4 py-2 border">Scheme Name</th>
+                    <th className="px-4 py-2 border">Gov Students</th>
+                    <th className="px-4 py-2 border">Gov Amount</th>
+                    <th className="px-4 py-2 border">Inst Students</th>
+                    <th className="px-4 py-2 border">Inst Amount</th>
+                    <th className="px-4 py-2 border">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -671,11 +649,24 @@ const Criteria5_1_1 = () => {
                     <td className="px-2 py-2 border">
                       <input
                         type="text"
+                        value={formData.year}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                          handleChange("year", value);
+                        }}
+                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        placeholder="YYYY"
+                        pattern="\d{4}"
+                        title="Please enter a 4-digit year"
+                      />
+                    </td>
+                    <td className="px-2 py-2 border">
+                      <input
+                        type="text"
                         value={formData.scheme_name}
                         onChange={(e) => handleChange("scheme_name", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Scheme Name"
-                        required
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -685,8 +676,7 @@ const Criteria5_1_1 = () => {
                         value={formData.gov_students_count}
                         onChange={(e) => handleChange("gov_students_count", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Gov Students"
-                        required
+                        placeholder="Count"
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -697,8 +687,7 @@ const Criteria5_1_1 = () => {
                         value={formData.gov_amount}
                         onChange={(e) => handleChange("gov_amount", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Gov Amount"
-                        required
+                        placeholder="Amount"
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -708,8 +697,7 @@ const Criteria5_1_1 = () => {
                         value={formData.inst_students_count}
                         onChange={(e) => handleChange("inst_students_count", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Inst Students"
-                        required
+                        placeholder="Count"
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -720,24 +708,24 @@ const Criteria5_1_1 = () => {
                         value={formData.inst_amount}
                         onChange={(e) => handleChange("inst_amount", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Inst Amount"
-                        required
+                        placeholder="Amount"
                       />
                     </td>
-                    <td className="px-2 py-2 border">
+                    <td className="border px-2 py-1">
                       <div className="flex gap-2">
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 rounded text-white ${
+                            submitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}
                         </button>
                         {isEditMode && (
                           <button
                             type="button"
                             onClick={() => {
-                              setIsEditMode(false);
                               setFormData({
                                 slNo: '',
                                 scheme_name: "",
@@ -747,10 +735,13 @@ const Criteria5_1_1 = () => {
                                 non_gov_amount: "",
                                 inst_students_count: "",
                                 inst_amount: "",
-                                supportLinks: []
+                                supportLinks: [],
+                                year: ""
                               });
+                              setEditKey(null);
+                              setIsEditMode(false);
                             }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
                           >
                             Cancel
                           </button>
@@ -764,113 +755,141 @@ const Criteria5_1_1 = () => {
           </div>
 
           {/* Upload Documents Section */}
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents (Scholarship Lists | Sanction Letters | Payment Records)
-            </label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                <i className="fas fa-upload mr-2"></i> Choose Files
-                <input
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const filesArray = Array.from(e.target.files);
-                    for (const file of filesArray) {
-                      try {
-                        const uploaded = await uploadFile(
-                          "criteria5_1_1",
-                          file,
-                          "5.1.1",
-                          currentYear
-                        );
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
-                        }));
-                      } catch (err) {
-                        console.error("Upload error:", err);
-                        alert(err.message || "Upload failed");
-                      }
-                    }
-                  }}
-                />
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6 flex justify-between items-center">
+            <div className="mb-6 w-full">
+              <label className="block text-gray-700 font-medium mb-2">
+                Upload Documents
               </label>
-              {uploading && <span className="text-gray-600">Uploading...</span>}
-              {uploadError && <span className="text-red-600">{uploadError}</span>}
+              <div className="flex items-center gap-4 mb-2">
+                <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                  <i className="fas fa-upload mr-2"></i> Choose Files
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={async (e) => {
+                      const filesArray = Array.from(e.target.files);
+                      for (const file of filesArray) {
+                        try {
+                          console.log('Uploading file:', file.name);
+                          const yearToUse = currentYear || new Date().getFullYear().toString();
+                          console.log('Using year:', yearToUse);
+                          
+                          const uploaded = await uploadFile(
+                            "criteria5_1_1",
+                            file,
+                            "5.1.1",
+                            yearToUse,
+                            user?.session
+                          );
+
+                          setFormData(prev => ({
+                            ...prev,
+                            supportLinks: [
+                              ...prev.supportLinks, 
+                              {
+                                id: uploaded.id,
+                                url: uploaded.fileUrl,
+                                name: file.name
+                              }
+                            ]
+                          }));
+                        } catch (err) {
+                          console.error('Upload error:', err);
+                          console.error('Error details:', {
+                            message: err.message,
+                            response: err.response?.data,
+                            status: err.response?.status
+                          });
+                          setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                        }
+                      }
+                    }}
+                  />
+                </label>
+
+                {uploading && <span className="text-gray-600">Uploading...</span>}
+                {uploadError && <span className="text-red-600">{uploadError}</span>}
+              </div>
+              <div className="text-sm text-gray-500 flex items-center">
+                <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                Changes will be auto-saved
+              </div>
+              {formData.supportLinks && formData.supportLinks.length > 0 && (
+                <ul className="list-disc pl-5 text-gray-700">
+                  {formData.supportLinks.map((link, index) => (
+                    <li key={index} className="flex justify-between items-center mb-1">
+                      <a
+                        href={`http://localhost:3000${link.url}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline"
+                      >
+                        {link.name || link.url.split("/").pop()}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => {
+                            const newLinks = prev.supportLinks.filter(l => l.id !== link.id);
+                            if (newLinks.length < prev.supportLinks.length) {
+                              alert('File deleted successfully!');
+                            }
+                            return {
+                              ...prev,
+                              supportLinks: newLinks
+                            };
+                          });
+                          removeFile("criteria5_1_1", link.id);
+                        }}
+                        className="text-red-600 hover:text-red-800 bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                        title="Remove file"
+                      >
+                        <FaTrash size={16} className="text-red-600" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            
-            {formData.supportLinks && formData.supportLinks.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-700">
-                {formData.supportLinks.map((link, index) => (
-                  <li key={index} className="flex justify-between items-center mb-1">
-                    <a
-                      href={`http://localhost:3000${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      {link.split("/").pop()}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: prev.supportLinks.filter(l => l !== link)
-                        }));
-                        removeFile("criteria5_1_1", link);
-                      }}
-                      className="text-red-600 ml-2"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
 
-          {/* Year-wise Data Display */}
+          {/* Submitted Entries Section */}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
+
           {availableSessions?.map((session) => (
             <div key={session} className="mb-8 border rounded">
-              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
+              <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">
+                Year: {session}
+              </h3>
               {yearData[session] && yearData[session].length > 0 ? (
                 <table className="w-full text-sm border border-black">
-                  <thead className="bg-gray-200">
+                  <thead className="bg-blue-100">
                     <tr>
-                      <th rowSpan="2" className="border border-black px-4 py-2 text-gray-800">#</th>
-                      <th rowSpan="2" className="border border-black px-4 py-2 text-gray-800">Scheme Name</th>
-                      <th colSpan="2" className="border border-black px-4 py-2 text-gray-800">Government</th>
-                      <th colSpan="2" className="border border-black px-4 py-2 text-gray-800">Non-Government</th>
-                      <th colSpan="2" className="border border-black px-4 py-2 text-gray-800">Institution</th>
-                      <th rowSpan="2" className="border border-black px-4 py-2 text-gray-800">Actions</th>
-                    </tr>
-                    <tr>
-                      <th className="border border-black px-2 py-1 text-gray-800">Students</th>
-                      <th className="border border-black px-2 py-1 text-gray-800">Amount</th>
-                      <th className="border border-black px-2 py-1 text-gray-800">Students</th>
-                      <th className="border border-black px-2 py-1 text-gray-800">Amount</th>
-                      <th className="border border-black px-2 py-1 text-gray-800">Students</th>
-                      <th className="border border-black px-2 py-1 text-gray-800">Amount</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">S.No</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Scheme Name</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Gov Students</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Gov Amount</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Inst Students</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Inst Amount</th>
+                      <th className="border border-black px-4 py-2 text-gray-800 w-32">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {yearData[session].map((entry, index) => (
                       <tr key={`${entry.scheme_name}-${entry.year}-${index}`}>
-                        <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{index + 1}</td>
                         <td className="border border-black text-black px-4 py-2">{entry.scheme_name}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.gov_students_count}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.gov_amount}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.non_gov_students_count || 0}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.non_gov_amount || 0}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.inst_students_count || 0}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.inst_amount || 0}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{entry.gov_students_count}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">₹{entry.gov_amount}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">{entry.inst_students_count || 0}</td>
+                        <td className="border border-black text-black px-4 py-2 text-center">₹{entry.inst_amount || 0}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              className="p-2 bg-white text-blue-500 rounded-full hover:bg-blue-50 transition-colors duration-200 flex items-center"
                               onClick={() => {
                                 setFormData({
                                   slNo: entry.sl_no || entry.slNo,
@@ -882,6 +901,7 @@ const Criteria5_1_1 = () => {
                                   inst_students_count: entry.inst_students_count || '',
                                   inst_amount: entry.inst_amount || '',
                                   supportLinks: [],
+                                  year: entry.year
                                 });
                                 setEditKey({ 
                                   slNo: entry.sl_no || entry.slNo, 
@@ -889,20 +909,22 @@ const Criteria5_1_1 = () => {
                                 });
                                 setIsEditMode(true);
                               }}
-                              title="Edit entry"
+                              title="Edit"
                             >
-                              <FaEdit className="w-4 h-4" />
+                              <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              className="p-2 bg-white text-red-500 rounded-full hover:bg-red-50 transition-colors duration-200 flex items-center"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
+                                if (window.confirm('Are you sure you want to delete this entry?')) {
+                                  handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
+                                }
                               }}
                               disabled={submitting}
-                              title="Delete entry"
+                              title="Delete"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>
@@ -923,9 +945,9 @@ const Criteria5_1_1 = () => {
               <table className="table-auto border-collapse w-full">
                 <thead>
                   <tr className="bg-gray-100 text-gray-600 font-semibold">
-                    <th className="border border-[gray] px-4 py-2">YEAR</th>
+                    <th className="border border-gray-400 px-4 py-2">YEAR</th>
                     {availableSessions?.slice(0, 5).map((year) => (
-                      <th key={year} className="border border-[gray] px-4 py-2">
+                      <th key={year} className="border border-gray-400 px-4 py-2">
                         {year}
                       </th>
                     ))}
@@ -969,7 +991,7 @@ const Criteria5_1_1 = () => {
               <div className="flex justify-end mt-4">
                 <button 
                   onClick={fetchScore}
-                  className="px-4 py-2 !bg-blue-600 text-white rounded hover:!bg-blue-600"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Calculate Score
                 </button>
@@ -1009,7 +1031,7 @@ const Criteria5_1_1 = () => {
           )}
 
           {/* Bottom Navigation */}
-          <div className="mt-6">
+          <div className="mt-6 mb-6">
             <Bottom onNext={goToNextPage} onPrevious={goToPreviousPage} onExport={handleExport} />
           </div>
         </div>

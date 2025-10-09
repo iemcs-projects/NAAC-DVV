@@ -27,6 +27,7 @@ const Criteria5_2_2 = () => {
   const [yearData, setYearData] = useState({});
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [error, setError] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [formData, setFormData] = useState({
     slNo: '',

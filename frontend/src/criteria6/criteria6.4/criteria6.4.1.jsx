@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Sidebar from "../../components/sidebar";
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
 

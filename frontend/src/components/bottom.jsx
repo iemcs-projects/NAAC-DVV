@@ -16,13 +16,13 @@ const Bottom = ({ onNext, onPrevious, onExport, onSubmit }) => {
       <div className="flex space-x-4">
         <button
           onClick={onExport}
-          className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
+          className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:!bg-blue-700 transition duration-200"
         >
           Export data
         </button>
         <button
           onClick={onSubmit}
-          className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:bg-gray-800 transition duration-200"
+          className="!bg-blue-600 text-white px-6 py-3 rounded-md font-semibold hover:!bg-blue-700 transition duration-200"
         >
           Submit entry
         </button>

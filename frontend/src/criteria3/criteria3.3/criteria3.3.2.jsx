@@ -30,12 +30,12 @@ const Criteria3_3_2 = () => {
 
   const [formData, setFormData] = useState({
     slNo: '',
-    name_of_activity: "",
-    organizing_unit: "",
-    start_date: "",
-    end_date: "",
-    number_of_participants: "",
-    supportLinks: []
+    activity_name: "",
+    award_name: "",
+    awarding_body: "",
+    year_of_award: "",
+    supportLinks: [],
+    year: currentYear
   });
 
   const [submittedData, setSubmittedData] = useState([]);
@@ -60,10 +60,11 @@ const Criteria3_3_2 = () => {
       console.log('Sending request with session:', yearToSend);
       
       const response = await api.get(
-        "/criteria3/getResponse332", 
+        "/criteria2/getResponse/3.3.2", 
         { 
           params: { 
-            session: yearToSend
+            session: yearToSend,
+            criteriaCode: '030302030201'
           }
         }
       );
@@ -75,12 +76,18 @@ const Criteria3_3_2 = () => {
         return [];
       }
       
-      const data = response.data.data;
+      // Handle both array and object responses
+      let data = Array.isArray(response.data.data) 
+        ? response.data.data 
+        : [response.data.data];
+      
+      console.log('Processed data:', data);
       
       // Store the SL numbers in localStorage for each entry
       data.forEach(item => {
-        if (item.slNo) {
-          localStorage.setItem(`criteria3.3.2_slNo_${item.id}`, item.slNo);
+        if (item.sl_no) {
+          const project = item.activity_name || item.name_of_activity;
+          localStorage.setItem(`criteria332_${project}_${yearToSend}`, item.sl_no);
         }
       });
       
@@ -137,47 +144,38 @@ const Criteria3_3_2 = () => {
     setError(null);
     
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear();
       const payload = {
-        name_of_activity: formDataToSubmit.name_of_activity,
-        organizing_unit: formDataToSubmit.organizing_unit,
-        start_date: formDataToSubmit.start_date,
-        end_date: formDataToSubmit.end_date,
-        number_of_participants: parseInt(formDataToSubmit.number_of_participants) || 0,
+        activity_name: formDataToSubmit.activity_name,
+        award_name: formDataToSubmit.award_name,
+        awarding_body: formDataToSubmit.awarding_body,
+        year_of_award: formDataToSubmit.year_of_award,
         session: parseInt(yearToSend),
+        year: parseInt(yearToSend)
       };
       
       console.log('Sending request with payload:', payload);
       const response = await api.post('/criteria3/createResponse332', payload);
-      console.log('Response received:', response);
       
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Request was successful, showing alert');
+      if (response.data?.data) {
+        // Store SL number in localStorage
+        localStorage.setItem(
+          `criteria332_${formDataToSubmit.name_of_activity}_${yearToSend}`, 
+          response.data.data.sl_no
+        );
         
-        alert('Award and recognition data submitted successfully!');
-        
-        if (response.data?.data?.sl_no) {
-          localStorage.setItem(
-            `criteria332_${formDataToSubmit.name_of_activity}_${yearToSend}`, 
-            response.data.data.sl_no
-          );
-        }
-        
+        // Fetch fresh data
         const updatedData = await fetchResponseData(currentYear);
         
+        // Update states
         setYearData(prev => ({
           ...prev,
           [currentYear]: updatedData
         }));
         
-        setSubmittedData(prev => [
-          ...prev,
-          {
-            ...formDataToSubmit,
-            slNo: response.data?.data?.sl_no || Date.now(),
-            year: currentYear
-          }
-        ]);
+        setSubmittedData(updatedData);
+        setSuccess('Award and recognition data submitted successfully!');
+        setTimeout(() => setSuccess(''), 3000);
         
         // Reset form
         setFormData({
@@ -187,20 +185,17 @@ const Criteria3_3_2 = () => {
           start_date: "",
           end_date: "",
           number_of_participants: "",
-          supportLinks: []
+          supportLinks: [],
+          year: currentYear
         });
-        
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err) {
-      console.error("Error creating entry:", err);
-      setError(err.response?.data?.message || "Failed to create entry");
+      console.error('Error creating entry:', err);
+      setError(err.response?.data?.message || 'Failed to create entry');
     } finally {
       setSubmitting(false);
     }
   };
-
   // Handle update entry
   const handleUpdate = async (formDataToSubmit) => {
     const entryId = formDataToSubmit.id || formDataToSubmit.slNo;
@@ -216,40 +211,47 @@ const Criteria3_3_2 = () => {
     try {
       const yearToSend = formDataToSubmit.year?.split("-")[0] || new Date().getFullYear().toString();
       const payload = {
-        sl_no: entryId,
-        name_of_activity: formDataToSubmit.name_of_activity,
-        organizing_unit: formDataToSubmit.organizing_unit,
-        start_date: formDataToSubmit.start_date,
-        end_date: formDataToSubmit.end_date,
-        number_of_participants: parseInt(formDataToSubmit.number_of_participants) || 0,
-        session: parseInt(yearToSend),
-        year: yearToSend,
+        session: yearToSend,
+        activity_name: formDataToSubmit.name_of_activity,
+        award_name: formDataToSubmit.organizing_unit,
+        awarding_body: formDataToSubmit.start_date,
+        year_of_award: formDataToSubmit.end_date,
+        year: yearToSend
       };
       
       console.log('Sending update payload:', payload);
       const response = await api.put(`/criteria3/updateResponse332/${entryId}`, payload);
       
-      if (!response.data || !response.data.success) {
-        const errorMsg = response.data?.message || "Failed to update entry";
-        throw new Error(errorMsg);
+      if (response.data) {
+        // Update local state with the updated data
+        const updatedData = await fetchResponseData(currentYear);
+        
+        setYearData(prev => ({
+          ...prev,
+          [currentYear]: updatedData
+        }));
+        
+        setSuccess('Entry updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+        
+        // Reset form and exit edit mode
+        setFormData({
+          slNo: '',
+          name_of_activity: "",
+          organizing_unit: "",
+          start_date: "",
+          end_date: "",
+          number_of_participants: "",
+          supportLinks: []
+        });
+        setIsEditMode(false);
+        setEditKey(null);
+      } else {
+        throw new Error('Failed to update entry: No data in response');
       }
-      
-      const updatedData = await fetchResponseData(currentYear);
-      
-      setYearData(prev => ({
-        ...prev,
-        [currentYear]: updatedData
-      }));
-      setSubmittedData(updatedData);
-      
-      setSuccess('Entry updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-      
-      return true;
     } catch (err) {
-      console.error("Error updating entry:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Failed to update entry";
-      setError(errorMsg);
+      console.error('Error updating entry:', err);
+      setError(err.response?.data?.message || 'Failed to update entry');
       throw err;
     } finally {
       setSubmitting(false);
@@ -271,17 +273,24 @@ const Criteria3_3_2 = () => {
       return String(value);
     };
 
-    // Check each required field
-    if (!checkStringField(dataToSubmit.name_of_activity)) missingFields.push("Activity Name");
-    if (!checkStringField(dataToSubmit.organizing_unit)) missingFields.push("Organizing Unit");
-    if (!checkStringField(dataToSubmit.start_date)) missingFields.push("Start Date");
+    // Check each required field with new field names
+    if (!checkStringField(dataToSubmit.activity_name)) missingFields.push("Activity Name");
+    if (!checkStringField(dataToSubmit.award_name)) missingFields.push("Award Name");
+    if (!checkStringField(dataToSubmit.awarding_body)) missingFields.push("Awarding Body");
+    if (!dataToSubmit.year_of_award) missingFields.push("Year of Award");
     
     if (missingFields.length > 0) {
       throw new Error(`Please fill in all required fields: ${missingFields.join(', ')}`);
     }
     
+    // Validate year format
+    const year = parseInt(dataToSubmit.year_of_award);
+    if (isNaN(year) || year < 1900 || year > currentYearNum) {
+      throw new Error(`Year of Award must be between 1900 and ${currentYearNum}.`);
+    }
+
     if (isNaN(session) || session < 1990 || session > currentYearNum) {
-      throw new Error(`Year must be between 1990 and ${currentYearNum}.`);
+      throw new Error(`Session must be between 1990 and ${currentYearNum}.`);
     }
 
     return true;
@@ -289,21 +298,18 @@ const Criteria3_3_2 = () => {
 
   // Handle edit
   const handleEdit = (entry) => {
+    console.log('Editing entry:', entry);
     const formData = {
-      slNo: '',
-      name_of_activity: '',
-      organizing_unit: '',
-      start_date: '',
-      end_date: '',
-      number_of_participants: '',
-      supportLinks: [],
-      year: currentYear,
-      // Override with entry data
-      ...entry,
-      // Ensure these fields are set from the entry or use defaults
-      id: entry.id || entry.slNo,
-      year: entry.year || currentYear
+      slNo: entry.sl_no || '',
+      activity_name: entry.activity_name || '',
+      award_name: entry.award_name || '',
+      awarding_body: entry.awarding_body || '',
+      year_of_award: entry.year_of_award || '',
+      supportLinks: entry.supporting_documents ? [entry.supporting_documents] : [],
+      year: entry.year || currentYear,
+      id: entry.id || entry.sl_no || ''
     };
+    console.log('Form data for edit:', formData);
     
     setFormData(formData);
     setIsEditMode(true);
@@ -359,15 +365,21 @@ const Criteria3_3_2 = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (submitting) return;
+    
     try {
-      const formDataWithYear = { 
+      setSubmitting(true);
+      setError(null);
+      
+      // Prepare form data for validation
+      const dataToSubmit = {
         ...formData,
-        year: formData.year?.toString() || currentYear.toString(),
-        number_of_participants: formData.number_of_participants ? 
-          parseInt(formData.number_of_participants) : 0
+        year: formData.year || currentYear,
+        session: formData.year ? formData.year.split('-')[0] : currentYear.toString().split('-')[0]
       };
       
-      console.log('Submitting form data:', formDataWithYear);
+      // Validate form data
+      validateFormData(dataToSubmit);
       
       validateFormData(formDataWithYear);
       
@@ -383,11 +395,10 @@ const Criteria3_3_2 = () => {
       // Reset form after successful operation
       setFormData({
         slNo: '',
-        name_of_activity: "",
-        organizing_unit: "",
-        start_date: "",
-        end_date: "",
-        number_of_participants: "",
+        activity_name: "",
+        award_name: "",
+        awarding_body: "",
+        year_of_award: "",
         supportLinks: [],
         year: currentYear
       });
@@ -608,10 +619,9 @@ const Criteria3_3_2 = () => {
                 <thead className="bg-gray-100 font-semibold text-gray-950">
                   <tr>
                     <th className="px-4 py-2 border">Activity Name</th>
-                    <th className="px-4 py-2 border">Organizing Unit</th>
-                    <th className="px-4 py-2 border">Start Date</th>
-                    <th className="px-4 py-2 border">End Date</th>
-                    <th className="px-4 py-2 border">No. of Participants</th>
+                    <th className="px-4 py-2 border">Award Name</th>
+                    <th className="px-4 py-2 border">Awarding Body</th>
+                    <th className="px-4 py-2 border">Year of Award</th>
                     <th className="px-4 py-2 border">Action</th>
                   </tr>
                 </thead>
@@ -620,8 +630,8 @@ const Criteria3_3_2 = () => {
                     <td className="px-2 py-2 border">
                       <input
                         type="text"
-                        value={formData.name_of_activity}
-                        onChange={(e) => handleChange("name_of_activity", e.target.value)}
+                        value={formData.activity_name}
+                        onChange={(e) => handleChange("activity_name", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
                         placeholder="Activity Name"
                         required
@@ -630,39 +640,33 @@ const Criteria3_3_2 = () => {
                     <td className="px-2 py-2 border">
                       <input
                         type="text"
-                        value={formData.organizing_unit}
-                        onChange={(e) => handleChange("organizing_unit", e.target.value)}
+                        value={formData.award_name}
+                        onChange={(e) => handleChange("award_name", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Organizing Unit"
+                        placeholder="Award Name"
                         required
                       />
                     </td>
                     <td className="px-2 py-2 border">
                       <input
-                        type="date"
-                        value={formData.start_date}
-                        onChange={(e) => handleChange("start_date", e.target.value)}
+                        type="text"
+                        value={formData.awarding_body}
+                        onChange={(e) => handleChange("awarding_body", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Start Date"
+                        placeholder="Awarding Body"
                         required
-                      />
-                    </td>
-                    <td className="px-2 py-2 border">
-                      <input
-                        type="date"
-                        value={formData.end_date}
-                        onChange={(e) => handleChange("end_date", e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="End Date"
                       />
                     </td>
                     <td className="px-2 py-2 border">
                       <input
                         type="number"
-                        value={formData.number_of_participants}
-                        onChange={(e) => handleChange("number_of_participants", e.target.value)}
+                        min="1900"
+                        max={new Date().getFullYear()}
+                        value={formData.year_of_award}
+                        onChange={(e) => handleChange("year_of_award", e.target.value)}
                         className="w-full px-2 py-1 border rounded text-gray-900"
-                        placeholder="Participants"
+                        placeholder="Year of Award"
+                        required
                       />
                     </td>
                     <td className="px-2 py-2 border">
@@ -681,12 +685,12 @@ const Criteria3_3_2 = () => {
                               setIsEditMode(false);
                               setFormData({
                                 slNo: '',
-                                name_of_activity: "",
-                                organizing_unit: "",
-                                start_date: "",
-                                end_date: "",
-                                number_of_participants: "",
-                                supportLinks: []
+                                activity_name: "",
+                                award_name: "",
+                                awarding_body: "",
+                                year_of_award: "",
+                                supportLinks: [],
+                                year: currentYear
                               });
                             }}
                             className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
@@ -781,22 +785,20 @@ const Criteria3_3_2 = () => {
                     <tr>
                       <th className="border border-black px-4 py-2 text-gray-800">#</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Activity Name</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">Organizing Unit</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">Start Date</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">End Date</th>
-                      <th className="border border-black px-4 py-2 text-gray-800">Participants</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Award Name</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Awarding Body</th>
+                      <th className="border border-black px-4 py-2 text-gray-800">Year of Award</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {yearData[session].map((entry, index) => (
-                      <tr key={`${entry.name_of_activity}-${entry.year}-${index}`}>
+                      <tr key={`${entry.activity_name}-${entry.year}-${index}`}>
                         <td className="border border-black !text-black px-4 py-2 text-center">{index + 1}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.name_of_activity}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.organizing_unit}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.start_date}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.end_date}</td>
-                        <td className="border border-black text-black px-4 py-2">{entry.number_of_participants}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.activity_name}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.award_name}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.awarding_body}</td>
+                        <td className="border border-black text-black px-4 py-2">{entry.year_of_award}</td>
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button

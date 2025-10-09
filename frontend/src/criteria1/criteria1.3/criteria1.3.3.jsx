@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
+import { useNavigate } from 'react-router-dom';
 import Header from "../../components/header";
 import Navbar from "../../components/navbar";
 import Sidebar from "../../components/sidebar";
@@ -18,10 +19,11 @@ const Criteria1_3_3 = () => {
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [editKey, setEditKey] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState('');
   const [yearData, setYearData] = useState({});
   const [provisionalScore, setProvisionalScore] = useState(null);
   const [error, setError] = useState(null);
@@ -197,38 +199,52 @@ const Criteria1_3_3 = () => {
 
   // Handle update entry
   const handleUpdate = async (formDataToSubmit) => {
-    if (!formDataToSubmit.slNo) {
+    const recordId = editingId || formDataToSubmit.slNo;
+    if (!recordId) {
       setError("No entry selected for update");
-      return;
+      return false;
     }
     
     setSubmitting(true);
-    setError(null);
+    setError('');
     
     try {
-      const yearToSend = formDataToSubmit.year.split("-")[0];
+      const yearToSend = (formDataToSubmit.year || currentYear).split("-")[0];
       const payload = {
-        program_code: formDataToSubmit.program_code,
-        program_name: formDataToSubmit.program_name,
-        student_name: formDataToSubmit.student_name,
+        program_code: formDataToSubmit.program_code || '',
+        program_name: formDataToSubmit.program_name || '',
+        student_name: formDataToSubmit.student_name || '',
         session: parseInt(yearToSend),
       };
       
-      const response = await api.put(`/criteria1/updateResponse133/${formDataToSubmit.slNo}`, payload);
+      console.log('Updating record with ID:', recordId);
+      console.log('Payload:', payload);
       
-      if (response.data.success) {
+      const response = await api.put(`/criteria1/updateResponse133/${recordId}`, payload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      console.log('Update response:', response);
+      
+      if (response.status >= 200 && response.status < 300) {
         const updatedData = await fetchResponseData(currentYear);
         setYearData(prev => ({
           ...prev,
           [currentYear]: updatedData
         }));
+        setSubmittedData(updatedData || []);
         
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 3000);
+        setSuccess('Entry updated successfully!');
+        setTimeout(() => setSuccess(''), 3000);
+        return true;
+      } else {
+        throw new Error(response.data?.message || 'Failed to update entry');
       }
     } catch (err) {
       console.error("Error updating entry:", err);
-      setError(err.response?.data?.message || "Failed to update entry");
+      setError(err.response?.data?.message || "Failed to update entry. Please try again.");
+      setTimeout(() => setError(''), 3000);
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -252,15 +268,48 @@ const Criteria1_3_3 = () => {
     return true;
   };
 
-  // Handle edit
-  const handleEdit = (entry) => {
+  // Reset form and edit state
+  const resetForm = () => {
     setFormData({
-      ...entry,
-      id: entry.id,
+      slNo: '',
+      program_code: '',
+      program_name: '',
+      student_name: '',
+      supportLinks: [],
       year: currentYear
     });
+    setIsEditMode(false);
+    setEditingId(null);
+    setEditKey(null);
+    setError('');
+  };
+
+  // Handle edit
+  const handleEdit = (entry) => {
+    const recordId = entry.slNo || entry.sl_no || entry.id;
+    if (!recordId) {
+      console.error('No valid ID found for edit:', entry);
+      setError('Cannot edit: Invalid entry ID');
+      return;
+    }
+
+    console.log('Editing entry with ID:', recordId);
+    
+    setFormData({
+      slNo: recordId,
+      program_code: entry.program_code || '',
+      program_name: entry.program_name || '',
+      student_name: entry.student_name || '',
+      supportLinks: entry.supportLinks || [],
+      year: entry.year || currentYear
+    });
+    
+    // Set editing state
+    setEditingId(recordId);
     setIsEditMode(true);
-    setEditKey(entry.id);
+    setEditKey(recordId);
+    
+    // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -321,25 +370,24 @@ const Criteria1_3_3 = () => {
       const formDataWithYear = { ...formData, year: currentYear };
       validateFormData(formDataWithYear);
       
-      if (isEditMode && formData.id) {
-        console.log('Updating entry:', formDataWithYear);
+      // Determine if we're updating or creating
+      const isUpdating = isEditMode && (editingId || formData.slNo);
+      const recordId = editingId || formData.slNo;
+      
+      console.log('Submit mode:', isUpdating ? 'UPDATE' : 'CREATE');
+      console.log('Record ID:', recordId);
+      console.log('Form data:', formDataWithYear);
+      
+      if (isUpdating && recordId) {
+        console.log('Updating entry with ID:', recordId);
         await handleUpdate(formDataWithYear);
       } else {
-        console.log('Creating new entry:', formDataWithYear);
+        console.log('Creating new entry');
         await handleCreate(formDataWithYear);
       }
       
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      
       // Reset form and edit mode
-      setIsEditMode(false);
-      setFormData({
-        program_code: '',
-        program_name: '',
-        student_name: '',
-        supportLinks: []
-      });
+      resetForm();
       
       // Refresh data
       const data = await fetchResponseData(currentYear);
@@ -348,7 +396,7 @@ const Criteria1_3_3 = () => {
     } catch (error) {
       console.error('Error submitting form:', error);
       setError(error.message || 'Failed to submit form. Please try again.');
-      setTimeout(() => setError(null), 3000);
+      setTimeout(() => setError(''), 3000);
     }
   };
 
@@ -472,28 +520,31 @@ const Criteria1_3_3 = () => {
               <i className="fas fa-arrow-left"></i>
             </a>
             <div>
-              <p className="text-2xl font-bold text-gray-800">Criteria 1-Curricular Planning and Implementation</p>
+              <p className="text-2xl font-bold text-gray-800">Criteria 1 - Curricular Planning and Implementation</p>
               <p className="text-gray-600 text-sm">1.3 Curriculum Enrichment</p>
             </div>
           </div>
           <div className="flex items-center">
-            <UserDropdown user={user} className="ml-2 mr-4 " />
+            <UserDropdown user={user} className="ml-2 mr-4" />
           </div>
         </div>
 
-          <div className="bg-white p-6 rounded shadow mb-6">
-            <h3 className="text-blue-600 font-semibold mb-2">1.3.3 Metric Information</h3>
-            <p className="text-sm text-gray-700 mb-2">
-              Percentage of students undertaking project work/field work/internship
-            </p>
-            <h4 className="text-blue-600 font-medium mt-4 mb-2">Requirements:</h4>
-            <ul className="list-disc pl-5 text-sm text-gray-700">
-              <li className="mb-1">List of programmes and number of students undertaking project work/field work/internships</li>
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h3 className="text-blue-600 font-semibold text-lg mb-3">1.3.3 Metric Information</h3>
+          <p className="text-gray-700 mb-4">
+            Percentage of students undertaking project work/field work/internship
+          </p>
+          <div className="bg-blue-50 p-4 rounded-md">
+            <h4 className="font-medium text-blue-700 mb-2">Requirements:</h4>
+            <ul className="list-disc pl-5 text-gray-700 space-y-1">
+              <li>List of programmes and number of students undertaking project work/field work/internships</li>
             </ul>
           </div>
+        </div>
 
-          <h2 className="text-xl font-bold text-gray-500 mb-4">Project Work/Field Work/Internship Entry</h2>
-
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">Project Work/Field Work/Internship Entry</h2>
+          
           {/* Year Dropdown */}
           <div className="mb-4">
             <label className="font-medium text-gray-700 mr-2">Select Year:</label>
@@ -530,59 +581,59 @@ const Criteria1_3_3 = () => {
           </div>
 
           {/* Input Table */}
-          <div className="overflow-auto border rounded mb-6">
+          <div className="border rounded mb-6">
             <h2 className="text-xl font-bold bg-blue-100 text-gray-800 px-4 py-2">
               Student Projects/Internships - {isEditMode ? 'Edit Mode' : 'Add New'}
             </h2>
             <form onSubmit={handleSubmit}>
-              <table className="min-w-full border text-sm text-left">
-                <thead className="bg-gray-100 font-semibold text-gray-950">
+              <table className="w-full border text-sm border-black">
+                <thead className="bg-gray-100 text-gray-950">
                   <tr>
-                    <th className="px-4 py-2 border">Programme Code</th>
-                    <th className="px-4 py-2 border">Programme Name</th>
-                    <th className="px-4 py-2 border">Name of the Students</th>
-                    <th className="px-4 py-2 border">Action</th>
+                    <th className="border px-2 py-2">Programme Code</th>
+                    <th className="border px-2 py-2">Programme Name</th>
+                    <th className="border px-2 py-2">Name of the Students</th>
+                    <th className="border px-2 py-2">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="px-2 py-2 border">
+                    <td className="border px-2 py-1">
                       <input
                         type="text"
                         value={formData.program_code}
                         onChange={(e) => handleChange("program_code", e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
                         placeholder="Programme Code"
                         required
                       />
                     </td>
-                    <td className="px-2 py-2 border">
+                    <td className="border px-2 py-1">
                       <input
                         type="text"
                         value={formData.program_name}
                         onChange={(e) => handleChange("program_name", e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
                         placeholder="Programme Name"
                         required
                       />
                     </td>
-                    <td className="px-2 py-2 border">
+                    <td className="border px-2 py-1">
                       <input
                         type="text"
                         value={formData.student_name}
                         onChange={(e) => handleChange("student_name", e.target.value)}
-                        className="w-full px-2 py-1 border rounded text-gray-900"
+                        className="w-full border text-gray-950 border-black rounded px-2 py-1"
                         placeholder="Student Names"
                       />
                     </td>
-                    <td className="px-2 py-2 border">
+                    <td className="border px-2 py-1 text-center">
                       <div className="flex gap-2">
                         <button
                           type="submit"
                           disabled={submitting}
-                          className={`px-3 py-1 text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
+                          className={`px-3 py-1 !bg-blue-600 !text-white rounded ${isEditMode ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'} ${submitting ? 'opacity-50' : ''}`}
                         >
-                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Add')}
+                          {submitting ? 'Saving...' : (isEditMode ? 'Update' : 'Save')}
                         </button>
                         {isEditMode && (
                           <button
@@ -596,7 +647,7 @@ const Criteria1_3_3 = () => {
                                 supportLinks: []
                               });
                             }}
-                            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                            className="px-3 py-1 !bg-blue-600 !text-white rounded hover:bg-gray-600"
                           >
                             Cancel
                           </button>
@@ -610,84 +661,128 @@ const Criteria1_3_3 = () => {
           </div>
 
           {/* Upload Documents Section */}
-          <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents
-            </label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                <i className="fas fa-upload mr-2"></i> Choose Files
-                <input
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const filesArray = Array.from(e.target.files);
-                    for (const file of filesArray) {
-                      try {
-                        const uploaded = await uploadFile(
-                          "criteria1_3_3",
-                          file,
-                          "1.3.3",
-                          currentYear
-                        );
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
-                        }));
-                      } catch (err) {
-                        console.error("Upload error:", err);
-                        alert(err.message || "Upload failed");
-                      }
-                    }
-                  }}
-                />
+          <div className="mt-auto bg-white border-t border-gray-200 shadow-inner py-4 px-6">
+            <div className="mb-6">
+              <label className="block text-gray-700 font-medium mb-2">
+                Upload Documents
               </label>
-              {uploading && <span className="text-gray-600">Uploading...</span>}
-              {uploadError && <span className="text-red-600">{uploadError}</span>}
+              <div className="flex items-center gap-4 mb-2">
+                <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+                  <i className="fas fa-upload mr-2"></i> Choose Files
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={async (e) => {
+                      const filesArray = Array.from(e.target.files);
+                      for (const file of filesArray) {
+                        try {
+                          console.log('Uploading file:', file.name);
+                          const yearToUse = currentYear || new Date().getFullYear().toString();
+                          console.log('Using year:', yearToUse);
+                          
+                          const uploaded = await uploadFile(
+                            "1.3.3",  // Metric ID
+                            file,
+                            "1.3.3",  // Criteria code
+                            yearToUse,
+                            user?.session
+                          );
+          
+                          // Add the uploaded file info to the form data
+                          setFormData(prev => ({
+                            ...prev,
+                            supportLinks: [
+                              ...(prev.supportLinks || []), 
+                              {
+                                id: uploaded.id,
+                                url: uploaded.fileUrl || uploaded.file_url,
+                                name: file.name
+                              }
+                            ]
+                          }));
+                        } catch (err) {
+                          console.error('Upload error:', err);
+                          console.error('Error details:', {
+                            message: err.message,
+                            response: err.response?.data,
+                            status: err.response?.status
+                          });
+                          setError(err.response?.data?.message || err.message || 'Upload failed. Please try again.');
+                        }
+                      }
+                    }}
+                  />
+                </label>
+                {uploading && <span className="text-gray-600">Uploading...</span>}
+                {error && <span className="text-red-600">{error}</span>}
+              </div>
+              <div className="text-sm text-gray-500 flex items-center">
+                <i className="fas fa-sync-alt fa-spin mr-2"></i>
+                Changes will be auto-saved
+              </div>
+              {formData.supportLinks && formData.supportLinks.length > 0 && (
+                <ul className="list-disc pl-5 text-gray-700 mt-2">
+                  {formData.supportLinks.map((link, index) => (
+                    <li key={index} className="flex justify-between items-center mb-1">
+                      <a
+                        href={`http://localhost:3000${link.url || link}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {link.name || (typeof link === 'string' ? link.split("/").pop() : link.url?.split("/").pop())}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Remove from local formData
+                          setFormData(prev => {
+                            const newLinks = prev.supportLinks.filter(l => 
+                              typeof link === 'string' 
+                                ? l !== link 
+                                : l.id !== link.id
+                            );
+                            // Show success message
+                            if (newLinks.length < prev.supportLinks.length) {
+                              console.log('File removed successfully');
+                            }
+                            return {
+                              ...prev,
+                              supportLinks: newLinks
+                            };
+                          });
+                          // Also remove from context
+                          if (typeof link === 'object' && link.id) {
+                            removeFile("1.3.3", link.id);
+                          } else if (typeof link === 'string') {
+                            removeFile("1.3.3", link);
+                          }
+                        }}
+                        className="text-red-600 hover:text-red-800 bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
+                        title="Remove file"
+                      >
+                        <FaTrash size={16} className="text-red-600" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            
-            {formData.supportLinks && formData.supportLinks.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-700">
-                {formData.supportLinks.map((link, index) => (
-                  <li key={index} className="flex justify-between items-center mb-1">
-                    <a
-                      href={`http://localhost:3000${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      {link.split("/").pop()}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: prev.supportLinks.filter(l => l !== link)
-                        }));
-                        removeFile("criteria1_3_3", link);
-                      }}
-                      className="text-red-600 ml-2"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
 
           {/* Submitted Data Table */}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
+          </div>
           
-
           {/* Year-wise Data Display */}
           {availableSessions?.map((session) => (
             <div key={session} className="mb-8 border rounded">
               <h3 className="text-lg font-semibold bg-gray-100 text-gray-800 px-4 py-2">Year: {session}</h3>
               {yearData[session] && yearData[session].length > 0 ? (
                 <table className="w-full text-sm border border-black">
-                  <thead className="bg-gray-200">
+                  <thead className="bg-blue-100">
                     <tr>
                       <th className="border border-black px-4 py-2 text-gray-800">#</th>
                       <th className="border border-black px-4 py-2 text-gray-800">Program Code</th>
@@ -706,7 +801,7 @@ const Criteria1_3_3 = () => {
                         <td className="border border-black text-black px-4 py-2 text-center">
                           <div className="flex justify-center space-x-2">
                             <button
-                              className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                              className="p-2 text-blue-600 !bg-white hover:bg-blue-100 rounded-full transition-colors"
                               onClick={() => {
                                 setFormData({
                                   slNo: entry.sl_no || entry.slNo,
@@ -723,10 +818,10 @@ const Criteria1_3_3 = () => {
                               }}
                               title="Edit entry"
                             >
-                              <FaEdit className="w-4 h-4" />
+                              <FaEdit className="text-blue-500" size={16} />
                             </button>
                             <button
-                              className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                              className="p-2 text-red-600 !bg-white hover:bg-red-100 rounded-full transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(entry.sl_no || entry.slNo, entry.year || currentYear);
@@ -734,7 +829,7 @@ const Criteria1_3_3 = () => {
                               disabled={submitting}
                               title="Delete entry"
                             >
-                              <FaTrash className="w-4 h-4" />
+                              <FaTrash className="text-red-500" size={16} />
                             </button>
                           </div>
                         </td>
@@ -784,6 +879,7 @@ const Criteria1_3_3 = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
     
   );
