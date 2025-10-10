@@ -36,7 +36,10 @@ class DatabaseConfig:
             'password': self.password,
             'autocommit': True,
             'charset': 'utf8mb4',
-            'collation': 'utf8mb4_unicode_ci'
+            'collation': 'utf8mb4_unicode_ci',
+            'consume_results': True,  # Automatically consume unread results
+            'get_warnings': True,     # Enable warning handling
+            'raise_on_warnings': False  # Don't raise exceptions for warnings
         }
 
 class NAACDatabase:
@@ -52,6 +55,8 @@ class NAACDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT 1")
+                result = cursor.fetchone()  # Consume the result
+                cursor.close()  # Properly close cursor
                 logger.info("[SUCCESS] Database connection successful")
         except Error as e:
             logger.error(f"❌ Database connection failed: {str(e)}")
@@ -68,8 +73,21 @@ class NAACDatabase:
             logger.error(f"Database error: {str(e)}")
             raise
         finally:
-            if connection and connection.is_connected():
-                connection.close()
+            if connection:
+                try:
+                    # Handle any unread results before closing
+                    if connection.is_connected():
+                        # Consume any unread results
+                        try:
+                            while connection.unread_result:
+                                cursor = connection.cursor()
+                                cursor.fetchall()
+                                cursor.close()
+                        except:
+                            pass  # Ignore errors when consuming unread results
+                        connection.close()
+                except:
+                    pass  # Ignore any errors during cleanup
     
     def get_criteria_record(self, criteria_code: str, record_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -104,23 +122,26 @@ class NAACDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor(dictionary=True)
                 
-                # Get all columns for the record
-                query = f"""
-                    SELECT * FROM {table_name} 
-                    WHERE sl_no = %s 
-                    ORDER BY submitted_at DESC 
-                    LIMIT 1
-                """
-                
-                cursor.execute(query, (record_id,))
-                record = cursor.fetchone()
-                
-                if record:
-                    logger.info(f"[SUCCESS] Found record {record_id} for criteria {criteria_code}")
-                    return record
-                else:
-                    logger.warning(f"⚠️ No record found with sl_no {record_id} for criteria {criteria_code}")
-                    return None
+                try:
+                    # Get all columns for the record
+                    query = f"""
+                        SELECT * FROM {table_name} 
+                        WHERE sl_no = %s 
+                        ORDER BY submitted_at DESC 
+                        LIMIT 1
+                    """
+                    
+                    cursor.execute(query, (record_id,))
+                    record = cursor.fetchone()
+                    
+                    if record:
+                        logger.info(f"[SUCCESS] Found record {record_id} for criteria {criteria_code}")
+                        return record
+                    else:
+                        logger.warning(f"⚠️ No record found with sl_no {record_id} for criteria {criteria_code}")
+                        return None
+                finally:
+                    cursor.close()
                     
         except Error as e:
             logger.error(f"Database query error: {str(e)}")
@@ -156,17 +177,20 @@ class NAACDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor(dictionary=True)
                 
-                query = f"""
-                    SELECT * FROM {table_name} 
-                    ORDER BY submitted_at DESC 
-                    LIMIT %s
-                """
-                
-                cursor.execute(query, (limit,))
-                records = cursor.fetchall()
-                
-                logger.info(f"[SUCCESS] Retrieved {len(records)} records for criteria {criteria_code}")
-                return records
+                try:
+                    query = f"""
+                        SELECT * FROM {table_name} 
+                        ORDER BY submitted_at DESC 
+                        LIMIT %s
+                    """
+                    
+                    cursor.execute(query, (limit,))
+                    records = cursor.fetchall()
+                    
+                    logger.info(f"[SUCCESS] Retrieved {len(records)} records for criteria {criteria_code}")
+                    return records
+                finally:
+                    cursor.close()
                 
         except Error as e:
             logger.error(f"Database query error: {str(e)}")
@@ -216,18 +240,21 @@ class NAACDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor(dictionary=True)
                 
-                query = f"""
-                    SELECT * FROM {table_name} 
-                    WHERE {' AND '.join(conditions)}
-                    ORDER BY submitted_at DESC
-                    LIMIT 20
-                """
-                
-                cursor.execute(query, values)
-                records = cursor.fetchall()
-                
-                logger.info(f"[SUCCESS] Found {len(records)} matching records for criteria {criteria_code}")
-                return records
+                try:
+                    query = f"""
+                        SELECT * FROM {table_name} 
+                        WHERE {' AND '.join(conditions)}
+                        ORDER BY submitted_at DESC
+                        LIMIT 20
+                    """
+                    
+                    cursor.execute(query, values)
+                    records = cursor.fetchall()
+                    
+                    logger.info(f"[SUCCESS] Found {len(records)} matching records for criteria {criteria_code}")
+                    return records
+                finally:
+                    cursor.close()
                 
         except Error as e:
             logger.error(f"Database search error: {str(e)}")
@@ -239,25 +266,28 @@ class NAACDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor(dictionary=True)
                 
-                # Get table statistics
-                tables = ["response_2_1_1", "response_3_1_1", "response_3_2_1", 
-                         "response_3_2_2", "response_3_3_1", "response_3_4_1"]
-                
-                table_stats = {}
-                for table in tables:
-                    try:
-                        cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
-                        result = cursor.fetchone()
-                        table_stats[table] = result["count"]
-                    except Error:
-                        table_stats[table] = "error"
-                
-                return {
-                    "status": "connected",
-                    "host": self.config.host,
-                    "database": self.config.database,
-                    "table_counts": table_stats
-                }
+                try:
+                    # Get table statistics
+                    tables = ["response_2_1_1", "response_3_1_1", "response_3_2_1", 
+                             "response_3_2_2", "response_3_3_1", "response_3_4_1"]
+                    
+                    table_stats = {}
+                    for table in tables:
+                        try:
+                            cursor.execute(f"SELECT COUNT(*) as count FROM {table}")
+                            result = cursor.fetchone()
+                            table_stats[table] = result["count"]
+                        except Error:
+                            table_stats[table] = "error"
+                    
+                    return {
+                        "status": "connected",
+                        "host": self.config.host,
+                        "database": self.config.database,
+                        "table_counts": table_stats
+                    }
+                finally:
+                    cursor.close()
                 
         except Error as e:
             return {
