@@ -1,49 +1,74 @@
 #!/usr/bin/env python3
 """
-NAAC Validation FastAPI Application - Streamlined Version
-Provides REST API endpoints for file validation and text extraction
+NAAC Validation System - Simplified FastAPI Application
+
+This is a streamlined version of the NAAC validation system with only essential endpoints.
+Removed redundant endpoints and simplified code structure for better maintainability.
 """
 
-import sys
 import os
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 import logging
-import json
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
-from fastapi.responses import JSONResponse
+# FastAPI imports
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent))
-
-from config.settings import settings
+# Import validation system components
 from processors.ocr_processor import UnifiedOCRProcessor
 from validation.criteria.criteria_validator import CriteriaValidator
 from config.database import db
+from response_simplifier import format_api_response
 
-# Setup logging
+# Configure logging
 logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(settings.LOG_FILE),
-        logging.StreamHandler(sys.stdout),
-    ],
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
-# FastAPI app initialization
+# Pydantic models for API responses
+class ValidationResponse(BaseModel):
+    success: bool
+    message: str
+    data: Dict[str, Any]
+    error: Optional[str] = None
+
+# Initialize system components
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management"""
+    logger.info("🚀 Starting NAAC Validation System")
+    
+    # Initialize components
+    global ocr_processor, criteria_validator
+    
+    try:
+        ocr_processor = UnifiedOCRProcessor()
+        criteria_validator = CriteriaValidator()
+        logger.info("✅ System components initialized successfully")
+        yield
+    except Exception as e:
+        logger.error(f"❌ System initialization failed: {str(e)}")
+        yield
+    finally:
+        logger.info("🔄 Shutting down NAAC Validation System")
+
+# Create FastAPI application
 app = FastAPI(
     title="NAAC Validation System",
-    description="File validation and text extraction API for NAAC DVV submissions",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    description="Streamlined document validation against NAAC criteria using AI",
+    version="2.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -55,295 +80,213 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize processors
-ocr_processor = UnifiedOCRProcessor()
-criteria_validator = CriteriaValidator()
-
-
-class ValidationResponse(BaseModel):
-    """Response model for validation results"""
-    success: bool
-    message: str
-    data: Dict[str, Any]
-    errors: List[str] = []
-
-
+# Utility functions
 def _save_uploaded_file(file: UploadFile) -> str:
     """Save uploaded file to temporary location"""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
-        temp_file_path = temp_file.name
-        shutil.copyfileobj(file.file, temp_file)
-    return temp_file_path
-
+    try:
+        temp_path = f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+        with open(temp_path, "wb") as temp_file:
+            temp_file.write(file.file.read())
+        return temp_path
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"File upload failed: {str(e)}")
 
 def _cleanup_file(file_path: str):
     """Clean up temporary file"""
-    if file_path and Path(file_path).exists():
-        os.unlink(file_path)
+    try:
+        if file_path and Path(file_path).exists():
+            os.remove(file_path)
+    except Exception as e:
+        logger.warning(f"File cleanup failed: {str(e)}")
 
-
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "NAAC Validation System API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "status": "operational"
-    }
-
+# ==========================================
+# CORE API ENDPOINTS
+# ==========================================
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    try:
-        ocr_status = ocr_processor.get_status()
-        supported_criteria = criteria_validator.list_supported_criteria()
-        
-        return {
-            "status": "healthy",
-            "components": {
-                "ocr_processor": ocr_status,
-                "criteria_validator": "available",
-                "supported_criteria_count": len(supported_criteria)
-            }
+    """System health check"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "version": "2.0",
+        "components": {
+            "database": "connected" if db else "disconnected",
+            "ocr_processor": "initialized",
+            "criteria_validator": "initialized"
         }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+    }
 
-
-@app.post("/extract-text-mistral")
-async def extract_text_with_mistral(
+@app.post("/extract-text")
+async def extract_text_from_document(
     file: UploadFile = File(...),
-    force_ocr: bool = Form(default=True)
+    use_ocr: bool = Form(default=True)
 ):
-    """Extract text using Mistral AI Vision OCR or direct extraction"""
+    """Extract text from uploaded document"""
     temp_file_path = None
     
     try:
-        # Validate file type
-        if not file.filename.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.bmp')):
-            raise HTTPException(
-                status_code=400,
-                detail="Supported formats: PDF and image files (.pdf, .png, .jpg, .jpeg, .tiff, .bmp)"
-            )
-        
-        # Save and process file
         temp_file_path = _save_uploaded_file(file)
-        extraction_result = ocr_processor.extract_text(temp_file_path, use_ocr=force_ocr)
-        
-        extracted_text = extraction_result.get("text", "")
-        ocr_method = extraction_result.get("ocr_method", "none")
-        ocr_used = extraction_result.get("ocr_used", False)
-        
-        # Determine processing method
-        if ocr_used and ocr_method != "none":
-            method_description = f"{ocr_method.title()} OCR"
-            message = f"Text extracted using {ocr_method} OCR"
-        else:
-            method_description = "Direct PDF Text Extraction"
-            message = "Text extracted directly from PDF (no OCR needed)"
+        extraction_result = ocr_processor.extract_text(temp_file_path, use_ocr=use_ocr)
         
         return {
-            "success": bool(extracted_text),
-            "message": message,
+            "success": True,
+            "message": "Text extraction completed",
             "data": {
-                "extracted_text": extracted_text,
-                "text_length": len(extracted_text),
-                "ocr_method": ocr_method,
-                "ocr_used": ocr_used,
-                "pages_processed": extraction_result.get("pages_processed", 0),
-                "confidence_scores": extraction_result.get("confidence_scores", []),
-                "errors": extraction_result.get("errors", []),
-                "file_info": {
-                    "original_name": file.filename,
-                    "processed_with": method_description
-                }
+                "text": extraction_result.get("text", ""),
+                "text_length": len(extraction_result.get("text", "")),
+                "extraction_method": extraction_result.get("ocr_method", "direct"),
+                "filename": file.filename
             }
         }
         
     except Exception as e:
         logger.error(f"Text extraction error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Text extraction failed: {str(e)}")
-    
     finally:
-        _cleanup_file(temp_file_path)
+        if temp_file_path:
+            _cleanup_file(temp_file_path)
 
-
-@app.post("/validate-record", response_model=ValidationResponse)
-async def validate_record_from_database(
+@app.post("/validate-record")
+async def validate_single_record(
     file: UploadFile = File(...),
     criteria_code: str = Form(...),
     record_id: int = Form(...)
 ):
-    """Validate document against specific database record"""
+    """Validate document against specific database record with simplified response"""
     temp_file_path = None
     
     try:
-        # Fetch record from database
-        database_record = db.get_criteria_record(criteria_code, record_id)
-        if not database_record:
+        # Save uploaded file
+        temp_file_path = _save_uploaded_file(file)
+        
+        # Get database record
+        db_record = db.get_criteria_record(criteria_code, record_id)
+        if not db_record:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Record with ID {record_id} not found for criteria {criteria_code}"
+                status_code=404,
+                detail=f"No record found for criteria {criteria_code}, record_id {record_id}"
             )
         
-        # Save and extract text from file
-        temp_file_path = _save_uploaded_file(file)
-        extraction_result = ocr_processor.extract_text(temp_file_path)
-        
-        extracted_text = extraction_result.get("text", "")
-        if not extracted_text.strip():
+        # Extract text
+        extraction_result = ocr_processor.extract_text(temp_file_path, use_ocr=True)
+        if not extraction_result.get("text"):
             raise HTTPException(
                 status_code=400,
-                detail="No text could be extracted from the document"
+                detail="Could not extract text from uploaded file"
             )
         
         # Validate using criteria validator
         validation_result = criteria_validator.validate_criteria_document(
-            criteria_code, database_record, extracted_text
+            criteria_code, db_record, extraction_result["text"]
         )
         
-        response_data = {
-            "validation_result": validation_result,
-            "database_record": database_record,
-            "extraction_info": {
-                "text_length": len(extracted_text),
-                "ocr_method": extraction_result.get("ocr_method", "none"),
-                "ocr_used": extraction_result.get("ocr_used", False)
-            },
-            "processing_stats": {
-                "file_size": Path(temp_file_path).stat().st_size,
-                "confidence_score": validation_result.get("confidence_score", 0.0),
-                "record_id": record_id
-            }
+        # Create response structure for simplification
+        original_response = {
+            "success": True,
+            "message": f"Validation completed for {criteria_code}",
+            "data": {"validation_result": validation_result}
         }
         
-        # Collect validation errors
-        validation_errors = []
-        if validation_result.get("error"):
-            validation_errors.append(validation_result["error"])
-        if validation_result.get("errors"):
-            validation_errors.extend(validation_result["errors"])
+        # Return simplified response
+        return format_api_response(original_response, "single")
         
-        return ValidationResponse(
-            success=validation_result.get("is_valid", False),
-            message=f"Validation completed for criteria {criteria_code}",
-            data=response_data,
-            errors=validation_errors
-        )
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Validation error: {str(e)}")
+        logger.error(f"Single validation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
-    
     finally:
-        _cleanup_file(temp_file_path)
+        if temp_file_path:
+            _cleanup_file(temp_file_path)
 
-
-@app.post("/validate-against-all-records", response_model=ValidationResponse)
-async def validate_against_all_records(
+@app.post("/validate-all-records")
+async def validate_all_records(
     file: UploadFile = File(...),
     criteria_code: str = Form(...),
-    limit: int = Form(default=50)
+    confidence_threshold: float = Form(default=0.7),
+    max_records: int = Form(default=10)
 ):
-    """Validate document against ALL database records for a criteria"""
+    """Validate document against all database records with clean response"""
     temp_file_path = None
     
     try:
-        # Fetch all records for the criteria
-        all_records = db.get_records_by_criteria(criteria_code, limit)
-        if not all_records:
+        # Save uploaded file
+        temp_file_path = _save_uploaded_file(file)
+        
+        # Get records for criteria
+        records = db.get_records_by_criteria(criteria_code, limit=max_records)
+        if not records:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"No records found for criteria {criteria_code}"
             )
         
-        # Save and extract text from file
-        temp_file_path = _save_uploaded_file(file)
-        extraction_result = ocr_processor.extract_text(temp_file_path)
-        
-        extracted_text = extraction_result.get("text", "")
-        if not extracted_text.strip():
+        # Extract text
+        extraction_result = ocr_processor.extract_text(temp_file_path, use_ocr=True)
+        if not extraction_result.get("text"):
             raise HTTPException(
                 status_code=400,
-                detail="No text could be extracted from the document"
+                detail="Could not extract text from uploaded file"
             )
         
         # Validate against each record
         validation_results = []
-        best_match = None
-        best_confidence = 0.0
+        decision_counts = {"ACCEPT": 0, "FLAG_FOR_REVIEW": 0, "REJECT": 0}
         
-        for i, database_record in enumerate(all_records):
-            try:
-                validation_result = criteria_validator.validate_criteria_document(
-                    criteria_code, database_record, extracted_text
-                )
-                
-                validation_result["database_record"] = database_record
-                validation_result["record_index"] = i + 1
-                validation_results.append(validation_result)
-                
-                # Track best match
-                confidence = validation_result.get("confidence_score", 0.0)
-                if confidence > best_confidence:
-                    best_confidence = confidence
-                    best_match = validation_result
-                
-            except Exception as e:
-                logger.error(f"Failed to validate record {i+1}: {str(e)}")
-                validation_results.append({
-                    "database_record": database_record,
-                    "record_index": i + 1,
-                    "error": f"Validation failed: {str(e)}",
-                    "confidence_score": 0.0,
-                    "decision": "ERROR"
-                })
+        for idx, record in enumerate(records):
+            result = criteria_validator.validate_criteria_document(
+                criteria_code, record, extraction_result["text"]
+            )
+            
+            result["record_index"] = idx + 1
+            result["database_record"] = record
+            validation_results.append(result)
+            
+            # Count decisions
+            decision = result.get("decision", "REJECT")
+            decision_counts[decision] = decision_counts.get(decision, 0) + 1
         
-        # Sort results by confidence score
-        validation_results.sort(key=lambda x: x.get("confidence_score", 0.0), reverse=True)
+        # Filter and sort results
+        filtered_results = [
+            r for r in validation_results 
+            if r["confidence_score"] >= confidence_threshold
+        ]
+        filtered_results.sort(key=lambda x: x["confidence_score"], reverse=True)
         
-        # Calculate statistics
-        decision_stats = {}
-        for result in validation_results:
-            decision = result.get("decision", "ERROR")
-            decision_stats[decision] = decision_stats.get(decision, 0) + 1
+        best_match = filtered_results[0] if filtered_results else validation_results[0]
         
-        response_data = {
-            "bulk_validation_summary": {
-                "total_records_checked": len(all_records),
-                "best_match_confidence": best_confidence,
-                "decision_breakdown": decision_stats
-            },
-            "best_match": best_match,
-            "top_matches": validation_results[:10],  # Top 10 results
-            "extraction_info": {
-                "text_length": len(extracted_text),
-                "ocr_method": extraction_result.get("ocr_method", "none")
+        # Create response for simplification
+        original_response = {
+            "success": True,
+            "message": f"Bulk validation completed - {len(records)} records processed",
+            "data": {
+                "bulk_validation_summary": {
+                    "total_records_checked": len(records),
+                    "best_match_confidence": best_match["confidence_score"],
+                    "decision_breakdown": decision_counts
+                },
+                "best_match": best_match,
+                "top_matches": filtered_results[:5]
             }
         }
         
-        # Determine overall success
-        overall_success = best_match and best_match.get("decision") in ["ACCEPT", "FLAG_FOR_REVIEW"] if best_match else False
+        # Return simplified response
+        return format_api_response(original_response, "bulk")
         
-        return ValidationResponse(
-            success=overall_success,
-            message=f"Bulk validation completed - {len(validation_results)} records processed",
-            data=response_data,
-            errors=[]
-        )
-        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Bulk validation error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Bulk validation failed: {str(e)}")
-    
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
     finally:
-        _cleanup_file(temp_file_path)
+        if temp_file_path:
+            _cleanup_file(temp_file_path)
 
+# ==========================================
+# UTILITY ENDPOINTS
+# ==========================================
 
-# Utility endpoints
 @app.get("/criteria")
 async def list_supported_criteria():
     """List all supported NAAC criteria"""
@@ -356,7 +299,6 @@ async def list_supported_criteria():
     except Exception as e:
         logger.error(f"Error listing criteria: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list criteria: {str(e)}")
-
 
 @app.get("/records/{criteria_code}")
 async def get_records_by_criteria(criteria_code: str, limit: int = 10):
@@ -372,16 +314,87 @@ async def get_records_by_criteria(criteria_code: str, limit: int = 10):
         logger.error(f"Error getting records: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get records: {str(e)}")
 
-
 @app.get("/database/status")
 async def get_database_status():
     """Get database connection status"""
     try:
-        return db.get_database_status()
+        status = db.get_database_status()
+        return status
     except Exception as e:
-        logger.error(f"Database status check failed: {str(e)}")
+        logger.error(f"Database status error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database status check failed: {str(e)}")
 
+@app.get("/api-docs")
+async def get_api_documentation():
+    """API documentation and usage examples"""
+    return {
+        "endpoints": {
+            "/validate-record": {
+                "method": "POST",
+                "description": "Validate single record with clean response",
+                "parameters": ["file", "criteria_code", "record_id"]
+            },
+            "/validate-all-records": {
+                "method": "POST", 
+                "description": "Validate against all records with clean response",
+                "parameters": ["file", "criteria_code", "confidence_threshold", "max_records"]
+            },
+            "/extract-text": {
+                "method": "POST",
+                "description": "Extract text from document",
+                "parameters": ["file", "use_ocr"]
+            },
+            "/criteria": {
+                "method": "GET",
+                "description": "List supported criteria"
+            }
+        },
+        "supported_criteria": [
+            "2.1.1 - Teaching staff appointments",
+            "3.1.1 - Research grants received",
+            "3.2.1 - Publications/innovations",
+            "3.2.2 - Research workshops",
+            "3.3.1 - Research papers",
+            "3.4.1 - Extension activities"
+        ],
+        "response_format": {
+            "data": "Core validation results",
+            "details": "Detailed analysis and confidence breakdown"
+        }
+    }
+
+# ==========================================
+# ERROR HANDLERS
+# ==========================================
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error": exc.detail,
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle general exceptions"""
+    logger.error(f"Unhandled exception: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": "Internal server error",
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+# ==========================================
+# SERVER STARTUP
+# ==========================================
 
 if __name__ == "__main__":
     import uvicorn
@@ -389,6 +402,7 @@ if __name__ == "__main__":
     print("🚀 Starting NAAC Validation FastAPI Server")
     print("📖 API Documentation: http://localhost:8000/docs")
     print("❤️  Health Check: http://localhost:8000/health")
+    print("🎯 Simplified & Optimized Version 2.0")
     
     uvicorn.run(
         "app:app",
