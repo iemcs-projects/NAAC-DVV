@@ -1,0 +1,10 @@
+pytesseract==0.3.10
+Pillow==10.0.0
+PyPDF2==3.0.1
+opencv-python==4.8.1.78
+mysql-connector-python==8.1.0
+numpy<2.0
+dotenv
+fastapi 
+uvicorn
+python-multipart
