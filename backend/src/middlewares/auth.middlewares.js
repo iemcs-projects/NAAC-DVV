@@ -105,4 +105,5 @@ const verifyRole = (criteriaCode) => {
   };
 };
 
-export { verifyToken, verifyRole };
+export default verifyToken;
+export { verifyRole };

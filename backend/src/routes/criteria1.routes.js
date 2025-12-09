@@ -33,7 +33,6 @@ import {
   score142 
 } from '../controllers/criteria1.controller.js';
 
-
 router.route('/createResponse113')
     .post(createResponse113);
 
