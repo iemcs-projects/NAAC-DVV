@@ -1,101 +1,108 @@
 import jwt from "jsonwebtoken";
 import db from "../models/index.js";
+import { roleCriteriaAccess, HOD, FACULTY, COLLEGE_AUTHORITY, MENTOR} from "../utils/roleAccess.js";
 
 const IQAC = db.iqac_supervision;
 const User = db.users;
 const verifyToken = async (req, res, next) => {
-    try {
-        // Get token from cookies or Authorization header
-        let token;
-        
-        // Check cookies if they exist
-        if (req.cookies && req.cookies.accessToken) {
-            token = req.cookies.accessToken;
-            console.log('Token found in cookies');
-        } 
-        // Check Authorization header
-        else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-            token = req.headers.authorization.split(' ')[1];
-            console.log('Token found in Authorization header');
-        }
-        
-        console.log('Token received:', token);
-        
-        if (!token) {
-            console.log('No token provided in request');
-            return res.status(401).json({ 
-                success: false,
-                message: 'Unauthorized: No authentication token provided' 
-            });
-        }
+  try {
+    // Extract token from cookies or Authorization header
+    const token =
+      req.cookies?.accessToken ||
+      (req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.split(" ")[1]
+        : null);
 
-        try {
-            console.log('Verifying token with secret:', process.env.JWT_ACCESS_TOKEN ? 'Secret exists' : 'No secret found');
-            const decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
-            console.log('Decoded token:', decoded);
-            
-            if (!decoded.id) {
-                console.log('Token missing user ID');
-                return res.status(401).json({ 
-                    success: false,
-                    message: 'Invalid token: Missing user identification' 
-                });
-            }
-
-            // First check IQAC table
-            let user = await IQAC.findOne({ where: { uuid: decoded.id } });
-            
-            // If not found in IQAC, check Users table
-            if (!user) {
-                user = await User.findOne({ 
-                    where: { uuid: decoded.id },
-                    attributes: { exclude: ['password_hash', 'refresh_token'] }
-                });
-                console.log('User found in Users table:', user ? 'Yes' : 'No');
-            } else {
-                console.log('User found in IQAC table');
-            }
-            
-            if (!user) {
-                return res.status(404).json({ 
-                    success: false,
-                    message: 'User not found' 
-                });
-            }
-            
-            // Attach user to request object
-            req.user = user;
-            next();
-            
-        } catch (jwtError) {
-            console.error('JWT Verification Error:', jwtError);
-            
-            if (jwtError.name === 'TokenExpiredError') {
-                return res.status(401).json({ 
-                    success: false,
-                    message: 'Session expired. Please log in again.' 
-                });
-            }
-            
-            if (jwtError.name === 'JsonWebTokenError') {
-                return res.status(401).json({ 
-                    success: false,
-                    message: 'Invalid token. Please log in again.' 
-                });
-            }
-            
-            return res.status(401).json({ 
-                success: false,
-                message: 'Not authorized, token failed' 
-            });
-        }
-    } catch (error) {
-        console.error('Authentication Middleware Error:', error);
-        return res.status(500).json({ 
-            success: false,
-            message: 'Internal server error during authentication' 
-        });
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: No authentication token provided"
+      });
     }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(401).json({
+          success: false,
+          message: "Session expired. Please log in again."
+        });
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or malformed token"
+      });
+    }
+
+    if (!decoded.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload"
+      });
+    }
+
+    // Locate user (IQAC first, then Users)
+    let user =
+      (await IQAC.findOne({ where: { uuid: decoded.id } })) ||
+      (await User.findOne({
+        where: { uuid: decoded.id },
+        attributes: { exclude: ["password_hash", "refresh_token"] }
+      }));
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error("verifyToken Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authentication"
+    });
+  }
 };
 
-export default verifyToken;
+
+const verifyRole = (criteriaCode) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Unauthorized" 
+      });
+    }
+
+    const role = req.user.role;
+
+    // Role not registered in the RBAC map
+    if (!role || !roleCriteriaAccess[role]) {
+      return res.status(403).json({ 
+        success: false,
+        message: "Forbidden: Role not allowed" 
+      });
+    }
+
+    const allowedCriteria = roleCriteriaAccess[role];
+
+    // Criteria not permitted for this role
+    if (!allowedCriteria.includes(criteriaCode)) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: Role '${role}' cannot access criteria '${criteriaCode}'`
+      });
+    }
+
+    next();
+  };
+};
+
+export { verifyToken, verifyRole };
