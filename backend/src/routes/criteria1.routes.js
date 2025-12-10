@@ -130,6 +130,6 @@ router.route('/score142')
 
 // Dynamic criteria route - checks if user has access to the specific criteria
 router.route('/getResponsesByCriteriaCode/:criteriaCode')
-    .get(checkDynamicCriteriaAccess, getResponsesByCriteriaCode);
+    .get(verifyToken, checkDynamicCriteriaAccess, getResponsesByCriteriaCode);
 
 export default router;

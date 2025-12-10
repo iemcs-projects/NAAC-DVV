@@ -113,7 +113,7 @@ export const checkDynamicCriteriaAccess = (req, res, next) => {
   try {
     const criteriaCode = req.params.criteriaCode;
     const userRole = req.user?.role;
-    
+    console.log('Dynamic Criteria Access Check:', { userRole, criteriaCode });
     if (!userRole) {
       return res.status(401).json({
         success: false,
