@@ -2541,12 +2541,10 @@ const score271 = asyncHandler(async (req, res) => {
 
 
 export { 
-  // getAllCriteria211,
   createResponse211,
   updateResponse211,
   deleteResponse211,
   score211,
-  // getAllCriteria212,
   createResponse212,
   updateResponse212,
   deleteResponse212,
@@ -2563,7 +2561,6 @@ export {
   updateResponse263,
   deleteResponse263,
   createResponse271,
-  // getResponsesByCriteriaCode212,
   score212,
   score222,
   score242,
@@ -2573,11 +2570,4 @@ export {
   score233,
   score271,
   getResponsesByCriteriaCode,
-  // getAllCriteria241243222233 ,
-  // createResponse241243222233,
-  // getResponsesByCriteriaCode241243222233,
-  // score241,
-  // score243,
-  // score222,
-  // score271
 }

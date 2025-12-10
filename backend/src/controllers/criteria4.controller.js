@@ -2369,5 +2369,4 @@ export{
   updateResponse432,
   deleteResponse432,
   getResponsesByCriteriaCode
-  
 }

@@ -1,6 +1,5 @@
 import jwt from "jsonwebtoken";
 import db from "../models/index.js";
-import { roleCriteriaAccess, HOD, FACULTY, COLLEGE_AUTHORITY, MENTOR} from "../utils/roleAccess.js";
 
 const IQAC = db.iqac_supervision;
 const User = db.users;
@@ -72,38 +71,38 @@ const verifyToken = async (req, res, next) => {
 };
 
 
-const verifyRole = (criteriaCode) => {
-  return async (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Unauthorized" 
-      });
-    }
+// const verifyRole = (criteriaCode) => {
+//   return async (req, res, next) => {
+//     if (!req.user) {
+//       return res.status(401).json({ 
+//         success: false,
+//         message: "Unauthorized" 
+//       });
+//     }
 
-    const role = req.user.role;
+//     const role = req.user.role;
 
-    // Role not registered in the RBAC map
-    if (!role || !roleCriteriaAccess[role]) {
-      return res.status(403).json({ 
-        success: false,
-        message: "Forbidden: Role not allowed" 
-      });
-    }
+//     // Role not registered in the RBAC map
+//     if (!role || !roleCriteriaAccess[role]) {
+//       return res.status(403).json({ 
+//         success: false,
+//         message: "Forbidden: Role not allowed" 
+//       });
+//     }
 
-    const allowedCriteria = roleCriteriaAccess[role];
+//     const allowedCriteria = roleCriteriaAccess[role];
 
-    // Criteria not permitted for this role
-    if (!allowedCriteria.includes(criteriaCode)) {
-      return res.status(403).json({
-        success: false,
-        message: `Forbidden: Role '${role}' cannot access criteria '${criteriaCode}'`
-      });
-    }
+//     // Criteria not permitted for this role
+//     if (!allowedCriteria.includes(criteriaCode)) {
+//       return res.status(403).json({
+//         success: false,
+//         message: `Forbidden: Role '${role}' cannot access criteria '${criteriaCode}'`
+//       });
+//     }
 
-    next();
-  };
-};
+//     next();
+//   };
+// };
 
 export default verifyToken;
-export { verifyRole };
+// export { verifyRole };
