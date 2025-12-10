@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { checkAccess, checkDynamicCriteriaAccess } from '../middleware/rbacMiddleware.js';
+import { checkAccess, checkDynamicCriteriaAccess } from '../middlewares/rbacMiddlewares.js';
 import { 
   createResponse113,
   updateResponse113,

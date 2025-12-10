@@ -1,4 +1,4 @@
-import { rolesCriteria, criteriaControllers } from './rbacConfig.js';
+import { rolesCriteria, criteriaControllers } from '../utils/rbacConfig.js';
 
 // Build role permissions cache: role -> Set of allowed controllers
 const buildRolePermissions = () => {
