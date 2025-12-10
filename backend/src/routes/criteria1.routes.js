@@ -33,29 +33,29 @@ import {
   score141,
   score142 
 } from '../controllers/criteria1.controller.js';
+import verifyToken from '../middlewares/auth.middlewares.js';
 
 // Criteria 1.1.3 routes - Faculty only
 router.route('/createResponse113')
-    .post(checkAccess('createResponse113'), createResponse113);
+    .post( verifyToken, checkAccess('createResponse113'), createResponse113);
 
 router.route('/updateResponse113/:sl_no')
-    .put(checkAccess('updateResponse113'), updateResponse113);
+    .put( verifyToken, checkAccess('updateResponse113'), updateResponse113);
 
 router.route('/deleteResponse113/:sl_no')
-    .delete(checkAccess('deleteResponse113'), deleteResponse113);
+    .delete( verifyToken, checkAccess('deleteResponse113'), deleteResponse113);
 
 router.route('/score113')
-    .get(checkAccess('score113'), score113);
+    .get(verifyToken, checkAccess('score113'), score113);
 
 // Criteria 1.2.1 routes - Faculty only
 router.route('/createResponse121')
-    .post(checkAccess('createResponse121'), createResponse121);
-
+    .post(verifyToken, checkAccess('createResponse121'), createResponse121);
 router.route('/updateResponse121/:sl_no')
-    .put(checkAccess('updateResponse121'), updateResponse121);
+    .put(verifyToken, checkAccess('updateResponse121'), updateResponse121);
 
 router.route('/deleteResponse121/:sl_no')
-    .delete(checkAccess('deleteResponse121'), deleteResponse121);
+    .delete(verifyToken, checkAccess('deleteResponse121'), deleteResponse121);
 
 router.route('/score121')
     .get(checkAccess('score121'), score121);
