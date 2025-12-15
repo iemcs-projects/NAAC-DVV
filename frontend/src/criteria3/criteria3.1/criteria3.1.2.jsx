@@ -11,8 +11,13 @@ import axios from "axios";
 import { UploadProvider, useUpload } from "../../contextprovider/uploadsContext";
 import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
+import { validateDocument, isValidationPassed, formatValidationErrors } from "../../services/validatorService";
 
 const Criteria3_1_2 = () => {
+  const [validating, setValidating] = useState(false);
+const [validationResults, setValidationResults] = useState(null);
+const [showValidationModal, setShowValidationModal] = useState(false);
+const [currentValidationFile, setCurrentValidationFile] = useState(null);
   const { user } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pastFiveYears = Array.from({ length: 5 }, (_, i) => `${2024 - i}-${(2024 - i + 1).toString().slice(-2)}`);

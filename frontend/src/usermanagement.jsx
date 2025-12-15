@@ -332,20 +332,24 @@ function UserManagement() {
             {/* Filters */}
             <div className="flex gap-4 mb-6">
               <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search users by name or email..."
-                  className="w-full pl-4 pr-10 py-2 text-gray-950 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search users by name or email..."
+                    className="w-full pl-4 pr-10 py-2 text-gray-950 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <Search className="text-gray-400 w-4 h-4" />
+                  </div>
+                </div>
               </div>
               
               <div className="relative">
                 <button
                   onClick={() => setDepartmentDropdownOpen(!departmentDropdownOpen)}
-                  className="flex items-center justify-between w-48 px-4 py-2 border text-gray-950 border-gray-300 rounded-lg bg-white hover:bg-gray-50"
+                  className="flex items-center justify-between w-48 px-4 py-2 border !text-gray-950 border-gray-300 rounded-lg !bg-white hover:bg-gray-50"
                 >
                   <span className="text-sm">{departmentFilter}</span>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -371,13 +375,13 @@ function UserManagement() {
               <div className="relative">
                 <button
                   onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                  className="flex items-center justify-between w-32 px-4 py-2 border text-gray-950 border-gray-300 rounded-lg bg-white hover:bg-gray-50"
+                  className="flex items-center justify-between w-32 px-4 py-2 border !text-gray-950 border-gray-300 rounded-lg !bg-white hover:bg-gray-50"
                 >
                   <span className="text-sm">{roleFilter}</span>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
                 {roleDropdownOpen && (
-                  <div className="absolute top-full mt-1 w-32 bg-white border text-gray-950 border-gray-300 rounded-lg shadow-lg z-10">
+                  <div className="absolute top-full mt-1 w-32 !bg-white  !text-gray-950 !border-gray-300 rounded-lg shadow-lg z-10">
                     {roles.map((role) => (
                       <button
                         key={role}
@@ -385,7 +389,7 @@ function UserManagement() {
                           setRoleFilter(role);
                           setRoleDropdownOpen(false);
                         }}
-                        className="w-full bg-white text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
+                        className="w-full !bg-white text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg"
                       >
                         {role}
                       </button>

@@ -719,7 +719,7 @@ const Criteria1_1_3 = () => {
                         onClick={handleSubmit}
                         disabled={submitting}
                         className={`px-3 py-1 rounded text-white ${
-                          submitting ? 'bg-gray-400' : '!bg-blue-600 !hover:bg-blue-700'
+                          submitting ? '!bg-gray-400' : '!bg-blue-600 !hover:bg-blue-700'
                         }`}
                       >
                         {submitting ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update' : 'Save')}
@@ -773,9 +773,9 @@ const Criteria1_1_3 = () => {
                              console.log('Using year:', yearToUse);
                              
                              const uploaded = await uploadFile(
-                               "1.1.2",  // Metric ID
+                               "1.1.3",  // Metric ID
                                file,
-                               "1.1.2",  // Criteria code
+                               "1.1.3",  // Criteria code
                                yearToUse,
                                user?.session
                              );
@@ -842,7 +842,7 @@ const Criteria1_1_3 = () => {
                                };
                              });
                              // Also remove from context
-                             removeFile("1.1.2", link.id);
+                             removeFile("1.1.3", link.id);
                            }}
                            className="text-red-600 hover:text-red-800 !bg-white hover:bg-gray-100 ml-2 p-1 rounded transition-colors duration-200"
                            title="Remove file"

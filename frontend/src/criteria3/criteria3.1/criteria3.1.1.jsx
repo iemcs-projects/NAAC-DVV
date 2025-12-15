@@ -9,15 +9,20 @@ import UserDropdown from "../../components/UserDropdown";
 import { useAuth } from "../../auth/authProvider";
 import Sidebar from "../../components/sidebar";
 import Bottom from "../../components/bottom";
+import { validateDocument, isValidationPassed, formatValidationErrors } from "../../services/validatorService";
 
 const Criteria3_1_1 = () => {
-  const { user } = useAuth();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
-  const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
+const { user } = useAuth();
+const [validating, setValidating] = useState(false);
+const [validationResults, setValidationResults] = useState(null);
+const [showValidationModal, setShowValidationModal] = useState(false);
+const [currentValidationFile, setCurrentValidationFile] = useState(null);
+const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+const { uploads, uploading, uploadFile, removeFile, error: uploadError } = useUpload();
+const { sessions: availableSessions, isLoading: sessionLoading, error: sessionError } = useContext(SessionContext);
 
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editKey, setEditKey] = useState(null);
+const [isEditMode, setIsEditMode] = useState(false);
+const [editKey, setEditKey] = useState(null);
   const [editingId, setEditingId] = useState(null); // ADDED: Missing state variable
   const [currentYear, setCurrentYear] = useState(availableSessions?.[0] || "");
   const [loading, setLoading] = useState(false);
@@ -709,72 +714,371 @@ const Criteria3_1_1 = () => {
 
           {/* Upload Documents Section */}
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
-              Upload Documents
-            </label>
-            <div className="flex items-center gap-4 mb-2">
-              <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer">
-                <i className="fas fa-upload mr-2"></i> Choose Files
-                <input
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={async (e) => {
-                    const filesArray = Array.from(e.target.files);
-                    for (const file of filesArray) {
-                      try {
-                        const uploaded = await uploadFile(
-                          "criteria3_1_1",
-                          file,
-                          "3.1.1",
-                          currentYear
-                        );
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
-                        }));
-                      } catch (err) {
-                        console.error("Upload error:", err);
-                        alert(err.message || "Upload failed");
-                      }
-                    }
+  <label className="block text-gray-700 font-medium mb-2">
+    Upload Documents (with NAAC Validation)
+  </label>
+  
+  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-3">
+    <div className="flex items-start">
+      <div className="flex-shrink-0">
+        <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <div className="ml-3 flex-1">
+        <h3 className="text-sm font-medium text-blue-800">Document Validation</h3>
+        <div className="mt-2 text-sm text-blue-700">
+          <p>Each uploaded PDF will be validated against NAAC criteria 3.1.1 requirements:</p>
+          <ul className="list-disc list-inside mt-1 ml-2">
+            <li>Project name verification</li>
+            <li>Principal investigator details</li>
+            <li>Funding agency information</li>
+            <li>Sanctioned amount validation</li>
+            <li>Year of award confirmation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div className="flex items-center gap-4 mb-2">
+    <label className="bg-blue-600 text-white px-4 py-2 rounded-md cursor-pointer hover:bg-blue-700 transition-colors">
+      <i className="fas fa-upload mr-2"></i> Choose Files (PDF only)
+      <input
+        type="file"
+        className="hidden"
+        accept=".pdf"
+        multiple
+        onChange={async (e) => {
+          const filesArray = Array.from(e.target.files);
+          
+          for (const file of filesArray) {
+            try {
+              // Check if file is PDF
+              if (file.type !== 'application/pdf') {
+                alert(`${file.name} is not a PDF file. Only PDF files are supported for validation.`);
+                continue;
+              }
+
+              // Show validation status
+              setValidating(true);
+              setCurrentValidationFile(file.name);
+              
+              // Step 1: Validate the document
+              console.log(`Validating ${file.name} against criteria 3.1.1...`);
+              const validationResult = await validateDocument(file, "3.1.1");
+              
+              console.log('Validation result:', validationResult);
+              setValidationResults(validationResult);
+              
+              // Check if validation passed
+              const passed = isValidationPassed(validationResult);
+              
+              if (!passed) {
+                // Show validation errors
+                const errors = formatValidationErrors(validationResult);
+                setValidating(false);
+                setShowValidationModal(true);
+                
+                // Don't upload if validation failed
+                const shouldContinue = window.confirm(
+                  `Validation failed for ${file.name}:\n\n` +
+                  errors.map(e => `Page ${e.page}: ${e.message} (Confidence: ${(e.confidence * 100).toFixed(1)}%)`).join('\n\n') +
+                  '\n\nDo you still want to upload this file?'
+                );
+                
+                if (!shouldContinue) {
+                  console.log('Upload cancelled due to validation failure');
+                  continue;
+                }
+              } else {
+                // Validation passed
+                alert(`✓ Validation passed for ${file.name}!\nConfidence: ${(validationResult.validation_summary?.average_confidence * 100 || 0).toFixed(1)}%`);
+              }
+              
+              // Step 2: Upload the file (whether validation passed or user chose to continue)
+              setValidating(false);
+              const uploaded = await uploadFile(
+                "criteria3_1_1",
+                file,
+                "3.1.1",
+                currentYear
+              );
+              
+              setFormData(prev => ({
+                ...prev,
+                supportLinks: [...(prev.supportLinks || []), uploaded.file_url],
+              }));
+              
+              // Store validation result with the file
+              if (validationResult) {
+                localStorage.setItem(
+                  `validation_${uploaded.file_url}`,
+                  JSON.stringify({
+                    result: validationResult,
+                    timestamp: new Date().toISOString()
+                  })
+                );
+              }
+              
+            } catch (err) {
+              console.error("Upload/Validation error:", err);
+              setValidating(false);
+              setCurrentValidationFile(null);
+              
+              if (err.status === 500 || err.message?.includes('timeout')) {
+                alert(`Validation service error: ${err.message}\n\nThe file was not uploaded. Please check if the validation service is running on port 8000.`);
+              } else {
+                alert(err.message || "Upload failed");
+              }
+            }
+          }
+          
+          setValidating(false);
+          setCurrentValidationFile(null);
+        }}
+        disabled={validating || uploading}
+      />
+    </label>
+    
+    {(uploading || validating) && (
+      <div className="flex items-center gap-2">
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+        <span className="text-gray-600">
+          {validating ? `Validating ${currentValidationFile}...` : 'Uploading...'}
+        </span>
+      </div>
+    )}
+    
+    {uploadError && <span className="text-red-600">{uploadError}</span>}
+  </div>
+  
+  {/* Display validation summary if available */}
+  {validationResults && (
+    <div className={`mt-3 p-3 rounded-lg border ${
+      isValidationPassed(validationResults) 
+        ? 'bg-green-50 border-green-200' 
+        : 'bg-red-50 border-red-200'
+    }`}>
+      <h4 className={`font-semibold mb-2 ${
+        isValidationPassed(validationResults) ? 'text-green-800' : 'text-red-800'
+      }`}>
+        Latest Validation Result: {validationResults.validation_summary?.overall_status}
+      </h4>
+      <div className="text-sm">
+        <p className="text-gray-700">
+          Total Pages: {validationResults.total_pages} | 
+          Passed: {validationResults.validation_summary?.passed} | 
+          Failed: {validationResults.validation_summary?.failed}
+        </p>
+        {!isValidationPassed(validationResults) && (
+          <button
+            onClick={() => setShowValidationModal(true)}
+            className="mt-2 text-blue-600 hover:text-blue-800 underline text-sm"
+          >
+            View detailed errors
+          </button>
+        )}
+      </div>
+    </div>
+  )}
+  
+  {/* Uploaded files list */}
+  {formData.supportLinks && formData.supportLinks.length > 0 && (
+    <div className="mt-4">
+      <h4 className="font-medium text-gray-700 mb-2">Uploaded Documents:</h4>
+      <ul className="space-y-2">
+        {formData.supportLinks.map((link, index) => {
+          const storedValidation = localStorage.getItem(`validation_${link}`);
+          const validationData = storedValidation ? JSON.parse(storedValidation) : null;
+          const isPassed = validationData ? isValidationPassed(validationData.result) : null;
+          
+          return (
+            <li key={index} className="flex justify-between items-center p-2 bg-gray-50 rounded border">
+              <div className="flex items-center gap-2 flex-1">
+                {isPassed !== null && (
+                  <span className={`text-xs px-2 py-1 rounded ${
+                    isPassed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {isPassed ? '✓ Validated' : '⚠ Issues'}
+                  </span>
+                )}
+                <a
+                  href={`http://localhost:3000${link}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  {link.split("/").pop()}
+                </a>
+              </div>
+              <div className="flex gap-2">
+                {validationData && (
+                  <button
+                    onClick={() => {
+                      setValidationResults(validationData.result);
+                      setShowValidationModal(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                    title="View validation details"
+                  >
+                    <i className="fas fa-info-circle"></i>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      supportLinks: prev.supportLinks.filter(l => l !== link)
+                    }));
+                    removeFile("criteria3_1_1", link);
+                    localStorage.removeItem(`validation_${link}`);
                   }}
-                />
-              </label>
-              {uploading && <span className="text-gray-600">Uploading...</span>}
-              {uploadError && <span className="text-red-600">{uploadError}</span>}
+                  className="text-red-600 hover:text-red-800"
+                  title="Remove file"
+                >
+                  <i className="fas fa-trash"></i>
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  )}
+</div>
+
+{/* Add this Validation Results Modal before your closing divs */}
+{showValidationModal && validationResults && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      {/* Modal Header */}
+      <div className="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+        <h3 className="text-xl font-bold text-gray-800">
+          Validation Report - Criteria {validationResults.criteria_code}
+        </h3>
+        <button
+          onClick={() => setShowValidationModal(false)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <i className="fas fa-times text-xl"></i>
+        </button>
+      </div>
+      
+      {/* Modal Body */}
+      <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        {/* Summary Section */}
+        <div className={`mb-6 p-4 rounded-lg ${
+          isValidationPassed(validationResults)
+            ? 'bg-green-50 border border-green-200'
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          <h4 className={`text-lg font-semibold mb-3 ${
+            isValidationPassed(validationResults) ? 'text-green-800' : 'text-red-800'
+          }`}>
+            Overall Status: {validationResults.validation_summary?.overall_status}
+          </h4>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <span className="font-medium">Total Pages:</span>
+              <span className="ml-2">{validationResults.total_pages}</span>
             </div>
-            
-            {formData.supportLinks && formData.supportLinks.length > 0 && (
-              <ul className="list-disc pl-5 text-gray-700">
-                {formData.supportLinks.map((link, index) => (
-                  <li key={index} className="flex justify-between items-center mb-1">
-                    <a
-                      href={`http://localhost:3000${link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 underline"
-                    >
-                      {link.split("/").pop()}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          supportLinks: prev.supportLinks.filter(l => l !== link)
-                        }));
-                        removeFile("criteria3_1_1", link);
-                      }}
-                      className="text-red-600 ml-2"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div>
+              <span className="font-medium">Passed:</span>
+              <span className="ml-2 text-green-600">{validationResults.validation_summary?.passed}</span>
+            </div>
+            <div>
+              <span className="font-medium">Failed:</span>
+              <span className="ml-2 text-red-600">{validationResults.validation_summary?.failed}</span>
+            </div>
           </div>
+          <div className="mt-2 text-sm">
+            <span className="font-medium">Timestamp:</span>
+            <span className="ml-2">{new Date(validationResults.timestamp).toLocaleString()}</span>
+          </div>
+        </div>
+        
+        {/* Page Results */}
+        <div>
+          <h4 className="text-lg font-semibold mb-3 text-gray-800">Page-wise Results</h4>
+          <div className="space-y-4">
+            {validationResults.page_results?.map((page, index) => (
+              <div
+                key={index}
+                className={`border rounded-lg p-4 ${
+                  page.is_valid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <h5 className="font-semibold text-gray-800">
+                    Page {page.page_number}
+                  </h5>
+                  <span className={`px-3 py-1 rounded text-sm font-medium ${
+                    page.is_valid
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {page.is_valid ? 'Valid' : 'Invalid'}
+                  </span>
+                </div>
+                
+                {/* Confidence Score */}
+                <div className="mb-3">
+                  <span className="text-sm font-medium text-gray-700">Confidence Score: </span>
+                  <span className={`text-sm font-semibold ${
+                    page.confidence_score >= 0.8 ? 'text-green-600' : 'text-orange-600'
+                  }`}>
+                    {(page.confidence_score * 100).toFixed(1)}%
+                  </span>
+                </div>
+                
+                {/* Errors */}
+                {page.errors && page.errors.length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-sm font-medium text-red-700 mb-1">Errors:</p>
+                    <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+                      {page.errors.map((error, errIdx) => (
+                        <li key={errIdx}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {/* Matched Fields */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Field Validation:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(page.matched_fields || {}).map(([field, matched]) => (
+                      <div key={field} className="flex items-center text-sm">
+                        <span className={matched ? 'text-green-600' : 'text-red-600'}>
+                          {matched ? '✓' : '✗'}
+                        </span>
+                        <span className="ml-2 text-gray-700">
+                          {field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Modal Footer */}
+      <div className="bg-gray-100 px-6 py-4 border-t flex justify-end">
+        <button
+          onClick={() => setShowValidationModal(false)}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
           <div className="mb-6">
             <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">Submitted Entries</h2>
