@@ -30,7 +30,7 @@ router.route('/getApprovedUsers')
 
 
 router.route('/approveUser/:uuid')
-    .post(approveUser);
+    .post(verifyToken,approveUser);
 
 router.route('/rejectUser/:uuid')
     .post(rejectUser);
